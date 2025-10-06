@@ -5,3 +5,4 @@ __pycache__/
 .token*
 archive.txt
 downloads/
+credentials.json
