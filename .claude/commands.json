@@ -1,0 +1,56 @@
+[
+  {
+    "name": "python:setup",
+    "cmd": "python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt",
+    "cwd": ".",
+    "description": "Cria venv e instala dependências do script"
+  },
+  {
+    "name": "python:download:HLS (com cookies)",
+    "cmd": "source .venv/bin/activate && python main.py download \"${URL}\" --out-dir ./downloads --path \"${PATH}\" --file-name \"${FILE}\" --archive-id \"${ARCHIVE}\" --referer \"${REFERER}\" --origin \"${ORIGIN}\" --cookies-file ./cookies.txt --concurrent-fragments 10 --fmt \"bestvideo+bestaudio/best\"",
+    "cwd": ".",
+    "description": "Baixa um HLS protegido por sessão (preencha as variáveis)"
+  },
+  {
+    "name": "python:download:YouTube",
+    "cmd": "source .venv/bin/activate && python main.py download \"${URL}\" --out-dir ./downloads --workers 2 --fmt \"bestvideo+bestaudio/best\"",
+    "cwd": ".",
+    "description": "Baixa de YouTube padrão"
+  },
+  {
+    "name": "ui:dev",
+    "cmd": "npm run dev",
+    "cwd": "yt-archiver-ui",
+    "description": "Sobe o Vite dev server"
+  },
+  {
+    "name": "ui:build",
+    "cmd": "npm run build",
+    "cwd": "yt-archiver-ui",
+    "description": "Build de produção da UI"
+  },
+  {
+    "name": "ui:shadcn:init",
+    "cmd": "npx shadcn-ui@latest init -d -y",
+    "cwd": "yt-archiver-ui",
+    "description": "Inicializa shadcn/ui no projeto Vite"
+  },
+  {
+    "name": "ui:shadcn:add:core",
+    "cmd": "npx shadcn-ui@latest add button card input label select textarea dropdown-menu toast dialog popover",
+    "cwd": "yt-archiver-ui",
+    "description": "Adiciona componentes base do shadcn/ui"
+  },
+  {
+    "name": "servers:python:run (MCP)",
+    "cmd": "source ../../.venv/bin/activate && python downloader_server.py",
+    "cwd": "servers/python",
+    "description": "Executa MCP server Python (stdio)"
+  },
+  {
+    "name": "servers:node:run (MCP)",
+    "cmd": "npm i && npx tsx frontend_server.ts",
+    "cwd": "servers/node",
+    "description": "Executa MCP server Node/TS (stdio)"
+  }
+]

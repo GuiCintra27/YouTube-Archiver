@@ -1,0 +1,40 @@
+{
+  "projectName": "yt-archiver",
+  "readmePath": "CLAUDE.md",
+  "shell": "bash",
+  "askBeforeWrite": true,
+  "ignoredPaths": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.venv/**",
+    "**/.git/**",
+    "**/.cache/**"
+  ],
+  "workingDirectories": [
+    {
+      "label": "python",
+      "path": "."
+    },
+    {
+      "label": "ui",
+      "path": "yt-archiver-ui"
+    },
+    {
+      "label": "servers:python",
+      "path": "servers/python"
+    },
+    {
+      "label": "servers:node",
+      "path": "servers/node"
+    }
+  ],
+  "style": {
+    "typescript": {
+      "preferTypeImports": true
+    },
+    "python": {
+      "version": "3.12",
+      "formatter": "black"
+    }
+  }
+}

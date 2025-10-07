@@ -1,0 +1,46 @@
+{
+  "mcpServers": {
+    "python": {
+      "command": "uvx",
+      "args": ["mcp-server-python"],
+      "description": "Python code execution and environment management"
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/guilherme-cintra"],
+      "description": "File system operations and management"
+    },
+    "git": {
+      "command": "uvx",
+      "args": ["mcp-server-git", "--repository", "."],
+      "description": "Git repository management and operations"
+    },
+    "sqlite": {
+      "command": "uvx",
+      "args": ["mcp-server-sqlite", "--db-path", "./database.db"],
+      "description": "SQLite database operations (useful for data storage)"
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "description": "Persistent memory for storing context between sessions"
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--headless=true",
+        "--isolated=true"
+      ]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your_github_token_here"
+      },
+      "description": "GitHub API integration for repository management"
+    }
+  }
+}
