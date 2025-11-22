@@ -493,9 +493,41 @@ Contribuições são bem-vindas!
 
 1. Fork o projeto
 2. Crie uma branch para sua feature (`git checkout -b feature/MinhaFeature`)
-3. Commit suas mudanças (`git commit -m 'Adiciona MinhaFeature'`)
+3. Commit suas mudanças usando Commitizen (veja abaixo)
 4. Push para a branch (`git push origin feature/MinhaFeature`)
 5. Abra um Pull Request
+
+### 📝 Commits Convencionais (Commitizen)
+
+Este projeto usa [Commitizen](https://github.com/commitizen/cz-cli) para padronizar mensagens de commit seguindo a convenção [Conventional Commits](https://www.conventionalcommits.org/).
+
+**Setup inicial (primeira vez):**
+```bash
+# Na raiz do repositório
+npm install
+```
+
+**Como fazer commits:**
+```bash
+# Opção 1: Usando o script npm
+npm run commit
+
+# Opção 2: Usando npx
+npx cz
+
+# Opção 3: Usando git-cz (se instalado globalmente)
+git cz
+```
+
+O Commitizen irá guiá-lo através de um wizard interativo para criar commits padronizados:
+- **feat**: Nova funcionalidade
+- **fix**: Correção de bug
+- **docs**: Alterações na documentação
+- **style**: Formatação, ponto e vírgula, etc (sem mudanças de código)
+- **refactor**: Refatoração de código
+- **perf**: Melhorias de performance
+- **test**: Adição ou correção de testes
+- **chore**: Tarefas de build, configurações, etc
 
 ### Áreas de melhoria
 

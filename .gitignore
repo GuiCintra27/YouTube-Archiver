@@ -2,3 +2,7 @@ cookies.txt
 credentials.json
 token.json
 uploaded.jsonl
+
+# Node.js (Commitizen na raiz)
+node_modules/
+package-lock.json

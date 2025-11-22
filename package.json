@@ -1,5 +1,12 @@
 {
+  "name": "yt-archiver",
+  "version": "2.0.0",
+  "description": "Sistema completo de download e arquivamento de vídeos do YouTube com interface web e integração com Google Drive",
+  "scripts": {
+    "commit": "cz"
+  },
   "devDependencies": {
+    "commitizen": "^4.3.1",
     "cz-conventional-changelog": "^3.3.0"
   },
   "config": {

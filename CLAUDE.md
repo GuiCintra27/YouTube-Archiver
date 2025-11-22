@@ -199,6 +199,22 @@ lsof -ti:8000 | xargs kill -9
 cd backend && ./run.sh
 ```
 
+### Git e Commits (Commitizen)
+```bash
+# Setup inicial (primeira vez na raiz do projeto)
+npm install
+
+# Fazer commits usando Commitizen
+npm run commit       # Opção 1 (recomendado)
+npx cz              # Opção 2
+git cz              # Opção 3 (se instalado globalmente)
+
+# O wizard interativo irá guiar a criação de commits padronizados
+# seguindo a convenção Conventional Commits (feat, fix, docs, etc.)
+```
+
+**IMPORTANTE:** O Commitizen requer `node_modules` instalado na raiz. Se não funcionar, rode `npm install` primeiro.
+
 ---
 
 ## 🚨 Gotchas Importantes
