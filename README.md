@@ -1,15 +1,14 @@
 # YT-Archiver
 
-Sistema completo para download e arquivamento de vídeos do YouTube e streams HLS (sem DRM), com suporte opcional a upload automático para Google Drive.
+Sistema completo para download e arquivamento de vídeos do YouTube e streams HLS (sem DRM), com interface web moderna e integração opcional com Google Drive.
 
 ## 📋 Visão Geral
 
-O YT-Archiver é uma ferramenta que combina:
+O YT-Archiver combina uma API REST robusta com uma interface web moderna para facilitar o download e gerenciamento de vídeos:
 
-- **Script Python** (`python/main.py`): CLI poderosa baseada em `yt-dlp` para download de vídeos
-- **API REST** (`backend/`): FastAPI com endpoints para integração web
-- **Interface Web Moderna** (`web-ui/`): Next.js 15 com shadcn/ui para download visual e intuitivo
-- **Frontend CLI Generator** (`frontend/`): Interface web para geração de comandos CLI
+- **API REST** (`backend/`): FastAPI com sistema de jobs assíncronos e integração com Google Drive
+- **Interface Web** (`web-ui/`): Next.js 15 + shadcn/ui para uma experiência visual intuitiva
+- **Motor de Download**: yt-dlp para downloads de YouTube, playlists e streams HLS
 
 ### Principais Funcionalidades
 
@@ -17,350 +16,369 @@ O YT-Archiver é uma ferramenta que combina:
 - ✅ Suporte a streams HLS (M3U8) sem DRM
 - ✅ Headers customizados (Referer, Origin, User-Agent)
 - ✅ Cookies personalizados via arquivo Netscape
-- ✅ Upload automático para Google Drive com espelhamento de estrutura de pastas
+- ✅ **Biblioteca de vídeos local** - Visualize, reproduza e gerencie vídeos baixados
+- ✅ **Sincronização com Google Drive** - Upload, visualização e streaming de vídeos no Drive
+- ✅ **Sistema de jobs assíncronos** - Downloads em background com progresso em tempo real
 - ✅ Sistema de arquivamento para evitar downloads duplicados
-- ✅ Download paralelo com workers
 - ✅ Controle de qualidade e formato de saída
+- ✅ Rate limiting configurável (anti-ban para playlists grandes)
 - ✅ Extração de áudio (MP3)
-- ✅ Download de legendas e miniaturas
-- ✅ Nomes de arquivo customizados
-- ✅ Interface web moderna com progresso em tempo real
-- ✅ API REST para integração com outras aplicações
+- ✅ Download de legendas, miniaturas e metadados
+- ✅ Nomes de arquivo e caminhos customizados
+- ✅ API REST completa para integração
 
 ---
 
-## 🌐 Interface Web Moderna
-
-**Novidade!** Agora você pode usar o YT-Archiver através de uma interface web moderna e intuitiva.
-
-### Início Rápido (Web UI)
-
-```bash
-# Executar script de desenvolvimento (Linux/Mac)
-./start-dev.sh
-
-# Ou no Windows
-start-dev.bat
-```
-
-Acesse: **http://localhost:3000**
-
-Para mais detalhes sobre a interface web, consulte [WEB-UI-README.md](./WEB-UI-README.md)
-
-### Funcionalidades da Interface Web
-
-- ✨ Interface moderna e responsiva com Next.js
-- 📊 Barra de progresso em tempo real
-- ⚙️ Todas as opções avançadas acessíveis via formulário
-- 🎯 Design intuitivo para usuários não-técnicos
-- 🔄 Feedback visual de sucesso/erro
-- 📱 Compatível com mobile
-
----
-
-## 🚀 Início Rápido (CLI)
+## 🚀 Início Rápido
 
 ### Pré-requisitos
 
 - Python 3.12+
+- Node.js 18+ e npm
 - ffmpeg instalado no sistema
-- (Opcional) Node.js 18+ para executar o frontend
 
-### Instalação
+### Instalação e Execução
 
-#### 1. Clone o repositório
+#### Opção 1: Script Automático (Recomendado)
 
 ```bash
-git clone <seu-repositorio>
-cd yt-archiver
+# Linux/Mac
+./start-dev.sh
+
+# Windows
+start-dev.bat
 ```
 
-#### 2. Configure o ambiente Python
+Isso irá:
+1. Configurar e ativar o ambiente virtual do backend
+2. Instalar dependências Python
+3. Iniciar o backend na porta 8000
+4. Iniciar o frontend na porta 3000
 
+**Acesse:** http://localhost:3000
+
+#### Opção 2: Manual
+
+**Backend:**
 ```bash
-cd python
-python -m venv .venv
-source .venv/bin/activate  # No Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+cd backend
+./run.sh  # Ou: source .venv/bin/activate && python api.py
 ```
 
-#### 3. (Opcional) Configure o Frontend
-
+**Frontend:**
 ```bash
-cd frontend
+cd web-ui
 npm install
 npm run dev
 ```
 
----
-
-## 📖 Uso do Script Python
-
-### Comandos Básicos
-
-#### Listar vídeos de uma playlist
-
-```bash
-python main.py list "https://www.youtube.com/playlist?list=PLx..."
-```
-
-#### Download simples de um vídeo
-
-```bash
-python main.py download "https://www.youtube.com/watch?v=..."
-```
-
-#### Download de playlist completa
-
-```bash
-python main.py download "https://www.youtube.com/playlist?list=PLx..." \
-  --out-dir ./downloads \
-  --workers 3
-```
-
-### Exemplos Avançados
-
-#### Download de stream HLS com headers customizados
-
-```bash
-python main.py download "https://example.com/playlist.m3u8" \
-  --referer "https://example.com" \
-  --origin "https://example.com" \
-  --cookies-file ./cookies.txt \
-  --concurrent-fragments 10
-```
-
-#### Download com nome e caminho customizados
-
-```bash
-python main.py download "https://example.com/aula.m3u8" \
-  --path "Curso/Módulo 01" \
-  --file-name "Aula 01 - Introdução" \
-  --archive-id "aula-01"
-```
-
-#### Extrair apenas áudio em MP3
-
-```bash
-python main.py download "https://www.youtube.com/watch?v=..." \
-  --audio-only \
-  --out-dir ./music
-```
-
-#### Download com upload automático para Google Drive
-
-```bash
-python main.py download "https://www.youtube.com/playlist?list=..." \
-  --drive-upload \
-  --drive-root "MeusVideos" \
-  --drive-credentials ./credentials.json
-```
+**Acesse:**
+- Interface Web: http://localhost:3000
+- API: http://localhost:8000
+- Documentação da API: http://localhost:8000/docs
 
 ---
 
-## ⚙️ Parâmetros da CLI
+## 🌐 Interface Web
 
-### Comando `download`
+### Funcionalidades da UI
 
-| Parâmetro        | Tipo | Padrão          | Descrição                                            |
-| ---------------- | ---- | --------------- | ---------------------------------------------------- |
-| `source`         | str  | _obrigatório_   | URL do vídeo/playlist/canal ou arquivo .txt com URLs |
-| `--out-dir`      | str  | `./downloads`   | Diretório de saída para downloads                    |
-| `--archive-file` | str  | `./archive.txt` | Arquivo para rastrear downloads e evitar duplicatas  |
-| `--fmt`          | str  | `bv*+ba/b`      | Seletor de formato do yt-dlp                         |
-| `--max-res`      | int  | `None`          | Limita altura máxima do vídeo (ex: 1080)             |
-| `--subs`         | bool | `True`          | Baixar legendas                                      |
-| `--auto-subs`    | bool | `True`          | Baixar legendas automáticas                          |
-| `--sub-langs`    | str  | `pt,en`         | Idiomas de legendas (separados por vírgula)          |
-| `--thumbnails`   | bool | `True`          | Baixar miniaturas                                    |
-| `--audio-only`   | bool | `False`         | Extrair apenas áudio (MP3)                           |
-| `--workers`      | int  | `1`             | Número de downloads paralelos                        |
-| `--limit`        | int  | `None`          | Limitar número de itens de playlist/canal            |
-| `--dry-run`      | bool | `False`         | Simular sem baixar                                   |
+**Página Principal (`/`):**
+- 📥 Formulário de download com todas as opções configuráveis
+- 📊 Barra de progresso em tempo real durante downloads
+- 📚 Biblioteca de vídeos locais com thumbnails
+- ▶️ Player de vídeo integrado (Plyr)
+- 🗑️ Exclusão de vídeos com limpeza automática de arquivos relacionados
+- ⚙️ Opções avançadas: headers, cookies, rate limiting, nomenclatura customizada
 
-### Headers e Cookies
+**Página Google Drive (`/drive`):**
+- ☁️ Autenticação OAuth2 com Google Drive
+- 📂 Visualização de vídeos sincronizados no Drive
+- ⬆️ Upload individual ou em lote de vídeos locais
+- 🔄 Painel de sincronização mostrando diferenças entre local e Drive
+- ▶️ Streaming direto do Google Drive com suporte a seek/skip
+- 🗑️ Exclusão de vídeos do Drive
 
-| Parâmetro                | Tipo | Padrão        | Descrição                                           |
-| ------------------------ | ---- | ------------- | --------------------------------------------------- |
-| `--cookies-file`         | str  | `None`        | Caminho para arquivo cookies.txt (formato Netscape) |
-| `--referer`              | str  | `None`        | Header Referer customizado                          |
-| `--origin`               | str  | `None`        | Header Origin customizado                           |
-| `--user-agent`           | str  | `yt-archiver` | Header User-Agent                                   |
-| `--concurrent-fragments` | int  | `10`          | Fragmentos HLS simultâneos                          |
-
-### Nomenclatura Customizada
-
-| Parâmetro      | Tipo | Padrão | Descrição                                  |
-| -------------- | ---- | ------ | ------------------------------------------ |
-| `--path`       | str  | `None` | Subpasta relativa ao `--out-dir`           |
-| `--file-name`  | str  | `None` | Nome base do arquivo (extensão automática) |
-| `--archive-id` | str  | `None` | ID manual para controle de duplicatas      |
-
-### Google Drive
-
-| Parâmetro             | Tipo | Padrão               | Descrição                       |
-| --------------------- | ---- | -------------------- | ------------------------------- |
-| `--drive-upload`      | bool | `False`              | Ativar upload para Google Drive |
-| `--drive-root`        | str  | `YouTubeArchive`     | Nome da pasta raiz no Drive     |
-| `--drive-credentials` | str  | `./credentials.json` | Credenciais OAuth do Google     |
-| `--drive-token`       | str  | `./token.json`       | Cache do token OAuth            |
-| `--uploaded-log`      | str  | `./uploaded.jsonl`   | Log de arquivos já enviados     |
+**Recursos da Interface:**
+- ✨ Design moderno e responsivo (Next.js 15 + Tailwind CSS)
+- 🎨 Componentes shadcn/ui (Radix UI primitives)
+- 📱 Compatível com desktop e mobile
+- 🌙 Suporte a tema escuro (via sistema)
+- 🔔 Feedback visual de sucesso/erro
+- ⚡ Atualizações de progresso em tempo real via polling
 
 ---
 
-## 🔐 Configuração do Google Drive
+## 📖 Uso
 
-### 1. Criar projeto no Google Cloud Console
+### Download Básico
 
-1. Acesse [Google Cloud Console](https://console.cloud.google.com/)
-2. Crie um novo projeto
-3. Ative a **Google Drive API**
-4. Crie credenciais OAuth 2.0 (tipo "Desktop app")
-5. Baixe o JSON de credenciais e salve como `credentials.json`
+1. Acesse http://localhost:3000
+2. Selecione o tipo (Vídeo Único ou Playlist)
+3. Cole a URL do YouTube
+4. (Opcional) Configure opções avançadas
+5. Clique em "Baixar"
+6. Acompanhe o progresso em tempo real
+7. Vídeo aparecerá automaticamente na biblioteca
 
-### 2. Primeira autenticação
+### Opções Avançadas
 
-```bash
-python main.py download "URL" --drive-upload
-```
+**Configurações de Qualidade:**
+- Resolução máxima (altura em pixels)
+- Apenas áudio (extração MP3)
+- Download de legendas e miniaturas
 
-O navegador abrirá automaticamente para autorização. Após autorizar, o token será salvo em `token.json`.
+**Nomenclatura Customizada:**
+- Subpasta personalizada (ex: `Curso/Módulo 01`)
+- Nome do arquivo customizado (ex: `Aula 01 - Introdução`)
 
----
+**Headers HTTP:**
+- Referer customizado
+- Origin customizado
+- Arquivo de cookies (formato Netscape)
 
-## 📁 Estrutura de Pastas
+**Proteção Anti-Ban (para playlists grandes):**
+- Delay entre vídeos (recomendado: 2-5s)
+- Agrupamento em batches (ex: 5 vídeos por batch)
+- Delay entre batches (recomendado: 10-30s)
+- Randomização de delays (simula comportamento humano)
+- **Presets:** Seguro, Moderado, Rápido
 
-### Padrão de Nomenclatura
+### Google Drive Integration
 
-Quando `--path` e `--file-name` **não** são especificados:
+**Configuração Inicial:**
 
-```
-downloads/
-  └── NomeDoCanal/
-      └── NomePlaylist/
-          └── 2024-01-15 - Título do Vídeo [VIDEO_ID].mp4
-```
+1. Siga o guia completo: **[GOOGLE-DRIVE-SETUP.md](./GOOGLE-DRIVE-SETUP.md)**
+2. Resumo rápido:
+   - Criar projeto no Google Cloud Console
+   - Ativar Google Drive API
+   - Criar credenciais OAuth 2.0 (Desktop app)
+   - Baixar `credentials.json` → `backend/credentials.json`
 
-Quando `--path` e `--file-name` **são** especificados:
+**Usando o Drive:**
 
-```
-downloads/
-  └── Curso/
-      └── Módulo 01/
-          └── Aula 01 - Introdução.mp4
-```
-
-### Espelhamento no Google Drive
-
-A estrutura de pastas local é espelhada no Google Drive:
-
-```
-GoogleDrive/
-  └── MeusVideos/  (--drive-root)
-      └── Curso/
-          └── Módulo 01/
-              └── Aula 01 - Introdução.mp4
-```
-
----
-
-## 🐳 Usando Docker
-
-### Build da imagem
-
-```bash
-cd python
-docker build -t yt-archiver .
-```
-
-### Executar com Docker
-
-```bash
-docker run --rm -v $(pwd)/downloads:/downloads yt-archiver \
-  download "https://www.youtube.com/watch?v=..." \
-  --out-dir /downloads
-```
-
-### Com cookies e credenciais
-
-```bash
-docker run --rm \
-  -v $(pwd)/downloads:/downloads \
-  -v $(pwd)/cookies.txt:/app/cookies.txt \
-  -v $(pwd)/credentials.json:/app/credentials.json \
-  yt-archiver download "URL" \
-  --cookies-file /app/cookies.txt \
-  --drive-upload
-```
+1. Acesse http://localhost:3000/drive
+2. Clique em "Conectar com Google Drive"
+3. Autorize o aplicativo no navegador
+4. Gerencie vídeos:
+   - 📤 Upload individual ou sincronização completa
+   - 📊 Visualize status de sincronização
+   - ▶️ Reproduza vídeos diretamente do Drive
+   - 🗑️ Exclua vídeos do Drive
 
 ---
 
-## 🛠️ Desenvolvimento
+## 🔌 API REST
 
-### Estrutura do Projeto
+A API FastAPI oferece endpoints completos para integração:
+
+### Endpoints de Download
+
+**POST** `/api/download` - Inicia um download em background
+```json
+{
+  "url": "https://www.youtube.com/watch?v=...",
+  "max_res": 1080,
+  "subs": true,
+  "audio_only": false,
+  "path": "Curso/Modulo 01",
+  "file_name": "Aula 01",
+  "delay_between_downloads": 3,
+  "batch_size": 5,
+  "randomize_delay": true
+}
+```
+
+**GET** `/api/jobs/{job_id}` - Obtém status e progresso de um job
+
+**GET** `/api/jobs` - Lista todos os jobs
+
+**POST** `/api/jobs/{job_id}/cancel` - Cancela um download em andamento
+
+**DELETE** `/api/jobs/{job_id}` - Remove um job do histórico
+
+**POST** `/api/video-info` - Obtém informações de um vídeo sem baixar
+
+### Endpoints de Biblioteca Local
+
+**GET** `/api/videos` - Lista vídeos baixados localmente
+
+**GET** `/api/videos/stream/{video_path}` - Stream de vídeo local (com range requests)
+
+**GET** `/api/videos/thumbnail/{thumbnail_path}` - Serve thumbnail de vídeo local
+
+**DELETE** `/api/videos/{video_path}` - Exclui vídeo e arquivos relacionados
+
+### Endpoints Google Drive
+
+**GET** `/api/drive/auth-status` - Verifica status de autenticação
+
+**GET** `/api/drive/auth-url` - Gera URL de autenticação OAuth
+
+**GET** `/api/drive/oauth2callback?code=...` - Callback OAuth (troca código por token)
+
+**GET** `/api/drive/videos` - Lista vídeos no Google Drive
+
+**POST** `/api/drive/upload/{video_path}` - Upload de vídeo local para Drive
+
+**GET** `/api/drive/sync-status` - Status de sincronização (local vs Drive)
+
+**POST** `/api/drive/sync-all` - Sincroniza todos os vídeos locais para Drive
+
+**GET** `/api/drive/stream/{file_id}` - Stream de vídeo do Drive (com range requests)
+
+**GET** `/api/drive/thumbnail/{file_id}` - Thumbnail de vídeo do Drive
+
+**DELETE** `/api/drive/videos/{file_id}` - Remove vídeo do Drive
+
+**Documentação Interativa:** http://localhost:8000/docs
+
+---
+
+## 📁 Estrutura do Projeto
 
 ```
 yt-archiver/
-├── python/
-│   ├── main.py              # Script principal
-│   ├── requirements.txt     # Dependências Python
-│   ├── Dockerfile          # Imagem Docker
-│   └── .venv/              # Ambiente virtual Python
-├── frontend/               # UI React (opcional)
+├── backend/                 # API FastAPI
+│   ├── api.py              # API principal com endpoints
+│   ├── downloader.py       # Lógica de download (yt-dlp wrapper)
+│   ├── drive_manager.py    # Gerenciamento do Google Drive
+│   ├── requirements.txt    # Dependências Python
+│   ├── run.sh             # Script para iniciar backend com venv
+│   ├── .venv/             # Ambiente virtual Python
+│   ├── downloads/         # Vídeos baixados (padrão)
+│   ├── archive.txt        # Controle de downloads
+│   ├── credentials.json   # Credenciais OAuth Google (gitignored)
+│   └── token.json         # Token OAuth (gitignored)
+│
+├── web-ui/                 # Interface Next.js
 │   ├── src/
+│   │   ├── app/           # App Router (Next.js 15)
+│   │   │   ├── page.tsx          # Página principal
+│   │   │   ├── drive/page.tsx    # Página Google Drive
+│   │   │   ├── layout.tsx        # Layout raiz
+│   │   │   └── globals.css       # Estilos globais
+│   │   ├── components/    # Componentes React
+│   │   │   ├── download-form.tsx       # Formulário de download
+│   │   │   ├── video-grid.tsx          # Grid de vídeos locais
+│   │   │   ├── video-player.tsx        # Player de vídeo
+│   │   │   ├── drive-auth.tsx          # Autenticação Drive
+│   │   │   ├── drive-video-grid.tsx    # Grid de vídeos do Drive
+│   │   │   ├── sync-panel.tsx          # Painel de sincronização
+│   │   │   ├── navigation.tsx          # Navegação entre páginas
+│   │   │   └── ui/                     # Componentes shadcn/ui
+│   │   └── lib/           # Utilitários
+│   │       ├── utils.ts             # Funções helper
+│   │       └── url-validator.ts     # Validação de URLs
 │   ├── package.json
-│   └── vite.config.ts
-├── CLAUDE.md              # Instruções para Claude Code
-└── README.md              # Esta documentação
+│   └── next.config.ts
+│
+├── start-dev.sh           # Script de início rápido (Linux/Mac)
+├── start-dev.bat          # Script de início rápido (Windows)
+├── CLAUDE.md             # Instruções para Claude Code
+├── GOOGLE-DRIVE-SETUP.md # Guia de configuração do Drive
+├── GOOGLE-DRIVE-FEATURES.md # Documentação de features do Drive
+└── README.md             # Esta documentação
 ```
 
-### Tecnologias Utilizadas
+---
 
-**Backend (Python):**
+## 🔧 Tecnologias
 
-- `yt-dlp`: Motor de download
-- `typer`: Framework CLI
-- `rich`: Interface colorida no terminal
-- `google-api-python-client`: Integração com Google Drive
-- `ffmpeg`: Processamento de vídeo/áudio
+### Backend
+- **FastAPI** - Framework web assíncrono
+- **yt-dlp** - Motor de download de vídeos
+- **Uvicorn** - Servidor ASGI
+- **Google API Client** - Integração com Google Drive
+- **Pydantic** - Validação de dados
 
-**Frontend (React):**
+### Frontend
+- **Next.js 15** - Framework React com App Router
+- **TypeScript** - Type safety
+- **Tailwind CSS** - Utility-first CSS
+- **shadcn/ui** - Componentes acessíveis (Radix UI)
+- **Plyr** - Player de vídeo HTML5
+- **Lucide React** - Ícones
 
-- Vite
-- React + TypeScript
-- Tailwind CSS
-- shadcn/ui (componentes)
+### Infraestrutura
+- **ffmpeg** - Processamento de vídeo/áudio (requerido)
+- **Python 3.12+** - Runtime backend
+- **Node.js 18+** - Runtime frontend
 
 ---
 
 ## 📝 Sistema de Arquivamento
 
-### Arquivo `archive.txt`
+### Controle de Duplicatas
 
-O yt-dlp mantém um registro de vídeos baixados para evitar duplicatas:
+O arquivo `backend/archive.txt` mantém registro de vídeos baixados:
 
 ```
-youtube VIDEO_ID1
-youtube VIDEO_ID2
-custom aula-01
+youtube dQw4w9WgXcQ
+youtube j8PxqgliIno
+custom aula-01-introducao
 ```
 
-### Comportamento
+**Comportamento:**
+- Downloads do YouTube são automaticamente registrados por ID de vídeo
+- Com `--archive-id` (via opção customizada), você pode definir IDs manuais
+- Vídeos já registrados são pulados automaticamente
+- Ao excluir um vídeo pela interface, o registro é removido do archive
 
-- **Padrão**: yt-dlp registra automaticamente cada vídeo baixado
-- **Com `--archive-id`**: sistema customizado que:
-  - Desativa o registro automático do yt-dlp
-  - Usa o ID fornecido para controle manual
-  - Útil para streams HLS sem ID do YouTube
+---
+
+## 📂 Estrutura de Pastas
+
+### Padrão de Nomenclatura
+
+**Sem customização:**
+```
+backend/downloads/
+└── NomeDoCanal/
+    └── NomePlaylist/
+        └── 2024-01-15 - Título do Vídeo [VIDEO_ID].mp4
+        └── 2024-01-15 - Título do Vídeo [VIDEO_ID].jpg
+        └── 2024-01-15 - Título do Vídeo [VIDEO_ID].pt-BR.vtt
+        └── 2024-01-15 - Título do Vídeo [VIDEO_ID].info.json
+```
+
+**Com path e file_name customizados:**
+```
+backend/downloads/
+└── Curso/
+    └── Módulo 01/
+        └── Aula 01 - Introdução.mp4
+        └── Aula 01 - Introdução.jpg
+        └── Aula 01 - Introdução.info.json
+```
+
+### Espelhamento no Google Drive
+
+A estrutura de pastas local é preservada no Drive:
+
+```
+Google Drive/
+└── YouTube Archiver/        (pasta raiz criada automaticamente)
+    └── Curso/
+        └── Módulo 01/
+            ├── Aula 01 - Introdução.mp4
+            ├── Aula 01 - Introdução.jpg
+            └── Aula 01 - Introdução.info.json
+```
+
+**Nota:** Thumbnails, legendas e metadados (.info.json) são automaticamente enviados junto com o vídeo.
 
 ---
 
 ## 🍪 Usando Cookies
 
+### Quando usar
+
+Necessário para conteúdo que requer autenticação (vídeos privados, conteúdo premium, etc).
+
 ### Exportar cookies do navegador
 
-Use extensões como:
-
+Use extensões:
 - **Chrome/Edge**: [Get cookies.txt LOCALLY](https://chrome.google.com/webstore/detail/get-cookiestxt-locally/)
 - **Firefox**: [cookies.txt](https://addons.mozilla.org/firefox/addon/cookies-txt/)
 
@@ -368,59 +386,62 @@ Use extensões como:
 
 ```
 # Netscape HTTP Cookie File
-.example.com	TRUE	/	FALSE	1735689600	session_id	abc123
+.youtube.com	TRUE	/	FALSE	1735689600	CONSENT	YES+
+.youtube.com	TRUE	/	TRUE	1735689600	__Secure-1PSID	xxx...
 ```
 
 ### Uso
 
-```bash
-python main.py download "URL" --cookies-file ./cookies.txt
-```
+1. Exporte cookies do site desejado
+2. Salve como `cookies.txt` no backend
+3. Na interface web, configure "Arquivo de Cookies" como `./cookies.txt`
 
 ---
 
-## ⚠️ Limitações e Notas
+## ⚠️ Limitações e Boas Práticas
 
 ### DRM
 
-Este projeto **NÃO** suporta conteúdo protegido por DRM (Widevine, FairPlay, etc.). Apenas streams HLS não criptografados são suportados.
+Este projeto **NÃO** suporta conteúdo protegido por DRM (Widevine, FairPlay, PlayReady). Apenas streams não criptografados são suportados.
 
 ### Rate Limiting
 
-Ao baixar grandes quantidades de vídeos:
+Para evitar bloqueios ao baixar playlists grandes:
 
-- Use `--workers` com cautela (máx. 3-5)
-- Considere adicionar delays entre requests
-- Respeite os termos de serviço das plataformas
+✅ **Recomendado:**
+- Use o preset "Seguro" (delay 5s, batch 5, delay entre batches 30s)
+- Ative "Randomizar Delays"
+- Evite baixar mais de 50-100 vídeos de uma vez
+
+⚠️ **Evite:**
+- Preset "Rápido" para playlists grandes
+- Downloads paralelos massivos (a UI usa 1 worker)
+- Ignorar termos de serviço das plataformas
 
 ### Espaço em Disco
 
-- Vídeos em alta qualidade ocupam muito espaço
-- Use `--max-res` para limitar qualidade
-- Configure limpeza automática ou use `--drive-upload` + exclusão local
+- Vídeos em alta qualidade (1080p+) ocupam muito espaço
+- Use "Resolução Máxima" para limitar (ex: 720)
+- Configure upload automático para Drive e exclua localmente
+- Monitore espaço disponível regularmente
 
 ---
 
-## 🤝 Contribuindo
+## 🐛 Troubleshooting
 
-1. Fork o projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
+### "Erro ao conectar com o servidor"
 
----
+**Solução:**
+```bash
+cd backend
+./run.sh  # Certifique-se de que o backend está rodando
+```
 
-## 📄 Licença
+Verifique se http://localhost:8000 responde.
 
-Este projeto é fornecido "como está", sem garantias. Use por sua conta e risco, respeitando os direitos autorais e termos de serviço das plataformas de origem.
+### "ffmpeg not found"
 
----
-
-## 🆘 Troubleshooting
-
-### Erro: "ffmpeg not found"
-
+**Instalação:**
 ```bash
 # Ubuntu/Debian
 sudo apt install ffmpeg
@@ -429,35 +450,81 @@ sudo apt install ffmpeg
 brew install ffmpeg
 
 # Windows
-# Baixe de https://ffmpeg.org/download.html
+# Baixe de https://ffmpeg.org/download.html e adicione ao PATH
 ```
 
-### Erro: "No video formats found"
+### "No video formats found"
 
-- Verifique se a URL está acessível
-- Tente adicionar `--cookies-file` se o conteúdo requer login
-- Verifique se não há proteção DRM
+**Possíveis causas:**
+- URL inacessível ou inválida
+- Conteúdo protegido por DRM
+- Requer cookies (tente adicionar cookies.txt)
+- Site não suportado pelo yt-dlp
 
 ### Upload para Drive falha
 
-- Verifique se `credentials.json` é válido
-- Delete `token.json` e reautentique
-- Confirme que a API do Google Drive está ativada
+**Soluções:**
+1. Verifique se `backend/credentials.json` existe e é válido
+2. Delete `backend/token.json` e reautentique
+3. Confirme que a Google Drive API está ativada no console
+4. Verifique logs do backend para erros detalhados
 
 ### Downloads muito lentos
 
-- Aumente `--concurrent-fragments` (padrão: 10, tente 15-20)
-- Use `--workers` para paralelizar múltiplos vídeos
+**Otimizações:**
+- Configure "Resolução Máxima" menor (720p em vez de 1080p)
 - Verifique sua conexão de internet
+- Tente outro horário (pode ser throttling do provedor)
+- Use `concurrent_fragments` maior (padrão é 10, tente 15-20 via API)
+
+### Vídeos não aparecem na biblioteca
+
+**Checklist:**
+1. Aguarde o download completar (veja progresso)
+2. Verifique se estão em `backend/downloads/`
+3. Atualize a página (F5)
+4. Verifique console do navegador para erros
+
+---
+
+## 🤝 Contribuindo
+
+Contribuições são bem-vindas!
+
+1. Fork o projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/MinhaFeature`)
+3. Commit suas mudanças (`git commit -m 'Adiciona MinhaFeature'`)
+4. Push para a branch (`git push origin feature/MinhaFeature`)
+5. Abra um Pull Request
+
+### Áreas de melhoria
+
+- [ ] Suporte a mais plataformas além do YouTube
+- [ ] Sistema de filas mais robusto (com prioridades)
+- [ ] Testes automatizados (backend e frontend)
+- [ ] Docker Compose para deploy simplificado
+- [ ] Suporte a múltiplos usuários (autenticação)
+- [ ] Compressão automática de vídeos
+- [ ] Notificações push quando downloads completam
+
+---
+
+## 📄 Licença
+
+Este projeto é fornecido "como está", sem garantias. Use por sua conta e risco.
+
+**Importante:** Respeite direitos autorais e termos de serviço das plataformas. Este projeto é destinado para arquivamento ético de conteúdo público e educacional.
 
 ---
 
 ## 📚 Recursos Adicionais
 
 - [Documentação do yt-dlp](https://github.com/yt-dlp/yt-dlp#readme)
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+- [Next.js Documentation](https://nextjs.org/docs)
+- [shadcn/ui Components](https://ui.shadcn.com/)
 - [Google Drive API](https://developers.google.com/drive/api/guides/about-sdk)
-- [FFmpeg Documentation](https://ffmpeg.org/documentation.html)
 
 ---
 
-**Desenvolvido para arquivamento ético de conteúdo público**
+**Desenvolvido para arquivamento ético de conteúdo público** 📼✨

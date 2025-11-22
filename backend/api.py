@@ -11,19 +11,28 @@ from datetime import datetime
 from typing import Optional, Dict, List
 from dataclasses import asdict
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, quote
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+import io
+import re
 
 from downloader import Settings, download_video, get_video_info
+from drive_manager import DriveManager
 
 # Estado global para jobs
 jobs_db: Dict[str, dict] = {}
 active_tasks: Dict[str, asyncio.Task] = {}
+
+# Google Drive Manager
+drive_manager = DriveManager(
+    credentials_path="./credentials.json",
+    token_path="./token.json"
+)
 
 app = FastAPI(
     title="YT-Archiver API",
@@ -401,7 +410,7 @@ async def list_videos(base_dir: str = "./downloads"):
 
 
 @app.get("/api/videos/stream/{video_path:path}")
-async def stream_video(video_path: str, base_dir: str = "./downloads"):
+async def stream_video(video_path: str, request: Request, base_dir: str = "./downloads"):
     """
     Serve o arquivo de vídeo para streaming.
     Suporta range requests para seek/skip.
@@ -411,24 +420,98 @@ async def stream_video(video_path: str, base_dir: str = "./downloads"):
         video_path = unquote(video_path)
         full_path = Path(base_dir) / video_path
 
+        print(f"[DEBUG] Streaming video: {video_path}")
+        print(f"[DEBUG] Full path: {full_path}")
+        print(f"[DEBUG] File exists: {full_path.exists()}")
+
         # Validar que o arquivo existe e está dentro do base_dir (segurança)
         if not full_path.exists() or not full_path.is_file():
+            print(f"[ERROR] File not found: {full_path}")
             raise HTTPException(status_code=404, detail="Vídeo não encontrado")
 
         if not str(full_path.resolve()).startswith(str(Path(base_dir).resolve())):
+            print(f"[ERROR] Access denied: {full_path.resolve()}")
             raise HTTPException(status_code=403, detail="Acesso negado")
 
-        return FileResponse(
-            full_path,
-            media_type="video/mp4",
-            headers={
-                "Accept-Ranges": "bytes",
-                "Content-Disposition": f'inline; filename="{full_path.name}"'
-            }
+        # Detectar MIME type baseado na extensão
+        mime_types = {
+            '.mp4': 'video/mp4',
+            '.webm': 'video/webm',
+            '.mkv': 'video/x-matroska',
+            '.avi': 'video/x-msvideo',
+            '.mov': 'video/quicktime',
+        }
+        file_ext = full_path.suffix.lower()
+        media_type = mime_types.get(file_ext, 'video/mp4')
+
+        print(f"[DEBUG] Media type: {media_type}")
+        print(f"[DEBUG] File size: {full_path.stat().st_size}")
+
+        # Verificar se é um range request
+        range_header = request.headers.get("range")
+
+        if not range_header:
+            # Resposta normal sem range
+            # Percent-encode filename para evitar problemas com caracteres especiais
+            encoded_filename = quote(full_path.name)
+            return FileResponse(
+                full_path,
+                media_type=media_type,
+                headers={
+                    "Accept-Ranges": "bytes",
+                    "Content-Disposition": f"inline; filename*=UTF-8''{encoded_filename}"
+                }
+            )
+
+        # Processar range request
+        file_size = full_path.stat().st_size
+        range_match = re.match(r'bytes=(\d+)-(\d*)', range_header)
+
+        if not range_match:
+            raise HTTPException(status_code=400, detail="Invalid range header")
+
+        start = int(range_match.group(1))
+        end = int(range_match.group(2)) if range_match.group(2) else file_size - 1
+
+        if start >= file_size or end >= file_size or start > end:
+            raise HTTPException(status_code=416, detail="Range not satisfiable")
+
+        chunk_size = end - start + 1
+
+        def iterfile():
+            with open(full_path, 'rb') as f:
+                f.seek(start)
+                remaining = chunk_size
+                while remaining > 0:
+                    read_size = min(8192, remaining)
+                    data = f.read(read_size)
+                    if not data:
+                        break
+                    remaining -= len(data)
+                    yield data
+
+        # Percent-encode filename para evitar problemas com caracteres especiais
+        encoded_filename = quote(full_path.name)
+        headers = {
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(chunk_size),
+            "Content-Disposition": f"inline; filename*=UTF-8''{encoded_filename}"
+        }
+
+        return StreamingResponse(
+            iterfile(),
+            status_code=206,
+            media_type=media_type,
+            headers=headers
         )
+
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        print(f"[ERROR] Exception in stream_video: {e}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -553,6 +636,312 @@ async def delete_video(video_path: str, base_dir: str = "./downloads"):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ========== Google Drive Endpoints ==========
+
+@app.get("/api/drive/auth-status")
+async def drive_auth_status():
+    """Verifica se o usuário está autenticado no Google Drive"""
+    return {
+        "authenticated": drive_manager.is_authenticated(),
+        "credentials_exists": os.path.exists(drive_manager.credentials_path),
+    }
+
+
+@app.get("/api/drive/auth-url")
+async def get_drive_auth_url():
+    """Gera URL de autenticação OAuth do Google Drive"""
+    try:
+        auth_url = drive_manager.get_auth_url()
+        return {"auth_url": auth_url}
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Credentials file not found. Please add credentials.json to the backend folder."
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/drive/oauth2callback")
+async def oauth2callback(code: str):
+    """Callback OAuth - troca código por tokens"""
+    try:
+        result = drive_manager.exchange_code(code)
+        return {
+            "status": "success",
+            "message": "Autenticação concluída com sucesso!",
+            **result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/drive/videos")
+async def list_drive_videos():
+    """Lista todos os vídeos no Google Drive"""
+    try:
+        if not drive_manager.is_authenticated():
+            raise HTTPException(status_code=401, detail="Not authenticated with Google Drive")
+
+        videos = drive_manager.list_videos()
+        return {
+            "total": len(videos),
+            "videos": videos
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/drive/upload/{video_path:path}")
+async def upload_to_drive(video_path: str, base_dir: str = "./downloads"):
+    """Upload de um vídeo local para o Google Drive"""
+    try:
+        if not drive_manager.is_authenticated():
+            raise HTTPException(status_code=401, detail="Not authenticated with Google Drive")
+
+        # Decodificar e sanitizar o path
+        video_path = unquote(video_path)
+        full_path = Path(base_dir) / video_path
+
+        # Validar que o arquivo existe e está dentro do base_dir
+        if not full_path.exists() or not full_path.is_file():
+            raise HTTPException(status_code=404, detail="Video not found")
+
+        if not str(full_path.resolve()).startswith(str(Path(base_dir).resolve())):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Upload
+        result = drive_manager.upload_video(
+            local_path=str(full_path),
+            relative_path=video_path
+        )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/drive/sync-status")
+async def get_sync_status(base_dir: str = "./downloads"):
+    """Obtém status de sincronização entre local e Drive"""
+    try:
+        if not drive_manager.is_authenticated():
+            raise HTTPException(status_code=401, detail="Not authenticated with Google Drive")
+
+        sync_state = drive_manager.get_sync_state(base_dir)
+        return sync_state
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/drive/sync-all")
+async def sync_all_to_drive(base_dir: str = "./downloads"):
+    """Sincroniza todos os vídeos locais para o Drive"""
+    try:
+        if not drive_manager.is_authenticated():
+            raise HTTPException(status_code=401, detail="Not authenticated with Google Drive")
+
+        sync_state = drive_manager.get_sync_state(base_dir)
+        local_only = sync_state["local_only"]
+
+        results = []
+        for video_path in local_only:
+            full_path = Path(base_dir) / video_path
+            try:
+                result = drive_manager.upload_video(
+                    local_path=str(full_path),
+                    relative_path=video_path
+                )
+                results.append({
+                    "video": video_path,
+                    **result
+                })
+            except Exception as e:
+                results.append({
+                    "video": video_path,
+                    "status": "error",
+                    "message": str(e)
+                })
+
+        return {
+            "total": len(results),
+            "results": results
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/drive/videos/{file_id}")
+async def delete_drive_video(file_id: str):
+    """Remove um vídeo do Google Drive"""
+    try:
+        if not drive_manager.is_authenticated():
+            raise HTTPException(status_code=401, detail="Not authenticated with Google Drive")
+
+        success = drive_manager.delete_video(file_id)
+
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete video")
+
+        return {
+            "status": "success",
+            "message": "Video deleted from Drive"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/drive/stream/{file_id}")
+async def stream_drive_video(file_id: str, request: Request):
+    """
+    Stream de vídeo do Google Drive com suporte a Range Requests.
+    Permite reprodução direta no navegador com seek/skip.
+    """
+    try:
+        if not drive_manager.is_authenticated():
+            raise HTTPException(status_code=401, detail="Not authenticated with Google Drive")
+
+        service = drive_manager._get_service()
+
+        # Obter metadados do arquivo para saber o tamanho
+        file_metadata = service.files().get(
+            fileId=file_id,
+            fields='size, mimeType, name'
+        ).execute()
+
+        file_size = int(file_metadata.get('size', 0))
+        mime_type = file_metadata.get('mimeType', 'video/mp4')
+
+        # Obter credenciais para fazer request direto
+        from google.oauth2.credentials import Credentials
+        import requests
+
+        creds = Credentials.from_authorized_user_file(
+            drive_manager.token_path,
+            ['https://www.googleapis.com/auth/drive.file']
+        )
+
+        # Verificar se há Range header
+        range_header = request.headers.get('range')
+        download_url = f'https://www.googleapis.com/drive/v3/files/{file_id}?alt=media'
+
+        # Headers de autenticação
+        auth_headers = {'Authorization': f'Bearer {creds.token}'}
+
+        if range_header:
+            # Adicionar Range header ao request
+            auth_headers['Range'] = range_header
+
+            # Parse do Range header para gerar Content-Range correto
+            range_match = re.search(r'bytes=(\d+)-(\d*)', range_header)
+            if range_match:
+                start = int(range_match.group(1))
+                end = int(range_match.group(2)) if range_match.group(2) else file_size - 1
+
+                # Validar range
+                if start >= file_size or end >= file_size or start > end:
+                    return Response(
+                        status_code=416,
+                        headers={"Content-Range": f"bytes */{file_size}"}
+                    )
+
+                # Fazer request com Range ao Drive
+                response = requests.get(download_url, headers=auth_headers, stream=True)
+
+                def iterfile():
+                    for chunk in response.iter_content(chunk_size=1024*1024):  # 1MB chunks
+                        if chunk:
+                            yield chunk
+
+                content_length = end - start + 1
+                headers = {
+                    "Content-Range": f"bytes {start}-{end}/{file_size}",
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(content_length),
+                    "Content-Type": mime_type,
+                    "Cache-Control": "public, max-age=3600",
+                }
+
+                return StreamingResponse(
+                    iterfile(),
+                    status_code=206,
+                    headers=headers,
+                    media_type=mime_type
+                )
+
+        else:
+            # Sem Range header - streaming completo
+            response = requests.get(download_url, headers=auth_headers, stream=True)
+
+            def iterfile():
+                for chunk in response.iter_content(chunk_size=2*1024*1024):  # 2MB chunks
+                    if chunk:
+                        yield chunk
+
+            headers = {
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(file_size),
+                "Content-Type": mime_type,
+                "Cache-Control": "public, max-age=3600",
+            }
+
+            return StreamingResponse(
+                iterfile(),
+                headers=headers,
+                media_type=mime_type
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/drive/thumbnail/{file_id}")
+async def get_drive_thumbnail(file_id: str):
+    """
+    Obtém thumbnail de um vídeo do Drive.
+    """
+    try:
+        if not drive_manager.is_authenticated():
+            raise HTTPException(status_code=401, detail="Not authenticated with Google Drive")
+
+        thumbnail_bytes = drive_manager.get_thumbnail(file_id)
+
+        if not thumbnail_bytes:
+            # Retornar 404 se não houver thumbnail
+            raise HTTPException(status_code=404, detail="Thumbnail not found")
+
+        return Response(
+            content=thumbnail_bytes,
+            media_type="image/jpeg",
+            headers={
+                "Cache-Control": "public, max-age=86400"  # Cache por 1 dia
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    # reload=True requer execução como módulo: uvicorn api:app --reload
+    # Para rodar diretamente: python api.py (sem reload)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import "plyr-react/plyr.css";
+import Navigation from "@/components/navigation";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,7 +22,10 @@ export default function RootLayout({
         <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
           <header className="border-b">
             <div className="container mx-auto px-4 py-4">
-              <h1 className="text-2xl font-bold">YT-Archiver</h1>
+              <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold">YT-Archiver</h1>
+                <Navigation />
+              </div>
             </div>
           </header>
           <main className="container mx-auto px-4 py-8">
