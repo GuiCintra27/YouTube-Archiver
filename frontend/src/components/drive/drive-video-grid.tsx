@@ -4,7 +4,14 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, VideoOff, Cloud, Trash2, RefreshCw, Play } from "lucide-react";
+import {
+  Loader2,
+  VideoOff,
+  Cloud,
+  Trash2,
+  RefreshCw,
+  Play,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import DriveVideoPlayer from "./drive-video-player";
+import { APIURLS } from "@/lib/api-urls";
 
 interface DriveVideo {
   id: string;
@@ -35,7 +43,9 @@ export default function DriveVideoGrid() {
   const [videoToDelete, setVideoToDelete] = useState<DriveVideo | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<DriveVideo | null>(null);
-  const [thumbnailErrors, setThumbnailErrors] = useState<Set<string>>(new Set());
+  const [thumbnailErrors, setThumbnailErrors] = useState<Set<string>>(
+    new Set()
+  );
 
   const apiUrl =
     typeof window !== "undefined"
@@ -47,7 +57,7 @@ export default function DriveVideoGrid() {
       setLoading(true);
       setError(null);
       setThumbnailErrors(new Set()); // Resetar erros ao recarregar
-      const response = await fetch(`${apiUrl}/api/drive/videos`);
+      const response = await fetch(`${apiUrl}/api/${APIURLS.DRIVE_VIDEOS}`);
 
       if (!response.ok) {
         throw new Error("Falha ao carregar vídeos do Drive");
@@ -77,7 +87,7 @@ export default function DriveVideoGrid() {
     try {
       setDeleting(true);
       const response = await fetch(
-        `${apiUrl}/api/drive/videos/${videoToDelete.id}`,
+        `${apiUrl}/api/${APIURLS.DRIVE_VIDEOS}/${videoToDelete.id}`,
         { method: "DELETE" }
       );
 
@@ -161,7 +171,10 @@ export default function DriveVideoGrid() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {videos.map((video) => (
-              <Card key={video.id} className="overflow-hidden hover:shadow-lg transition-shadow group">
+              <Card
+                key={video.id}
+                className="overflow-hidden hover:shadow-lg transition-shadow group"
+              >
                 <CardContent className="p-0">
                   {/* Thumbnail or Placeholder */}
                   <div
@@ -170,7 +183,7 @@ export default function DriveVideoGrid() {
                   >
                     {!thumbnailErrors.has(video.id) ? (
                       <img
-                        src={`${apiUrl}/api/drive/thumbnail/${video.id}`}
+                        src={`${apiUrl}/api/${APIURLS.DRIVE_THUMBNAIL}/${video.id}`}
                         alt={video.name}
                         className="w-full h-full object-cover"
                         onError={() => handleThumbnailError(video.id)}
@@ -182,7 +195,10 @@ export default function DriveVideoGrid() {
                     {/* Play Button Overlay */}
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <div className="bg-primary rounded-full p-4">
-                        <Play className="h-8 w-8 text-primary-foreground" fill="currentColor" />
+                        <Play
+                          className="h-8 w-8 text-primary-foreground"
+                          fill="currentColor"
+                        />
                       </div>
                     </div>
                   </div>
@@ -225,8 +241,8 @@ export default function DriveVideoGrid() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir vídeo do Drive?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir &quot;{videoToDelete?.name}&quot; do Google
-              Drive? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir &quot;{videoToDelete?.name}&quot;
+              do Google Drive? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import dynamic from "next/dynamic";
+import { APIURLS } from "@/lib/api-urls";
 
 // Importar Plyr dinamicamente para evitar SSR
 const Plyr = dynamic(() => import("plyr-react"), {
@@ -61,25 +62,25 @@ export default function DriveVideoPlayer({
       ? process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       : "http://localhost:8000";
 
-  const videoUrl = `${apiUrl}/api/drive/stream/${video.id}`;
+  const videoUrl = `${apiUrl}/api/${APIURLS.DRIVE_STREAM}/${video.id}`;
 
   // Configuração do Plyr
   const plyrOptions = {
     controls: [
-      'play-large',
-      'play',
-      'progress',
-      'current-time',
-      'duration',
-      'mute',
-      'volume',
-      'captions',
-      'settings',
-      'pip',
-      'airplay',
-      'fullscreen',
+      "play-large",
+      "play",
+      "progress",
+      "current-time",
+      "duration",
+      "mute",
+      "volume",
+      "captions",
+      "settings",
+      "pip",
+      "airplay",
+      "fullscreen",
     ],
-    settings: ['captions', 'speed'],
+    settings: ["captions", "speed"],
     speed: { selected: 1, options: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] },
     autoplay: false,
     hideControls: true,
@@ -130,15 +131,18 @@ export default function DriveVideoPlayer({
           </DialogHeader>
 
           <div className="p-6 pt-4">
-            <div className="bg-black rounded-lg overflow-hidden w-full" style={{ aspectRatio: '16/9' }}>
+            <div
+              className="bg-black rounded-lg overflow-hidden w-full"
+              style={{ aspectRatio: "16/9" }}
+            >
               <Plyr
                 ref={plyrRef}
                 source={{
-                  type: 'video',
+                  type: "video",
                   sources: [
                     {
                       src: videoUrl,
-                      type: 'video/mp4',
+                      type: "video/mp4",
                     },
                   ],
                 }}
@@ -170,8 +174,8 @@ export default function DriveVideoPlayer({
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir vídeo do Drive?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir &quot;{video.name}&quot; do Google Drive?
-              Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir &quot;{video.name}&quot; do Google
+              Drive? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

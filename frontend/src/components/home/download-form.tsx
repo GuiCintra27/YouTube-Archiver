@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { formatBytes, formatSpeed, formatTime } from "@/lib/utils";
 import { validateUrl, type UrlType } from "@/lib/url-validator";
+import { APIURLS } from "@/lib/api-urls";
 
 const getApiUrl = () => {
   if (typeof window !== "undefined") {
@@ -115,9 +116,12 @@ export default function DownloadForm() {
     if (!jobId || !apiUrl) return;
 
     try {
-      const response = await fetch(`${apiUrl}/api/jobs/${jobId}/cancel`, {
-        method: "POST",
-      });
+      const response = await fetch(
+        `${apiUrl}/api/${APIURLS.JOBS}/${jobId}/cancel`,
+        {
+          method: "POST",
+        }
+      );
 
       if (response.ok) {
         setIsDownloading(false);
@@ -150,7 +154,7 @@ export default function DownloadForm() {
 
     try {
       // Iniciar download
-      const response = await fetch(`${apiUrl}/api/download`, {
+      const response = await fetch(`${apiUrl}/api/${APIURLS.DOWLOAD}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -196,7 +200,7 @@ export default function DownloadForm() {
 
     const poll = async () => {
       try {
-        const response = await fetch(`${apiUrl}/api/jobs/${id}`);
+        const response = await fetch(`${apiUrl}/api/${APIURLS.JOBS}/${id}`);
         const status: JobStatus = await response.json();
 
         setJobStatus(status);

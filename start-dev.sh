@@ -1,13 +1,39 @@
 #!/bin/bash
 
 # Script para iniciar backend e frontend em modo desenvolvimento
+set -euo pipefail
 
 echo "🚀 Iniciando YT-Archiver..."
 
 # Cores para output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
+
+BACKEND_PID=""
+FRONTEND_PID=""
+
+cleanup() {
+    local exit_code=$?
+
+    if [ -n "${FRONTEND_PID}" ] && kill -0 "${FRONTEND_PID}" 2>/dev/null; then
+        echo -e "${YELLOW}🛑 Encerrando frontend (PID ${FRONTEND_PID})...${NC}"
+        kill "${FRONTEND_PID}" 2>/dev/null || true
+    fi
+
+    if [ -n "${BACKEND_PID}" ] && kill -0 "${BACKEND_PID}" 2>/dev/null; then
+        echo -e "${YELLOW}🛑 Encerrando backend (PID ${BACKEND_PID})...${NC}"
+        kill "${BACKEND_PID}" 2>/dev/null || true
+    fi
+
+    # Aguarda término para evitar processos órfãos
+    wait 2>/dev/null || true
+
+    exit ${exit_code}
+}
+
+trap cleanup EXIT
 
 # Verificar se ffmpeg está instalado
 if ! command -v ffmpeg &> /dev/null; then
@@ -33,9 +59,15 @@ echo "📥 Instalando dependências do backend..."
 pip install -q -r requirements.txt
 
 # Iniciar API em background
-echo -e "${GREEN}✅ Backend iniciado em http://localhost:8000${NC}"
 python api.py &
 BACKEND_PID=$!
+
+sleep 2
+if ! kill -0 "${BACKEND_PID}" 2>/dev/null; then
+    echo -e "${YELLOW}⚠️  Backend falhou ao iniciar. Verifique logs acima.${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ Backend iniciado em http://localhost:8000${NC}"
 
 # Voltar para raiz
 cd ..
@@ -51,9 +83,15 @@ if [ ! -d "node_modules" ]; then
 fi
 
 # Iniciar Next.js
-echo -e "${GREEN}✅ Frontend iniciado em http://localhost:3000${NC}"
 npm run dev &
 FRONTEND_PID=$!
+
+sleep 3
+if ! kill -0 "${FRONTEND_PID}" 2>/dev/null; then
+    echo -e "${YELLOW}⚠️  Frontend falhou ao iniciar. Verifique logs acima.${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ Frontend iniciado em http://localhost:3000${NC}"
 
 # Mensagem final
 echo ""

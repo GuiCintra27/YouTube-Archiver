@@ -13,7 +13,7 @@ from dataclasses import asdict
 from pathlib import Path
 from urllib.parse import unquote, quote
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Response, Request
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Response, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -339,6 +339,60 @@ async def stream_job_progress(job_id: str):
     )
 
 
+# ========== Upload Recording ==========
+
+@app.post("/api/recordings/upload")
+async def upload_recording(
+    file: UploadFile = File(...),
+    target_path: str = Form(default=""),
+    base_dir: str = "./downloads",
+):
+    """
+    Recebe uma gravação enviada pelo frontend e salva na pasta de downloads.
+    """
+    try:
+        base_path = Path(base_dir).resolve()
+        relative_target = Path(target_path) if target_path else Path()
+
+        if relative_target.is_absolute():
+            raise HTTPException(status_code=400, detail="O caminho de destino deve ser relativo")
+
+        target_dir = (base_path / relative_target).resolve()
+
+        if not str(target_dir).startswith(str(base_path)):
+            raise HTTPException(status_code=403, detail="Acesso negado ao diretório de destino")
+
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        safe_name = Path(file.filename or "gravacao.webm").name
+        final_path = target_dir / safe_name
+
+        # Evitar sobrescrever arquivos existentes
+        counter = 1
+        while final_path.exists():
+            stem = final_path.stem
+            suffix = final_path.suffix
+            final_path = target_dir / f"{stem}-{counter}{suffix}"
+            counter += 1
+
+        with open(final_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        return {
+            "status": "success",
+            "path": str(final_path.relative_to(base_path)),
+            "full_path": str(final_path),
+            "message": "Gravação salva com sucesso",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"[ERROR] {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ========== Video Library Endpoints ==========
 
 def scan_videos_directory(base_dir: str = "./downloads") -> List[dict]:
@@ -397,14 +451,30 @@ def scan_videos_directory(base_dir: str = "./downloads") -> List[dict]:
 
 
 @app.get("/api/videos")
-async def list_videos(base_dir: str = "./downloads"):
-    """Lista todos os vídeos disponíveis na biblioteca"""
+async def list_videos(base_dir: str = "./downloads", page: int = 1, limit: Optional[int] = None):
+    """Lista vídeos disponíveis na biblioteca (com paginação opcional)"""
     try:
+        if page < 1:
+            raise HTTPException(status_code=400, detail="Página deve ser >= 1")
+        if limit is not None and limit <= 0:
+            raise HTTPException(status_code=400, detail="Limite deve ser > 0")
+
         videos = scan_videos_directory(base_dir)
+        total = len(videos)
+
+        if limit:
+            start = (page - 1) * limit
+            end = start + limit
+            videos = videos[start:end]
+
         return {
-            "total": len(videos),
+            "total": total,
+            "page": page,
+            "limit": limit,
             "videos": videos,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

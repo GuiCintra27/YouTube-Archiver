@@ -2,15 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Cloud } from "lucide-react";
+import { Home, Cloud, MonitorDown, LibraryBig } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PATHS } from "@/lib/paths";
 
 export default function Navigation() {
   const pathname = usePathname();
 
   const links = [
-    { href: "/", label: "Local", icon: Home },
-    { href: "/drive", label: "Google Drive", icon: Cloud },
+    { href: PATHS.HOME, label: "Local", icon: Home },
+    { href: PATHS.RECORD, label: "Gravar", icon: MonitorDown },
+    { href: PATHS.LIBRARY, label: "Biblioteca", icon: LibraryBig },
+    { href: PATHS.DRIVE, label: "Google Drive", icon: Cloud },
   ];
 
   return (

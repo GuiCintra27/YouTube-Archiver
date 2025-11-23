@@ -1,5 +1,5 @@
 import DownloadForm from "@/components/home/download-form";
-import VideoGrid from "@/components/home/video-grid";
+import RecentVideos from "@/components/common/videos/recent-videos";
 
 export default function Home() {
   return (
@@ -44,9 +44,8 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Video Library Section */}
       <div className="mt-16 pt-8 border-t">
-        <VideoGrid />
+        <RecentVideos />
       </div>
     </div>
   );

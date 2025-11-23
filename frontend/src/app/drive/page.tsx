@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import DriveAuth from "@/components/drive/drive-auth";
 import DriveVideoGrid from "@/components/drive/drive-video-grid";
 import SyncPanel from "@/components/drive/sync-panel";
+import { APIURLS } from "@/lib/api-urls";
 
 export default function DrivePage() {
   const [authenticated, setAuthenticated] = useState(false);
@@ -20,7 +21,9 @@ export default function DrivePage() {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch(`${apiUrl}/api/drive/auth-status`);
+      const response = await fetch(
+        `${apiUrl}/api/${APIURLS.DRIVE_AUTH_STATUS}`
+      );
       const data = await response.json();
       setAuthenticated(data.authenticated);
     } catch (error) {

@@ -2,9 +2,16 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Cloud, Loader2, ShieldAlert } from "lucide-react";
+import { APIURLS } from "@/lib/api-urls";
 
 interface DriveAuthProps {
   onAuthenticated: () => void;
@@ -25,7 +32,7 @@ export default function DriveAuth({ onAuthenticated }: DriveAuthProps) {
       setError(null);
 
       // Obter URL de autenticação
-      const response = await fetch(`${apiUrl}/api/drive/auth-url`);
+      const response = await fetch(`${apiUrl}/api/${APIURLS.DRIVE_AUTH_URL}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -45,14 +52,18 @@ export default function DriveAuth({ onAuthenticated }: DriveAuthProps) {
       );
 
       if (!popup) {
-        throw new Error("Popup bloqueado. Por favor, habilite popups para este site.");
+        throw new Error(
+          "Popup bloqueado. Por favor, habilite popups para este site."
+        );
       }
 
       // Monitorar callback
       const checkInterval = setInterval(async () => {
         try {
           // Verificar se autenticação foi concluída
-          const statusResponse = await fetch(`${apiUrl}/api/drive/auth-status`);
+          const statusResponse = await fetch(
+            `${apiUrl}/api/${APIURLS.DRIVE_AUTH_STATUS}`
+          );
           const statusData = await statusResponse.json();
 
           if (statusData.authenticated) {
@@ -74,7 +85,6 @@ export default function DriveAuth({ onAuthenticated }: DriveAuthProps) {
         }
         setLoading(false);
       }, 5 * 60 * 1000);
-
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
       setLoading(false);
@@ -90,7 +100,8 @@ export default function DriveAuth({ onAuthenticated }: DriveAuthProps) {
           </div>
           <CardTitle>Conectar ao Google Drive</CardTitle>
           <CardDescription>
-            Autentique-se para visualizar e gerenciar seus vídeos no Google Drive
+            Autentique-se para visualizar e gerenciar seus vídeos no Google
+            Drive
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -122,10 +133,12 @@ export default function DriveAuth({ onAuthenticated }: DriveAuthProps) {
 
           <div className="text-xs text-muted-foreground text-center space-y-2">
             <p>
-              Ao conectar, você será redirecionado para o Google para autorizar o acesso ao Drive.
+              Ao conectar, você será redirecionado para o Google para autorizar
+              o acesso ao Drive.
             </p>
             <p className="font-medium">
-              ⚠️ Certifique-se de que o arquivo credentials.json está configurado no backend.
+              ⚠️ Certifique-se de que o arquivo credentials.json está
+              configurado no backend.
             </p>
           </div>
         </CardContent>

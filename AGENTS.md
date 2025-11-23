@@ -90,6 +90,7 @@ async def endpoint_name(request: RequestModel) -> ResponseModel:
 - **Types**: Strict type safety, avoid `any`
 - **Naming**: `camelCase` for functions/variables, `PascalCase` for components/types
 - **Files**: `kebab-case.tsx` for components, `kebab-case.py` for modules
+- **URLs**: Use enums para rotas e endpoints (não hardcode): `frontend/src/lib/paths.ts` (`PATHS`) e `frontend/src/lib/api-urls.ts` (`APIURLS`).
 
 **Example component pattern:**
 ```typescript

@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -20,6 +26,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { APIURLS } from "@/lib/api-urls";
 
 interface SyncStatus {
   local_only: string[];
@@ -45,7 +52,9 @@ export default function SyncPanel() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${apiUrl}/api/drive/sync-status`);
+      const response = await fetch(
+        `${apiUrl}/api/${APIURLS.DRIVE_SYNC_STATUS}`
+      );
 
       if (!response.ok) {
         throw new Error("Falha ao obter status de sincronização");
@@ -71,7 +80,7 @@ export default function SyncPanel() {
       setSyncing(true);
       setError(null);
 
-      const response = await fetch(`${apiUrl}/api/drive/sync-all`, {
+      const response = await fetch(`${apiUrl}/api/${APIURLS.DRIVE_SYNC_ALL}`, {
         method: "POST",
       });
 
@@ -98,7 +107,9 @@ export default function SyncPanel() {
       setError(null);
 
       const response = await fetch(
-        `${apiUrl}/api/drive/upload/${encodeURIComponent(videoPath)}`,
+        `${apiUrl}/api/${APIURLS.DRIVE_UPLOAD}/${encodeURIComponent(
+          videoPath
+        )}`,
         { method: "POST" }
       );
 
@@ -158,7 +169,9 @@ export default function SyncPanel() {
               <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-muted">
                 <HardDrive className="h-5 w-5 text-muted-foreground" />
                 <div className="text-center">
-                  <div className="text-2xl font-bold">{syncStatus.total_local}</div>
+                  <div className="text-2xl font-bold">
+                    {syncStatus.total_local}
+                  </div>
                   <div className="text-xs text-muted-foreground">Local</div>
                 </div>
               </div>
@@ -166,7 +179,9 @@ export default function SyncPanel() {
               <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-muted">
                 <Cloud className="h-5 w-5 text-muted-foreground" />
                 <div className="text-center">
-                  <div className="text-2xl font-bold">{syncStatus.total_drive}</div>
+                  <div className="text-2xl font-bold">
+                    {syncStatus.total_drive}
+                  </div>
                   <div className="text-xs text-muted-foreground">Drive</div>
                 </div>
               </div>
@@ -174,8 +189,12 @@ export default function SyncPanel() {
               <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-primary/10">
                 <CheckCircle2 className="h-5 w-5 text-primary" />
                 <div className="text-center">
-                  <div className="text-2xl font-bold">{syncStatus.synced.length}</div>
-                  <div className="text-xs text-muted-foreground">Sincronizados</div>
+                  <div className="text-2xl font-bold">
+                    {syncStatus.synced.length}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Sincronizados
+                  </div>
                 </div>
               </div>
             </div>
@@ -183,8 +202,12 @@ export default function SyncPanel() {
             {/* Progress */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Progresso de sincronização</span>
-                <span className="font-medium">{Math.round(syncPercentage)}%</span>
+                <span className="text-muted-foreground">
+                  Progresso de sincronização
+                </span>
+                <span className="font-medium">
+                  {Math.round(syncPercentage)}%
+                </span>
               </div>
               <Progress value={syncPercentage} />
             </div>
@@ -201,7 +224,10 @@ export default function SyncPanel() {
               </Button>
 
               {syncStatus.local_only.length > 0 && (
-                <Button onClick={handleSyncAll} disabled={syncing || uploadingVideo !== null}>
+                <Button
+                  onClick={handleSyncAll}
+                  disabled={syncing || uploadingVideo !== null}
+                >
                   {syncing ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -235,7 +261,9 @@ export default function SyncPanel() {
                           key={video}
                           className="flex items-center justify-between p-2 rounded bg-muted"
                         >
-                          <span className="text-sm truncate flex-1">{video}</span>
+                          <span className="text-sm truncate flex-1">
+                            {video}
+                          </span>
                           <Button
                             size="sm"
                             variant="ghost"

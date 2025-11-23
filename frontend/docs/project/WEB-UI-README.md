@@ -207,6 +207,12 @@ Obtém informações sobre um vídeo sem baixar.
 - shadcn/ui - Componentes
 - Lucide React - Ícones
 
+### Rotas e Endpoints Centralizados
+- Prefira os enums já disponíveis a strings literais:
+  - `frontend/src/lib/paths.ts` → `PATHS` para caminhos de páginas (`/`, `/drive`, `/record`, `/library`).
+  - `frontend/src/lib/api-urls.ts` → `APIURLS` para paths de API (`download`, `jobs`, `drive/auth-status`, etc.).
+- Motivos: evita typos, facilita refactors e mantém URLs coerentes entre chamadas e navegação.
+
 ### Estrutura de Componentes
 
 ```
