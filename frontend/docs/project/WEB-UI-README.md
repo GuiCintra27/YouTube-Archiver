@@ -176,6 +176,7 @@ Obtém informações sobre um vídeo sem baixar.
 - [x] Feedback visual de sucesso/erro
 - [x] Nomenclatura customizada de arquivos
 - [x] Suporte a streams HLS
+- [x] Alternância de tema claro/escuro com toggle no header
 
 ### 🔜 Futuras Melhorias
 
