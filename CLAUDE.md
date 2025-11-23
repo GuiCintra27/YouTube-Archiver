@@ -50,7 +50,7 @@ Baixar vídeos do YouTube (canais, playlists, vídeos individuais) e streams HLS
 - `yt-dlp` (download engine)
 - `google-api-python-client`, `google-auth-oauthlib` (Drive API)
 
-### Frontend (`web-ui/`)
+### Frontend (`frontend/`)
 **Framework:** Next.js 15 (App Router) + TypeScript
 **Porta:** 3000
 **UI Library:** shadcn/ui (Radix UI primitives) + Tailwind CSS
@@ -181,7 +181,7 @@ source .venv/bin/activate && python api.py
 
 ### Frontend (Next.js)
 ```bash
-cd web-ui
+cd frontend
 npm install          # Primeira vez
 npm run dev          # Desenvolvimento (porta 3000)
 npm run build        # Build de produção
@@ -280,12 +280,16 @@ backend/
 ├── downloads/              # Vídeos baixados (gitignored)
 ├── archive.txt             # Controle de duplicatas
 ├── credentials.json        # OAuth Google (gitignored, usar credentials.json.example)
-└── token.json              # Token OAuth (gitignored, gerado automaticamente)
+├── token.json              # Token OAuth (gitignored, gerado automaticamente)
+└── docs/project/           # Documentações específicas do backend
+    ├── ANTI-BAN.md
+    ├── EXPORT-COOKIES-GUIDE.md
+    └── PERFORMANCE-OPTIMIZATION.md
 ```
 
 ### Frontend
 ```
-web-ui/
+frontend/
 ├── src/
 │   ├── app/
 │   │   ├── page.tsx                  # ⭐ Página principal
@@ -302,17 +306,28 @@ web-ui/
 │       └── utils.ts                  # Helpers (cn, etc.)
 ├── package.json
 ├── next.config.ts
-└── tailwind.config.ts
+├── tailwind.config.ts
+└── docs/project/           # Documentações específicas do frontend
+    └── WEB-UI-README.md
 ```
 
 ### Documentação
 ```
 ├── CLAUDE.md                    # ⭐ Este arquivo (instruções para Claude)
 ├── README.md                    # ⭐ Documentação principal do projeto
-├── BUGS.md                      # ⭐ Bug tracking e correções
-├── GOOGLE-DRIVE-SETUP.md        # Guia de configuração OAuth
-├── GOOGLE-DRIVE-FEATURES.md     # Features do Google Drive
-└── start-dev.sh                 # Script de início rápido
+├── CHANGELOG.md                 # Changelog principal
+├── start-dev.sh                 # Script de início rápido
+└── docs/project/                # Documentações gerais
+    ├── BUGS.md                  # ⭐ Bug tracking e correções
+    ├── CHANGELOG-v2.2.md
+    ├── FEATURES-V2.1.md
+    ├── GOOGLE-DRIVE-FEATURES.md # Features do Google Drive
+    ├── GOOGLE-DRIVE-SETUP.md    # Guia de configuração OAuth
+    ├── MCP-README.md            # Configuração MCP
+    ├── QUICK-FIX.md
+    ├── QUICK-START.md
+    ├── TECHNICAL-REFERENCE.md   # ⭐ Referência técnica rápida
+    └── TESTING.md
 ```
 
 ---
@@ -352,7 +367,7 @@ web-ui/
 ## 🎯 Pedidos Típicos e Como Resolver
 
 ### "Adicionar uma nova opção ao formulário de download"
-1. Adicionar campo no componente `web-ui/src/components/download-form.tsx`
+1. Adicionar campo no componente `frontend/src/components/download-form.tsx`
 2. Adicionar parâmetro no modelo Pydantic em `backend/api.py` (classe `DownloadRequest`)
 3. Passar parâmetro para `Settings` em `backend/downloader.py`
 4. Implementar lógica em `_base_opts()` do `Downloader`
@@ -374,7 +389,7 @@ web-ui/
 
 ### "Adicionar componente shadcn/ui novo"
 ```bash
-cd web-ui
+cd frontend
 npx shadcn@latest add <component-name>
 # Ex: npx shadcn@latest add dialog
 ```

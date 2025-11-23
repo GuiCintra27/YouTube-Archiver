@@ -42,7 +42,7 @@ cd ..
 
 # Iniciar frontend
 echo -e "${BLUE}🎨 Iniciando Frontend (Next.js)...${NC}"
-cd web-ui || exit
+cd frontend || exit
 
 # Instalar dependências se necessário
 if [ ! -d "node_modules" ]; then

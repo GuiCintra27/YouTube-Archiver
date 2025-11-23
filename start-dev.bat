@@ -36,7 +36,7 @@ cd ..
 
 REM Iniciar frontend
 echo 🎨 Iniciando Frontend (Next.js)...
-cd web-ui
+cd frontend
 
 REM Instalar dependências se necessário
 if not exist "node_modules" (
