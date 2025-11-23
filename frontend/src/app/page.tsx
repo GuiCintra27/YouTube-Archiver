@@ -1,5 +1,5 @@
-import DownloadForm from "@/components/download-form";
-import VideoGrid from "@/components/video-grid";
+import DownloadForm from "@/components/home/download-form";
+import VideoGrid from "@/components/home/video-grid";
 
 export default function Home() {
   return (
@@ -9,8 +9,8 @@ export default function Home() {
           Baixe vídeos de forma simples
         </h2>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Suporte para YouTube, playlists e streams HLS. Configure opções avançadas
-          como headers customizados, resolução máxima e muito mais.
+          Suporte para YouTube, playlists e streams HLS. Configure opções
+          avançadas como headers customizados, resolução máxima e muito mais.
         </p>
       </div>
 

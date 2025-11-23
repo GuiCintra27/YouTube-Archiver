@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import DriveAuth from "@/components/drive-auth";
-import DriveVideoGrid from "@/components/drive-video-grid";
-import SyncPanel from "@/components/sync-panel";
+import DriveAuth from "@/components/drive/drive-auth";
+import DriveVideoGrid from "@/components/drive/drive-video-grid";
+import SyncPanel from "@/components/drive/sync-panel";
 
 export default function DrivePage() {
   const [authenticated, setAuthenticated] = useState(false);

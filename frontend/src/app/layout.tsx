@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import "plyr-react/plyr.css";
-import Navigation from "@/components/navigation";
+import Navigation from "@/components/common/navigation";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "YT-Archiver - Download de Vídeos",
-  description: "Baixe vídeos do YouTube, playlists e streams HLS de forma simples",
+  description:
+    "Baixe vídeos do YouTube, playlists e streams HLS de forma simples",
 };
 
 export default function RootLayout({
@@ -28,12 +29,13 @@ export default function RootLayout({
               </div>
             </div>
           </header>
-          <main className="container mx-auto px-4 py-8">
-            {children}
-          </main>
+          <main className="container mx-auto px-4 py-8">{children}</main>
           <footer className="border-t mt-auto">
             <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
-              <p>YT-Archiver v2.0 - Desenvolvido para arquivamento ético de conteúdo público</p>
+              <p>
+                YT-Archiver v2.0 - Desenvolvido para arquivamento ético de
+                conteúdo público
+              </p>
             </div>
           </footer>
         </div>

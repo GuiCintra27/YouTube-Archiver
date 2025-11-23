@@ -23,9 +23,10 @@ export default function VideoGrid() {
   const [error, setError] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
 
-  const apiUrl = typeof window !== "undefined"
-    ? process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-    : "http://localhost:8000";
+  const apiUrl =
+    typeof window !== "undefined"
+      ? process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      : "http://localhost:8000";
 
   const fetchVideos = async () => {
     try {
@@ -88,9 +89,7 @@ export default function VideoGrid() {
   if (error) {
     return (
       <Alert variant="destructive">
-        <AlertDescription>
-          Erro ao carregar vídeos: {error}
-        </AlertDescription>
+        <AlertDescription>Erro ao carregar vídeos: {error}</AlertDescription>
       </Alert>
     );
   }

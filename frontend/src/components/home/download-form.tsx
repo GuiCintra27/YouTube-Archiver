@@ -2,15 +2,34 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Download, Loader2, CheckCircle2, XCircle, X, Video, List } from "lucide-react";
+import {
+  Download,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  X,
+  Video,
+  List,
+} from "lucide-react";
 import { formatBytes, formatSpeed, formatTime } from "@/lib/utils";
 import { validateUrl, type UrlType } from "@/lib/url-validator";
 
@@ -147,7 +166,9 @@ export default function DownloadForm() {
           cookies_file: cookiesFile || null,
           referer: referer || null,
           origin: origin || null,
-          delay_between_downloads: delayBetweenDownloads ? parseInt(delayBetweenDownloads) : 0,
+          delay_between_downloads: delayBetweenDownloads
+            ? parseInt(delayBetweenDownloads)
+            : 0,
           batch_size: batchSize ? parseInt(batchSize) : null,
           batch_delay: batchDelay ? parseInt(batchDelay) : 0,
           randomize_delay: randomizeDelay,
@@ -196,7 +217,6 @@ export default function DownloadForm() {
 
         // Agendar próximo poll
         setTimeout(poll, pollInterval);
-
       } catch (error) {
         console.error("Erro ao verificar status:", error);
         setIsDownloading(false);
@@ -207,7 +227,7 @@ export default function DownloadForm() {
     poll();
   };
 
-  const progress = jobStatus?.progress || {};
+  const progress: any = jobStatus?.progress || {};
   const percentage = progress.percentage || 0;
 
   return (
@@ -231,14 +251,20 @@ export default function DownloadForm() {
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="video" id="video" />
-                <Label htmlFor="video" className="flex items-center gap-2 cursor-pointer">
+                <Label
+                  htmlFor="video"
+                  className="flex items-center gap-2 cursor-pointer"
+                >
                   <Video className="h-4 w-4" />
                   Vídeo Único
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="playlist" id="playlist" />
-                <Label htmlFor="playlist" className="flex items-center gap-2 cursor-pointer">
+                <Label
+                  htmlFor="playlist"
+                  className="flex items-center gap-2 cursor-pointer"
+                >
                   <List className="h-4 w-4" />
                   Playlist
                 </Label>
@@ -262,7 +288,9 @@ export default function DownloadForm() {
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 disabled={isDownloading}
-                onKeyDown={(e) => e.key === "Enter" && !validationError && startDownload()}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && !validationError && startDownload()
+                }
                 className={validationError ? "border-destructive" : ""}
               />
               {!isDownloading ? (
@@ -334,34 +362,45 @@ export default function DownloadForm() {
                   {progress.filename && (
                     <div>
                       <div className="text-muted-foreground">Arquivo</div>
-                      <div className="font-medium truncate">{progress.filename}</div>
-                    </div>
-                  )}
-                  {progress.downloaded_bytes !== undefined && progress.total_bytes && (
-                    <div>
-                      <div className="text-muted-foreground">Tamanho</div>
-                      <div className="font-medium">
-                        {formatBytes(progress.downloaded_bytes)} / {formatBytes(progress.total_bytes)}
+                      <div className="font-medium truncate">
+                        {progress.filename}
                       </div>
                     </div>
                   )}
+                  {progress.downloaded_bytes !== undefined &&
+                    progress.total_bytes && (
+                      <div>
+                        <div className="text-muted-foreground">Tamanho</div>
+                        <div className="font-medium">
+                          {formatBytes(progress.downloaded_bytes)} /{" "}
+                          {formatBytes(progress.total_bytes)}
+                        </div>
+                      </div>
+                    )}
                   {progress.speed && (
                     <div>
                       <div className="text-muted-foreground">Velocidade</div>
-                      <div className="font-medium">{formatSpeed(progress.speed)}</div>
+                      <div className="font-medium">
+                        {formatSpeed(progress.speed)}
+                      </div>
                     </div>
                   )}
                   {progress.eta && (
                     <div>
-                      <div className="text-muted-foreground">Tempo Restante</div>
-                      <div className="font-medium">{formatTime(progress.eta)}</div>
+                      <div className="text-muted-foreground">
+                        Tempo Restante
+                      </div>
+                      <div className="font-medium">
+                        {formatTime(progress.eta)}
+                      </div>
                     </div>
                   )}
                 </div>
               )}
 
               {/* Waiting Status */}
-              {(progress.status === "waiting" || progress.status === "batch_waiting") && (
+              {(progress.status === "waiting" ||
+                progress.status === "batch_waiting") && (
                 <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
                   <AlertDescription className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -525,7 +564,9 @@ export default function DownloadForm() {
                   <div className="space-y-4 pt-4 border-t">
                     <div className="flex items-center justify-between mb-2">
                       <div>
-                        <Label className="text-base font-semibold">Proteção Anti-Ban</Label>
+                        <Label className="text-base font-semibold">
+                          Proteção Anti-Ban
+                        </Label>
                         <p className="text-sm text-muted-foreground">
                           Evite bloqueios ao baixar playlists grandes
                         </p>
@@ -543,7 +584,9 @@ export default function DownloadForm() {
                           type="number"
                           min="0"
                           value={delayBetweenDownloads}
-                          onChange={(e) => setDelayBetweenDownloads(e.target.value)}
+                          onChange={(e) =>
+                            setDelayBetweenDownloads(e.target.value)
+                          }
                           placeholder="0"
                           disabled={isDownloading}
                         />
@@ -554,9 +597,7 @@ export default function DownloadForm() {
 
                       {/* Batch Size */}
                       <div className="space-y-2">
-                        <Label htmlFor="batchSize">
-                          Vídeos por Batch
-                        </Label>
+                        <Label htmlFor="batchSize">Vídeos por Batch</Label>
                         <Input
                           id="batchSize"
                           type="number"
@@ -593,7 +634,9 @@ export default function DownloadForm() {
                       {/* Randomize Delay */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between h-10">
-                          <Label htmlFor="randomizeDelay">Randomizar Delays</Label>
+                          <Label htmlFor="randomizeDelay">
+                            Randomizar Delays
+                          </Label>
                           <Switch
                             id="randomizeDelay"
                             checked={randomizeDelay}
