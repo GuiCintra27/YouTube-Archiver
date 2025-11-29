@@ -747,16 +747,27 @@ async def oauth2callback(code: str):
 
 
 @app.get("/api/drive/videos")
-async def list_drive_videos():
-    """Lista todos os vídeos no Google Drive"""
+async def list_drive_videos(page: int = 1, limit: int = 24):
+    """Lista vídeos no Google Drive com paginação simples"""
     try:
         if not drive_manager.is_authenticated():
             raise HTTPException(status_code=401, detail="Not authenticated with Google Drive")
 
+        if page < 1 or limit < 1:
+            raise HTTPException(status_code=400, detail="page and limit must be positive integers")
+
         videos = drive_manager.list_videos()
+        total = len(videos)
+
+        start = (page - 1) * limit
+        end = start + limit
+        page_videos = videos[start:end]
+
         return {
-            "total": len(videos),
-            "videos": videos
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "videos": page_videos
         }
     except HTTPException:
         raise

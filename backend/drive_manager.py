@@ -76,14 +76,35 @@ class DriveManager:
         }
 
     def is_authenticated(self) -> bool:
-        """Verifica se há token válido"""
+        """Verifica se há token válido, fazendo refresh se necessário"""
         if not os.path.exists(self.token_path):
             return False
 
         try:
             creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
-            return creds and creds.valid
-        except:
+
+            if not creds:
+                return False
+
+            # Se o token é válido, está autenticado
+            if creds.valid:
+                return True
+
+            # Se expirou mas tem refresh token, tentar renovar
+            if creds.expired and creds.refresh_token:
+                try:
+                    creds.refresh(Request())
+                    # Salvar token atualizado
+                    with open(self.token_path, 'w') as token:
+                        token.write(creds.to_json())
+                    return True
+                except Exception as e:
+                    print(f"[DEBUG] Failed to refresh token: {e}")
+                    return False
+
+            return False
+        except Exception as e:
+            print(f"[DEBUG] Error checking authentication: {e}")
             return False
 
     def _get_service(self):

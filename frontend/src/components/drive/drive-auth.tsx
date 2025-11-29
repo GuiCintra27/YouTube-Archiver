@@ -60,6 +60,13 @@ export default function DriveAuth({ onAuthenticated }: DriveAuthProps) {
       // Monitorar callback
       const checkInterval = setInterval(async () => {
         try {
+          // Verificar se o popup foi fechado pelo usuário
+          if (popup.closed) {
+            clearInterval(checkInterval);
+            setLoading(false);
+            return;
+          }
+
           // Verificar se autenticação foi concluída
           const statusResponse = await fetch(
             `${apiUrl}/api/${APIURLS.DRIVE_AUTH_STATUS}`
@@ -69,6 +76,7 @@ export default function DriveAuth({ onAuthenticated }: DriveAuthProps) {
           if (statusData.authenticated) {
             clearInterval(checkInterval);
             popup.close();
+            setLoading(false);
             onAuthenticated();
           }
         } catch (err) {
