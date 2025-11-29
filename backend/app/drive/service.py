@@ -1,0 +1,194 @@
+"""
+Drive service - business logic for Google Drive integration
+"""
+import re
+from pathlib import Path
+from typing import Dict, List, Optional, Generator
+import requests
+
+from google.oauth2.credentials import Credentials
+
+from .manager import drive_manager, SCOPES
+from app.core.security import validate_path_within_base, validate_file_exists, sanitize_path
+
+
+def get_auth_status() -> Dict:
+    """Get authentication status"""
+    return {
+        "authenticated": drive_manager.is_authenticated(),
+        "credentials_exists": drive_manager.credentials_exist(),
+    }
+
+
+def get_auth_url() -> str:
+    """Get OAuth authorization URL"""
+    return drive_manager.get_auth_url()
+
+
+def exchange_auth_code(code: str) -> Dict:
+    """Exchange authorization code for tokens"""
+    result = drive_manager.exchange_code(code)
+    return {
+        "status": "success",
+        "message": "Autenticação concluída com sucesso!",
+        **result
+    }
+
+
+def list_videos_paginated(page: int = 1, limit: int = 24) -> Dict:
+    """List Drive videos with pagination"""
+    videos = drive_manager.list_videos()
+    total = len(videos)
+
+    start = (page - 1) * limit
+    end = start + limit
+    page_videos = videos[start:end]
+
+    return {
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "videos": page_videos
+    }
+
+
+def upload_video(video_path: str, base_dir: str = "./downloads") -> Dict:
+    """Upload a local video to Drive"""
+    video_path = sanitize_path(video_path)
+    full_path = Path(base_dir) / video_path
+    base_path = Path(base_dir)
+
+    validate_file_exists(full_path)
+    validate_path_within_base(full_path, base_path)
+
+    return drive_manager.upload_video(
+        local_path=str(full_path),
+        relative_path=video_path
+    )
+
+
+def get_sync_status(base_dir: str = "./downloads") -> Dict:
+    """Get sync status between local and Drive"""
+    return drive_manager.get_sync_state(base_dir)
+
+
+def sync_all_videos(base_dir: str = "./downloads") -> Dict:
+    """Sync all local videos to Drive"""
+    sync_state = drive_manager.get_sync_state(base_dir)
+    local_only = sync_state["local_only"]
+
+    results = []
+    for video_path in local_only:
+        full_path = Path(base_dir) / video_path
+        try:
+            result = drive_manager.upload_video(
+                local_path=str(full_path),
+                relative_path=video_path
+            )
+            results.append({
+                "video": video_path,
+                **result
+            })
+        except Exception as e:
+            results.append({
+                "video": video_path,
+                "status": "error",
+                "message": str(e)
+            })
+
+    return {
+        "total": len(results),
+        "results": results
+    }
+
+
+def delete_video(file_id: str) -> Dict:
+    """Delete a video from Drive"""
+    success = drive_manager.delete_video(file_id)
+
+    if not success:
+        raise Exception("Failed to delete video")
+
+    return {
+        "status": "success",
+        "message": "Video deleted from Drive"
+    }
+
+
+def stream_video(
+    file_id: str,
+    range_header: Optional[str] = None
+) -> tuple[Generator, Dict, int]:
+    """
+    Stream video from Drive with range request support.
+
+    Returns:
+        Tuple of (generator, headers dict, status code)
+    """
+    file_metadata = drive_manager.get_file_metadata(file_id)
+    file_size = int(file_metadata.get('size', 0))
+    mime_type = file_metadata.get('mimeType', 'video/mp4')
+
+    # Get credentials for direct request
+    creds = Credentials.from_authorized_user_file(
+        drive_manager.token_path,
+        SCOPES
+    )
+
+    download_url = f'https://www.googleapis.com/drive/v3/files/{file_id}?alt=media'
+    auth_headers = {'Authorization': f'Bearer {creds.token}'}
+
+    if range_header:
+        # Add Range header to request
+        auth_headers['Range'] = range_header
+
+        # Parse Range header for Content-Range
+        range_match = re.search(r'bytes=(\d+)-(\d*)', range_header)
+        if range_match:
+            start = int(range_match.group(1))
+            end = int(range_match.group(2)) if range_match.group(2) else file_size - 1
+
+            # Validate range
+            if start >= file_size or end >= file_size or start > end:
+                return None, {"Content-Range": f"bytes */{file_size}"}, 416
+
+            # Make request with Range to Drive
+            response = requests.get(download_url, headers=auth_headers, stream=True)
+
+            def iterfile():
+                for chunk in response.iter_content(chunk_size=1024*1024):  # 1MB chunks
+                    if chunk:
+                        yield chunk
+
+            content_length = end - start + 1
+            headers = {
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(content_length),
+                "Content-Type": mime_type,
+                "Cache-Control": "public, max-age=3600",
+            }
+
+            return iterfile(), headers, 206
+
+    # No Range header - full streaming
+    response = requests.get(download_url, headers=auth_headers, stream=True)
+
+    def iterfile():
+        for chunk in response.iter_content(chunk_size=2*1024*1024):  # 2MB chunks
+            if chunk:
+                yield chunk
+
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Length": str(file_size),
+        "Content-Type": mime_type,
+        "Cache-Control": "public, max-age=3600",
+    }
+
+    return iterfile(), headers, 200
+
+
+def get_thumbnail(file_id: str) -> Optional[bytes]:
+    """Get thumbnail bytes for a video"""
+    return drive_manager.get_thumbnail(file_id)

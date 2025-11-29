@@ -22,28 +22,46 @@ Baixar vídeos do YouTube (canais, playlists, vídeos individuais) e streams HLS
 ### Backend (`backend/`)
 **Framework:** FastAPI + Uvicorn
 **Porta:** 8000
-**Principais módulos:**
+**Arquitetura:** Modular (similar ao NestJS)
 
-- **`api.py`** (endpoint principal)
-  - Endpoints de download (`/api/download`, `/api/jobs/*`)
-  - Endpoints de biblioteca local (`/api/videos`, `/api/videos/stream/*`)
-  - Endpoints Google Drive (`/api/drive/*`)
-  - Sistema de jobs assíncronos com threading
+O backend segue uma arquitetura modular com separação clara de responsabilidades:
 
-- **`downloader.py`** (motor de download)
-  - Wrapper do yt-dlp com suporte a:
-    - Headers customizados (Referer, Origin, User-Agent, cookies)
-    - Rate limiting (delays, batches, randomização)
-    - Controle de qualidade e formato
-    - Sistema de arquivamento (evita duplicatas)
-  - Callbacks de progresso em tempo real
+```
+backend/app/
+├── main.py              # Entry point FastAPI (inclui routers)
+├── config.py            # Configurações globais (Settings)
+├── core/                # Módulo central compartilhado
+│   ├── exceptions.py    # Exceções HTTP customizadas
+│   └── security.py      # Validações de path, sanitização
+├── downloads/           # Módulo de downloads
+│   ├── router.py        # Endpoints /api/download, /api/video-info
+│   ├── service.py       # Lógica de negócio
+│   ├── schemas.py       # Modelos Pydantic (DownloadRequest, etc.)
+│   └── downloader.py    # Engine yt-dlp wrapper
+├── jobs/                # Módulo de jobs assíncronos
+│   ├── router.py        # Endpoints /api/jobs/*
+│   ├── service.py       # Gerenciamento de jobs
+│   ├── schemas.py       # Modelos Pydantic
+│   └── store.py         # Storage in-memory
+├── library/             # Módulo de biblioteca local
+│   ├── router.py        # Endpoints /api/videos/*
+│   ├── service.py       # Scan, streaming, exclusão
+│   └── schemas.py       # Modelos Pydantic
+├── recordings/          # Módulo de gravações de tela
+│   ├── router.py        # Endpoint /api/recordings/upload
+│   └── service.py       # Salvamento de gravações
+└── drive/               # Módulo Google Drive
+    ├── router.py        # Endpoints /api/drive/*
+    ├── service.py       # Lógica de negócio
+    ├── schemas.py       # Modelos Pydantic
+    └── manager.py       # DriveManager (OAuth, upload, sync)
+```
 
-- **`drive_manager.py`** (integração Google Drive)
-  - OAuth 2.0 flow completo
-  - Upload/download de vídeos
-  - Streaming com range requests (HTTP 206)
-  - Sincronização de estrutura de pastas
-  - Upload de arquivos relacionados (thumbnails, metadata, legendas)
+**Padrão de cada módulo:**
+- **router.py**: Define endpoints da API (APIRouter)
+- **service.py**: Contém lógica de negócio
+- **schemas.py**: Modelos Pydantic para request/response
+- **Arquivos específicos**: downloader.py, manager.py, store.py
 
 **Dependências principais:**
 - `fastapi`, `uvicorn`, `pydantic`
@@ -122,13 +140,13 @@ src/
 **Problema:** UnicodeEncodeError ao reproduzir vídeos com caracteres especiais (ex: ⧸ U+29F8)
 **Causa:** Header `Content-Disposition` usando encoding latin-1 (padrão HTTP)
 **Solução:** Implementado RFC 5987 encoding (`filename*=UTF-8''...`)
-**Arquivo:** `backend/api.py:412-511` (função `stream_video()`)
+**Arquivo:** `backend/app/library/router.py` (função `stream_video()`)
 
 ### BUG #2: Upload para Google Drive - CORRIGIDO ✅
 **Problema:** Query malformada com aspas simples não escapadas (ex: "60's")
 **Causa:** Queries do Drive usam aspas simples como delimitadores
 **Solução:** Escape de aspas (`name.replace("'", "\\'")`) em queries
-**Arquivo:** `backend/drive_manager.py:136-301` (métodos `upload_video()` e `ensure_folder()`)
+**Arquivo:** `backend/app/drive/manager.py` (métodos `upload_video()` e `ensure_folder()`)
 
 **Referência completa:** Ver `BUGS.md` para detalhes técnicos e testes de validação
 
@@ -169,9 +187,9 @@ start-dev.bat   # Windows - Inicia backend + frontend
 ### Backend (API FastAPI)
 ```bash
 cd backend
-./run.sh                              # Recomendado (ativa venv automaticamente)
+./run.sh                              # Recomendado (ativa venv + uvicorn com reload)
 # OU manualmente:
-source .venv/bin/activate && python api.py
+source .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 **URLs do Backend:**
@@ -221,13 +239,13 @@ git cz              # Opção 3 (se instalado globalmente)
 
 ### Backend
 1. **SEMPRE use `./run.sh`** para iniciar o backend
-   - ❌ NÃO: `python api.py` (não ativa o venv)
-   - ✅ SIM: `./run.sh` (ativa venv automaticamente)
+   - ❌ NÃO: `python app/main.py` (não ativa o venv, sem reload)
+   - ✅ SIM: `./run.sh` (ativa venv + uvicorn com hot reload)
 
 2. **Hot reload do uvicorn**
-   - Funciona APENAS com `uvicorn api:app --reload`
-   - NÃO funciona com `python api.py`
-   - Backend atual usa `reload=True` no `uvicorn.run()` mas requer restart manual
+   - `./run.sh` já inclui `--reload` automaticamente
+   - Mudanças em arquivos `.py` são detectadas e recarregadas
+   - Comando usado: `uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload`
 
 3. **Encoding de Caracteres Especiais**
    - Sempre usar RFC 5987 para headers HTTP com Unicode
@@ -271,17 +289,42 @@ git cz              # Opção 3 (se instalado globalmente)
 ### Backend
 ```
 backend/
-├── api.py                  # ⭐ Endpoint principal (FastAPI)
-├── downloader.py           # ⭐ Lógica de download (yt-dlp wrapper)
-├── drive_manager.py        # ⭐ Google Drive manager
-├── requirements.txt        # Dependências Python
-├── run.sh                  # Script de inicialização
-├── .venv/                  # Ambiente virtual (gitignored)
-├── downloads/              # Vídeos baixados (gitignored)
-├── archive.txt             # Controle de duplicatas
-├── credentials.json        # OAuth Google (gitignored, usar credentials.json.example)
-├── token.json              # Token OAuth (gitignored, gerado automaticamente)
-└── docs/project/           # Documentações específicas do backend
+├── app/                        # ⭐ Pacote principal da aplicação
+│   ├── main.py                 # ⭐ Entry point FastAPI
+│   ├── config.py               # Configurações globais
+│   ├── core/                   # Módulo central
+│   │   ├── exceptions.py       # Exceções HTTP customizadas
+│   │   └── security.py         # Validações e sanitização
+│   ├── downloads/              # Módulo de downloads
+│   │   ├── router.py           # Endpoints /api/download, /api/video-info
+│   │   ├── service.py          # Lógica de negócio
+│   │   ├── schemas.py          # ⭐ DownloadRequest e outros modelos
+│   │   └── downloader.py       # ⭐ Engine yt-dlp wrapper
+│   ├── jobs/                   # Módulo de jobs
+│   │   ├── router.py           # Endpoints /api/jobs/*
+│   │   ├── service.py          # Gerenciamento de jobs
+│   │   ├── schemas.py          # Modelos de jobs
+│   │   └── store.py            # Storage in-memory
+│   ├── library/                # Módulo de biblioteca local
+│   │   ├── router.py           # ⭐ Endpoints /api/videos/* (streaming)
+│   │   ├── service.py          # Scan de diretórios
+│   │   └── schemas.py          # Modelos de vídeos
+│   ├── recordings/             # Módulo de gravações
+│   │   ├── router.py           # Endpoint /api/recordings/upload
+│   │   └── service.py          # Salvamento de gravações
+│   └── drive/                  # Módulo Google Drive
+│       ├── router.py           # Endpoints /api/drive/*
+│       ├── service.py          # Lógica de negócio
+│       ├── schemas.py          # Modelos do Drive
+│       └── manager.py          # ⭐ DriveManager (OAuth, upload, sync)
+├── requirements.txt            # Dependências Python
+├── run.sh                      # Script de inicialização
+├── .venv/                      # Ambiente virtual (gitignored)
+├── downloads/                  # Vídeos baixados (gitignored)
+├── archive.txt                 # Controle de duplicatas
+├── credentials.json            # OAuth Google (gitignored)
+├── token.json                  # Token OAuth (gitignored)
+└── docs/project/               # Documentações específicas
     ├── ANTI-BAN.md
     ├── EXPORT-COOKIES-GUIDE.md
     └── PERFORMANCE-OPTIMIZATION.md
@@ -368,9 +411,9 @@ frontend/
 
 ### "Adicionar uma nova opção ao formulário de download"
 1. Adicionar campo no componente `frontend/src/components/download-form.tsx`
-2. Adicionar parâmetro no modelo Pydantic em `backend/api.py` (classe `DownloadRequest`)
-3. Passar parâmetro para `Settings` em `backend/downloader.py`
-4. Implementar lógica em `_base_opts()` do `Downloader`
+2. Adicionar parâmetro no modelo Pydantic em `backend/app/downloads/schemas.py` (classe `DownloadRequest`)
+3. Passar parâmetro para `Settings` em `backend/app/downloads/service.py` (função `create_download_settings`)
+4. Implementar lógica em `_base_opts()` do `Downloader` em `backend/app/downloads/downloader.py`
 
 ### "Corrigir bug de encoding/Unicode"
 - Verificar se headers HTTP estão usando RFC 5987 (`filename*=UTF-8''...`)
@@ -386,6 +429,19 @@ frontend/
 - Ajustar chunk size em `MediaFileUpload` (padrão: 8MB)
 - Verificar range requests estão implementados
 - Considerar cache de thumbnails
+
+### "Adicionar novo módulo ao backend"
+1. Criar pasta em `backend/app/<nome_modulo>/`
+2. Criar arquivos:
+   - `__init__.py` (exportar router)
+   - `router.py` (APIRouter com endpoints)
+   - `service.py` (lógica de negócio)
+   - `schemas.py` (modelos Pydantic, se necessário)
+3. Registrar router em `backend/app/main.py`:
+   ```python
+   from app.<nome_modulo>.router import router as nome_router
+   app.include_router(nome_router)
+   ```
 
 ### "Adicionar componente shadcn/ui novo"
 ```bash
@@ -498,14 +554,25 @@ cat BUGS.md
 
 **Quando trabalhar neste projeto:**
 
-1. **Arquitetura:** Backend FastAPI + Frontend Next.js 15 + yt-dlp
-2. **Pasta backend:** `./run.sh` para iniciar, nunca `python api.py`
-3. **Unicode/Encoding:** Sempre RFC 5987 para headers, sempre escapar `'` em queries Drive
-4. **Bugs conhecidos:** Todos corrigidos (ver BUGS.md para histórico)
-5. **Google Drive:** OAuth configurado, streaming funcionando, upload funcionando
-6. **UI:** shadcn/ui + Tailwind, componentes já existentes em `components/ui/`
+1. **Arquitetura Backend:** Modular (similar NestJS) em `backend/app/`
+   - Cada módulo tem: `router.py`, `service.py`, `schemas.py`
+   - Entry point: `app/main.py`
+   - Configurações: `app/config.py`
+2. **Iniciar Backend:** `./run.sh` (nunca `python app/main.py` diretamente)
+3. **Arquitetura Frontend:** Next.js 15 + shadcn/ui + Tailwind
+4. **Unicode/Encoding:** Sempre RFC 5987 para headers, sempre escapar `'` em queries Drive
+5. **Bugs conhecidos:** Todos corrigidos (ver BUGS.md para histórico)
+6. **Google Drive:** OAuth em `app/drive/manager.py`, streaming funcionando
 7. **Player:** Plyr com range requests (HTTP 206) funcionando local + Drive
-8. **Sistema de jobs:** Assíncrono com polling, progresso em tempo real
+8. **Sistema de jobs:** Em `app/jobs/`, assíncrono com polling
+
+**Localização dos arquivos principais:**
+- Downloads: `app/downloads/` (schemas.py tem DownloadRequest)
+- Jobs: `app/jobs/` (store.py tem storage in-memory)
+- Streaming: `app/library/router.py`
+- Google Drive: `app/drive/manager.py`
+- Exceções: `app/core/exceptions.py`
+- Validações: `app/core/security.py`
 
 **Nunca:**
 - Suportar DRM
@@ -518,8 +585,9 @@ cat BUGS.md
 - Validar entradas
 - Documentar mudanças
 - Preservar estabilidade
+- Seguir o padrão modular ao criar novos endpoints
 
 ---
 
-**Última atualização:** 2025-10-08
-**Status:** ✅ Aplicação 100% funcional, todos os bugs críticos corrigidos
+**Última atualização:** 2025-11-29
+**Status:** ✅ Aplicação 100% funcional, arquitetura modular implementada

@@ -13,7 +13,7 @@ pip install -r requirements.txt
 cd ..
 
 # Frontend
-cd web-ui
+cd frontend
 npm install
 cd ..
 ```
@@ -35,13 +35,13 @@ start-dev.bat
 Terminal 1:
 ```bash
 cd backend
-source .venv/bin/activate
-python api.py
+./run.sh
+# Ou: source .venv/bin/activate && uvicorn app.main:app --reload
 ```
 
 Terminal 2:
 ```bash
-cd web-ui
+cd frontend
 npm run dev
 ```
 
@@ -102,20 +102,20 @@ brew install ffmpeg
 
 ### Frontend não conecta
 
-Verificar arquivo `web-ui/.env.local`:
-```
-NEXT_PUBLIC_API_URL=http://localhost:8000
+Verificar se o backend está rodando:
+```bash
+curl http://localhost:8000/
 ```
 
 ### Porta já em uso
 
 ```bash
-# Mudar porta do backend
-cd backend
-uvicorn api:app --host 0.0.0.0 --port 8001
+# Matar processo na porta
+lsof -ti:8000 | xargs kill -9
 
-# Atualizar .env.local
-NEXT_PUBLIC_API_URL=http://localhost:8001
+# Ou mudar porta do backend
+cd backend
+source .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 
 ## 📸 Interface Preview
