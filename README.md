@@ -6,8 +6,8 @@ Sistema completo para download e arquivamento de vídeos do YouTube e streams HL
 
 O YT-Archiver combina uma API REST robusta com uma interface web moderna para facilitar o download e gerenciamento de vídeos:
 
-- **API REST** (`backend/`): FastAPI com sistema de jobs assíncronos e integração com Google Drive
-- **Interface Web** (`web-ui/`): Next.js 15 + shadcn/ui para uma experiência visual intuitiva
+- **API REST** (`backend/`): FastAPI com arquitetura modular, sistema de jobs assíncronos e integração com Google Drive
+- **Interface Web** (`frontend/`): Next.js 15 + shadcn/ui para uma experiência visual intuitiva
 - **Motor de Download**: yt-dlp para downloads de YouTube, playlists e streams HLS
 
 ### Principais Funcionalidades
@@ -62,12 +62,12 @@ Isso irá:
 **Backend:**
 ```bash
 cd backend
-./run.sh  # Ou: source .venv/bin/activate && python api.py
+./run.sh  # Ou: source .venv/bin/activate && uvicorn app.main:app --reload
 ```
 
 **Frontend:**
 ```bash
-cd web-ui
+cd frontend
 npm install
 npm run dev
 ```
@@ -239,26 +239,51 @@ A API FastAPI oferece endpoints completos para integração:
 
 ```
 yt-archiver/
-├── backend/                 # API FastAPI
-│   ├── api.py              # API principal com endpoints
-│   ├── downloader.py       # Lógica de download (yt-dlp wrapper)
-│   ├── drive_manager.py    # Gerenciamento do Google Drive
-│   ├── requirements.txt    # Dependências Python
-│   ├── run.sh             # Script para iniciar backend com venv
-│   ├── .venv/             # Ambiente virtual Python
-│   ├── downloads/         # Vídeos baixados (padrão)
-│   ├── archive.txt        # Controle de downloads
-│   ├── credentials.json   # Credenciais OAuth Google (gitignored)
-│   └── token.json         # Token OAuth (gitignored)
+├── backend/                      # API FastAPI (arquitetura modular)
+│   ├── app/                      # Pacote principal da aplicação
+│   │   ├── main.py               # Entry point FastAPI
+│   │   ├── config.py             # Configurações globais
+│   │   ├── core/                 # Módulo central
+│   │   │   ├── exceptions.py     # Exceções HTTP customizadas
+│   │   │   └── security.py       # Validações e sanitização
+│   │   ├── downloads/            # Módulo de downloads
+│   │   │   ├── router.py         # Endpoints /api/download, /api/video-info
+│   │   │   ├── service.py        # Lógica de negócio
+│   │   │   ├── schemas.py        # Modelos Pydantic
+│   │   │   └── downloader.py     # Engine yt-dlp wrapper
+│   │   ├── jobs/                 # Módulo de jobs assíncronos
+│   │   │   ├── router.py         # Endpoints /api/jobs/*
+│   │   │   ├── service.py        # Gerenciamento de jobs
+│   │   │   ├── schemas.py        # Modelos de jobs
+│   │   │   └── store.py          # Storage in-memory
+│   │   ├── library/              # Módulo de biblioteca local
+│   │   │   ├── router.py         # Endpoints /api/videos/*
+│   │   │   ├── service.py        # Scan de diretórios
+│   │   │   └── schemas.py        # Modelos de vídeos
+│   │   ├── recordings/           # Módulo de gravações
+│   │   │   ├── router.py         # Endpoint /api/recordings/upload
+│   │   │   └── service.py        # Salvamento de gravações
+│   │   └── drive/                # Módulo Google Drive
+│   │       ├── router.py         # Endpoints /api/drive/*
+│   │       ├── service.py        # Lógica de negócio
+│   │       ├── schemas.py        # Modelos do Drive
+│   │       └── manager.py        # DriveManager (OAuth, upload, sync)
+│   ├── requirements.txt          # Dependências Python
+│   ├── run.sh                    # Script para iniciar backend
+│   ├── .venv/                    # Ambiente virtual Python
+│   ├── downloads/                # Vídeos baixados (padrão)
+│   ├── archive.txt               # Controle de downloads
+│   ├── credentials.json          # Credenciais OAuth Google (gitignored)
+│   └── token.json                # Token OAuth (gitignored)
 │
-├── web-ui/                 # Interface Next.js
+├── frontend/                     # Interface Next.js
 │   ├── src/
-│   │   ├── app/           # App Router (Next.js 15)
+│   │   ├── app/                  # App Router (Next.js 15)
 │   │   │   ├── page.tsx          # Página principal
 │   │   │   ├── drive/page.tsx    # Página Google Drive
 │   │   │   ├── layout.tsx        # Layout raiz
 │   │   │   └── globals.css       # Estilos globais
-│   │   ├── components/    # Componentes React
+│   │   ├── components/           # Componentes React
 │   │   │   ├── download-form.tsx       # Formulário de download
 │   │   │   ├── video-grid.tsx          # Grid de vídeos locais
 │   │   │   ├── video-player.tsx        # Player de vídeo
@@ -267,18 +292,18 @@ yt-archiver/
 │   │   │   ├── sync-panel.tsx          # Painel de sincronização
 │   │   │   ├── navigation.tsx          # Navegação entre páginas
 │   │   │   └── ui/                     # Componentes shadcn/ui
-│   │   └── lib/           # Utilitários
-│   │       ├── utils.ts             # Funções helper
-│   │       └── url-validator.ts     # Validação de URLs
+│   │   └── lib/                  # Utilitários
+│   │       ├── utils.ts          # Funções helper
+│   │       └── url-validator.ts  # Validação de URLs
 │   ├── package.json
 │   └── next.config.ts
 │
-├── start-dev.sh           # Script de início rápido (Linux/Mac)
-├── start-dev.bat          # Script de início rápido (Windows)
-├── CLAUDE.md             # Instruções para Claude Code
-├── GOOGLE-DRIVE-SETUP.md # Guia de configuração do Drive
-├── GOOGLE-DRIVE-FEATURES.md # Documentação de features do Drive
-└── README.md             # Esta documentação
+├── start-dev.sh                  # Script de início rápido (Linux/Mac)
+├── start-dev.bat                 # Script de início rápido (Windows)
+├── CLAUDE.md                     # Instruções para Claude Code
+├── GOOGLE-DRIVE-SETUP.md         # Guia de configuração do Drive
+├── GOOGLE-DRIVE-FEATURES.md      # Documentação de features do Drive
+└── README.md                     # Esta documentação
 ```
 
 ---
@@ -287,10 +312,29 @@ yt-archiver/
 
 ### Backend
 - **FastAPI** - Framework web assíncrono
+- **Arquitetura Modular** - Organização similar ao NestJS (router/service/schema)
 - **yt-dlp** - Motor de download de vídeos
-- **Uvicorn** - Servidor ASGI
+- **Uvicorn** - Servidor ASGI com hot reload
 - **Google API Client** - Integração com Google Drive
-- **Pydantic** - Validação de dados
+- **Pydantic** - Validação de dados e schemas
+
+### Arquitetura do Backend
+
+O backend segue uma arquitetura modular com separação clara de responsabilidades:
+
+| Módulo | Responsabilidade | Endpoints |
+|--------|-----------------|-----------|
+| `downloads` | Download de vídeos via yt-dlp | `/api/download`, `/api/video-info` |
+| `jobs` | Gerenciamento de jobs assíncronos | `/api/jobs/*` |
+| `library` | Biblioteca de vídeos locais | `/api/videos/*` |
+| `recordings` | Upload de gravações de tela | `/api/recordings/upload` |
+| `drive` | Integração Google Drive | `/api/drive/*` |
+| `core` | Exceções, segurança, utilitários | - |
+
+**Padrão de cada módulo:**
+- `router.py` - Define endpoints (APIRouter)
+- `service.py` - Lógica de negócio
+- `schemas.py` - Modelos Pydantic (request/response)
 
 ### Frontend
 - **Next.js 15** - Framework React com App Router

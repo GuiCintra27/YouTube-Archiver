@@ -8,8 +8,8 @@ venv/
 ENV/
 env/
 
-# Downloads
-downloads/
+# Downloads (only root level, not app/downloads module)
+/downloads/
 *.txt
 !requirements.txt
 

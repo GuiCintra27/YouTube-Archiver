@@ -2,7 +2,7 @@
 
 Guia de consulta rápida para desenvolvimento e troubleshooting.
 
-**Última atualização:** 2025-10-08
+**Última atualização:** 2025-11-29
 
 ---
 
@@ -52,30 +52,55 @@ Guia de consulta rápida para desenvolvimento e troubleshooting.
 
 ## 📁 Mapa de Arquivos Críticos
 
-### Backend (Python)
+### Backend (Python) - Arquitetura Modular
 
 ```
+backend/app/
+├── main.py                         # ⭐ Entry point FastAPI
+│   └── Registra todos os routers
+│
+├── config.py                       # Configurações globais (Settings)
+│
+├── core/                           # Módulo central compartilhado
+│   ├── exceptions.py               # HTTPExceptions customizadas
+│   └── security.py                 # Validações de path, sanitização
+│
+├── downloads/                      # Módulo de downloads
+│   ├── router.py                   # Endpoints /api/download, /api/video-info
+│   ├── service.py                  # Lógica de negócio
+│   ├── schemas.py                  # ⭐ DownloadRequest (Pydantic)
+│   └── downloader.py               # ⭐ Engine yt-dlp wrapper
+│       ├── Settings (dataclass):   Configurações de download
+│       ├── Downloader.download():  Método principal
+│       └── _base_opts():           Opções do yt-dlp
+│
+├── jobs/                           # Módulo de jobs assíncronos
+│   ├── router.py                   # Endpoints /api/jobs/*
+│   ├── service.py                  # Gerenciamento de jobs
+│   ├── schemas.py                  # Modelos de jobs
+│   └── store.py                    # Storage in-memory (jobs_db)
+│
+├── library/                        # Módulo de biblioteca local
+│   ├── router.py                   # ⭐ Endpoints /api/videos/* (streaming)
+│   ├── service.py                  # Scan de diretórios
+│   └── schemas.py                  # Modelos de vídeos
+│
+├── recordings/                     # Módulo de gravações
+│   ├── router.py                   # Endpoint /api/recordings/upload
+│   └── service.py                  # Salvamento de gravações
+│
+└── drive/                          # Módulo Google Drive
+    ├── router.py                   # Endpoints /api/drive/*
+    ├── service.py                  # Lógica de negócio
+    ├── schemas.py                  # Modelos do Drive
+    └── manager.py                  # ⭐ DriveManager
+        ├── get_auth_url():         Gera URL OAuth
+        ├── exchange_code():        Troca código por token
+        ├── upload_video():         Upload com metadata
+        ├── list_videos():          Lista recursiva
+        └── ensure_folder():        Cria/obtém pastas
+
 backend/
-├── api.py                          # ⭐ 600+ linhas - Todos os endpoints
-│   ├── Line 1-100:    Imports, configuração inicial, CORS
-│   ├── Line 100-400:  Endpoints de download e jobs
-│   ├── Line 400-550:  Endpoints de biblioteca local
-│   └── Line 550-700:  Endpoints Google Drive
-│
-├── downloader.py                   # ⭐ 300+ linhas - yt-dlp wrapper
-│   ├── Settings (dataclass):  Configurações de download
-│   ├── Downloader.download():  Método principal de download
-│   └── _base_opts():           Opções do yt-dlp
-│
-├── drive_manager.py                # ⭐ 430 linhas - Google Drive
-│   ├── DriveManager.__init__():        Inicialização
-│   ├── get_auth_url():                 Gera URL OAuth
-│   ├── exchange_code():                Troca código por token
-│   ├── upload_video():                 Upload com metadata
-│   ├── list_videos():                  Lista recursiva
-│   ├── get_file_stream():              Stream para download
-│   └── ensure_folder():                Cria/obtém pastas
-│
 ├── requirements.txt                # Dependências Python
 ├── run.sh                          # ⭐ Script de inicialização
 └── credentials.json.example        # Template de credenciais
@@ -84,7 +109,7 @@ backend/
 ### Frontend (TypeScript/React)
 
 ```
-web-ui/src/
+frontend/src/
 ├── app/
 │   ├── page.tsx                    # ⭐ Página principal
 │   │   └── Componentes: DownloadForm, VideoGrid
@@ -163,7 +188,7 @@ DELETE /api/drive/videos/{id}       # Remove vídeo
 
 ### BUG #1: Local Video Streaming (CORRIGIDO ✅)
 **Erro:** `UnicodeEncodeError: 'latin-1' codec can't encode character '\u29f8'`
-**Arquivo:** `backend/api.py:412-511`
+**Arquivo:** `backend/app/library/router.py` (função `stream_video`)
 **Fix:**
 ```python
 from urllib.parse import quote
@@ -175,7 +200,7 @@ headers = {
 
 ### BUG #2: Drive Upload (CORRIGIDO ✅)
 **Erro:** Query malformada com aspas simples (ex: "60's")
-**Arquivo:** `backend/drive_manager.py:136-301`
+**Arquivo:** `backend/app/drive/manager.py` (métodos `upload_video`, `ensure_folder`)
 **Fix:**
 ```python
 escaped_name = name.replace("'", "\\'")
@@ -186,22 +211,37 @@ query = f"name='{escaped_name}' and '{parent_id}' in parents and trashed=false"
 
 ## 💡 Padrões de Código
 
-### Backend (Python)
+### Backend (Python) - Arquitetura Modular
 
-#### Endpoint Pattern
+#### Router Pattern (router.py)
 ```python
-@app.post("/api/endpoint")
+from fastapi import APIRouter, HTTPException
+from .service import business_logic
+from .schemas import RequestModel, ResponseModel
+
+router = APIRouter(prefix="/api/module", tags=["module"])
+
+@router.post("/endpoint")
 async def endpoint_name(request: RequestModel) -> ResponseModel:
     """Descrição do endpoint (aparece em /docs)"""
     try:
-        # Validação (Pydantic já valida)
-        # Lógica de negócio
+        result = business_logic(request)
         return ResponseModel(data=result)
     except Exception as e:
         import traceback
         print(f"[ERROR] {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
+```
+
+#### Service Pattern (service.py)
+```python
+from .schemas import RequestModel
+
+def business_logic(request: RequestModel) -> dict:
+    """Lógica de negócio isolada do router"""
+    # Processar request
+    return {"status": "success"}
 ```
 
 #### Streaming Response
@@ -276,8 +316,9 @@ const result = await response.json();
 ### Python
 1. **SEMPRE escapar `'` em queries Drive:** `name.replace("'", "\\'")`
 2. **SEMPRE usar RFC 5987 em headers:** `filename*=UTF-8''{quote(name)}`
-3. **SEMPRE ativar venv:** Use `./run.sh`, não `python api.py`
+3. **SEMPRE ativar venv:** Use `./run.sh`, não `python app/main.py`
 4. **SEMPRE try/except com traceback em endpoints**
+5. **SEMPRE seguir o padrão modular:** router.py → service.py → schemas.py
 
 ### TypeScript
 1. **SEMPRE usar `"use client"` em componentes interativos**
@@ -318,17 +359,19 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # Frontend
-cd web-ui
+cd frontend
 npm install
 ```
 
 ### Desenvolvimento
 ```bash
-# Backend
+# Backend (uvicorn com hot reload)
 cd backend && ./run.sh
+# Ou manualmente:
+# source .venv/bin/activate && uvicorn app.main:app --reload
 
 # Frontend
-cd web-ui && npm run dev
+cd frontend && npm run dev
 
 # Ambos (script automático)
 ./start-dev.sh
@@ -356,7 +399,7 @@ lsof -ti:3000 | xargs kill -9  # Frontend
 cd backend && ./run.sh
 
 # Build de produção frontend
-cd web-ui && npm run build && npm start
+cd frontend && npm run build && npm start
 ```
 
 ---
@@ -426,9 +469,10 @@ cd web-ui && npm run build && npm start
 
 | Sintoma | Causa Provável | Solução |
 |---------|----------------|---------|
-| 500 ao fazer stream local | UnicodeEncodeError | ✅ Corrigido (RFC 5987) |
-| 500 ao fazer upload Drive | Aspas não escapadas | ✅ Corrigido (escape `'`) |
+| 500 ao fazer stream local | UnicodeEncodeError | ✅ Corrigido em `app/library/router.py` |
+| 500 ao fazer upload Drive | Aspas não escapadas | ✅ Corrigido em `app/drive/manager.py` |
 | ModuleNotFoundError | venv não ativado | Use `./run.sh` |
+| Import error no uvicorn | Estrutura de pasta errada | Verifique `backend/app/` existe |
 | Address in use (8000) | Backend travado | `lsof -ti:8000 \| xargs kill -9` |
 | Frontend não conecta | Backend não rodando | `cd backend && ./run.sh` |
 | No video formats found | DRM ou URL inválida | Verificar URL, tentar cookies |

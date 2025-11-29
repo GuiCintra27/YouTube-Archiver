@@ -1,0 +1,181 @@
+"""
+Drive router - API endpoints for Google Drive integration
+"""
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse, Response
+
+from .service import (
+    get_auth_status,
+    get_auth_url,
+    exchange_auth_code,
+    list_videos_paginated,
+    upload_video,
+    get_sync_status,
+    sync_all_videos,
+    delete_video,
+    stream_video,
+    get_thumbnail,
+)
+from .manager import drive_manager
+from app.core.exceptions import (
+    DriveNotAuthenticatedException,
+    DriveCredentialsNotFoundException,
+    InvalidRequestException,
+    ThumbnailNotFoundException,
+)
+
+router = APIRouter(prefix="/api/drive", tags=["drive"])
+
+
+def _require_auth():
+    """Helper to check Drive authentication"""
+    if not drive_manager.is_authenticated():
+        raise DriveNotAuthenticatedException()
+
+
+@router.get("/auth-status")
+async def auth_status():
+    """Check if user is authenticated with Google Drive"""
+    return get_auth_status()
+
+
+@router.get("/auth-url")
+async def auth_url():
+    """Generate OAuth authentication URL"""
+    try:
+        url = get_auth_url()
+        return {"auth_url": url}
+    except FileNotFoundError:
+        raise DriveCredentialsNotFoundException()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/oauth2callback")
+async def oauth2callback(code: str):
+    """OAuth callback - exchange code for tokens"""
+    try:
+        return exchange_auth_code(code)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/videos")
+async def list_videos(page: int = 1, limit: int = 24):
+    """List videos in Google Drive with pagination"""
+    try:
+        _require_auth()
+
+        if page < 1 or limit < 1:
+            raise InvalidRequestException("page and limit must be positive integers")
+
+        return list_videos_paginated(page, limit)
+    except (DriveNotAuthenticatedException, InvalidRequestException):
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/upload/{video_path:path}")
+async def upload_to_drive(video_path: str, base_dir: str = "./downloads"):
+    """Upload a local video to Google Drive"""
+    try:
+        _require_auth()
+        return upload_video(video_path, base_dir)
+    except DriveNotAuthenticatedException:
+        raise
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/sync-status")
+async def sync_status(base_dir: str = "./downloads"):
+    """Get sync status between local and Drive"""
+    try:
+        _require_auth()
+        return get_sync_status(base_dir)
+    except DriveNotAuthenticatedException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sync-all")
+async def sync_all(base_dir: str = "./downloads"):
+    """Sync all local videos to Drive"""
+    try:
+        _require_auth()
+        return sync_all_videos(base_dir)
+    except DriveNotAuthenticatedException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/videos/{file_id}")
+async def delete_drive_video(file_id: str):
+    """Remove a video from Google Drive"""
+    try:
+        _require_auth()
+        return delete_video(file_id)
+    except DriveNotAuthenticatedException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/stream/{file_id}")
+async def stream_drive_video(file_id: str, request: Request):
+    """
+    Stream video from Google Drive with Range Request support.
+    Allows direct playback in browser with seek/skip.
+    """
+    try:
+        _require_auth()
+
+        range_header = request.headers.get('range')
+        generator, headers, status_code = stream_video(file_id, range_header)
+
+        if generator is None:
+            # Range not satisfiable
+            return Response(
+                status_code=status_code,
+                headers=headers
+            )
+
+        return StreamingResponse(
+            generator,
+            status_code=status_code,
+            headers=headers,
+            media_type=headers.get("Content-Type", "video/mp4")
+        )
+    except DriveNotAuthenticatedException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/thumbnail/{file_id}")
+async def get_drive_thumbnail(file_id: str):
+    """Get thumbnail for a Drive video"""
+    try:
+        _require_auth()
+
+        thumbnail_bytes = get_thumbnail(file_id)
+
+        if not thumbnail_bytes:
+            raise ThumbnailNotFoundException()
+
+        return Response(
+            content=thumbnail_bytes,
+            media_type="image/jpeg",
+            headers={
+                "Cache-Control": "public, max-age=86400"  # Cache for 1 day
+            }
+        )
+    except (DriveNotAuthenticatedException, ThumbnailNotFoundException):
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

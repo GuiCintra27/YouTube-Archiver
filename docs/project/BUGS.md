@@ -1,5 +1,5 @@
 # YT-Archiver - Bug Report
-**Data**: 2025-10-08
+**Data**: 2025-11-29 (atualizado)
 **Testado em**: localhost:3000
 **Backend**: FastAPI rodando em http://0.0.0.0:8000
 **Frontend**: Next.js 15 rodando em http://localhost:3000
@@ -22,7 +22,7 @@ A reprodução de vídeos da biblioteca local estava falhando. Quando o usuário
 5. **Tratamento de Exceções**: Envolvido código em try/except com traceback
 
 ### Arquivo Modificado
-- **Backend**: `backend/api.py:412-511` - Função `stream_video()`
+- **Backend**: `backend/app/library/router.py` - Função `stream_video()`
 
 ### Código da Correção
 ```python
@@ -71,9 +71,9 @@ O upload individual de vídeos para o Google Drive estava falhando. Quando o usu
 4. **Tratamento de Exceções**: Envolvido código em try/except com traceback completo
 
 ### Arquivos Modificados
-- **Backend**: `backend/drive_manager.py:136-301`
-  - Método `ensure_folder()` (linhas 136-157)
-  - Método `upload_video()` (linhas 159-301)
+- **Backend**: `backend/app/drive/manager.py`
+  - Método `ensure_folder()`
+  - Método `upload_video()`
 
 ### Código da Correção
 ```python
