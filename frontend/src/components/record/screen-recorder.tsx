@@ -66,7 +66,9 @@ export default function ScreenRecorder({
   const [state, setState] = useState<RecorderState>(RecorderState.IDLE);
   const [apiUrl, setApiUrl] = useState("");
   const [fileName, setFileName] = useState(defaultFileName);
-  const [captureAudio, setCaptureAudio] = useState(true);
+  const [captureSystemAudio, setCaptureSystemAudio] = useState(false);
+  const [captureMicrophone, setCaptureMicrophone] = useState(false);
+  const [isLinux, setIsLinux] = useState(false);
   const [saveToLibrary, setSaveToLibrary] = useState(true);
   const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState("");
@@ -78,11 +80,17 @@ export default function ScreenRecorder({
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const recordedBlobRef = useRef<Blob | null>(null);
 
   useEffect(() => {
     setApiUrl(getApiUrl());
+    // Detectar se é Linux
+    if (typeof navigator !== "undefined") {
+      setIsLinux(navigator.platform.toLowerCase().includes("linux"));
+    }
   }, []);
 
   useEffect(() => {
@@ -91,6 +99,8 @@ export default function ScreenRecorder({
         URL.revokeObjectURL(blobUrl);
       }
       streamRef.current?.getTracks().forEach((track) => track.stop());
+      micStreamRef.current?.getTracks().forEach((track) => track.stop());
+      audioContextRef.current?.close();
     };
   }, [blobUrl]);
 
@@ -105,14 +115,86 @@ export default function ScreenRecorder({
     }
 
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
+      // Capturar tela (com ou sem áudio do sistema)
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 30 },
-        audio: captureAudio,
+        audio: captureSystemAudio
+          ? {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+            }
+          : false,
       });
 
-      const recorder = new MediaRecorder(stream, {
-        mimeType: "video/webm;codecs=vp9",
-      });
+      streamRef.current = displayStream;
+
+      // Capturar microfone se habilitado
+      let micStream: MediaStream | null = null;
+      if (captureMicrophone) {
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+            video: false,
+          });
+          micStreamRef.current = micStream;
+        } catch (micErr) {
+          console.warn("Não foi possível capturar microfone:", micErr);
+          setStatusMessage(
+            "Microfone não disponível, gravando apenas tela/sistema."
+          );
+        }
+      }
+
+      // Montar a stream final para gravação
+      let finalStream: MediaStream;
+      const videoTracks = displayStream.getVideoTracks();
+      const systemAudioTracks = displayStream.getAudioTracks();
+      const micAudioTracks = micStream?.getAudioTracks() || [];
+
+      // Se temos múltiplas fontes de áudio, usar AudioContext para mixar
+      if (systemAudioTracks.length > 0 && micAudioTracks.length > 0) {
+        const audioContext = new AudioContext();
+        audioContextRef.current = audioContext;
+
+        const destination = audioContext.createMediaStreamDestination();
+
+        // Conectar áudio do sistema
+        const systemSource = audioContext.createMediaStreamSource(
+          new MediaStream(systemAudioTracks)
+        );
+        systemSource.connect(destination);
+
+        // Conectar áudio do microfone
+        const micSource = audioContext.createMediaStreamSource(
+          new MediaStream(micAudioTracks)
+        );
+        micSource.connect(destination);
+
+        // Criar stream final com vídeo + áudio mixado
+        finalStream = new MediaStream([
+          ...videoTracks,
+          ...destination.stream.getAudioTracks(),
+        ]);
+      } else {
+        // Apenas uma fonte de áudio (ou nenhuma)
+        finalStream = new MediaStream([
+          ...videoTracks,
+          ...systemAudioTracks,
+          ...micAudioTracks,
+        ]);
+      }
+
+      // Configurar MediaRecorder
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+        ? "video/webm;codecs=vp9"
+        : "video/webm";
+
+      const recorder = new MediaRecorder(finalStream, { mimeType });
 
       chunksRef.current = [];
       recorder.ondataavailable = (event) => {
@@ -131,13 +213,25 @@ export default function ScreenRecorder({
         setStatusMessage(
           "Gravação finalizada. Baixe ou envie para a biblioteca."
         );
+
+        // Fechar AudioContext se existir
+        audioContextRef.current?.close();
+        audioContextRef.current = null;
       };
 
       recorder.start();
       mediaRecorderRef.current = recorder;
-      streamRef.current = stream;
       setState(RecorderState.RECORDING);
-      setStatusMessage("Gravando... clique em Parar quando concluir.");
+
+      // Mensagem de status baseada nas fontes de áudio
+      const audioSources = [];
+      if (systemAudioTracks.length > 0) audioSources.push("sistema");
+      if (micAudioTracks.length > 0) audioSources.push("microfone");
+      const audioInfo =
+        audioSources.length > 0
+          ? ` (áudio: ${audioSources.join(" + ")})`
+          : " (sem áudio)";
+      setStatusMessage(`Gravando${audioInfo}... clique em Parar quando concluir.`);
     } catch (err) {
       console.error("Erro ao iniciar gravação", err);
       setError(
@@ -154,6 +248,7 @@ export default function ScreenRecorder({
       mediaRecorderRef.current.stop();
     }
     streamRef.current?.getTracks().forEach((track) => track.stop());
+    micStreamRef.current?.getTracks().forEach((track) => track.stop());
   };
 
   const downloadRecording = () => {
@@ -228,6 +323,8 @@ export default function ScreenRecorder({
     setBlobSize(null);
     recordedBlobRef.current = null;
     chunksRef.current = [];
+    micStreamRef.current = null;
+    audioContextRef.current = null;
     setFileName(defaultFileName());
   };
 
@@ -241,8 +338,8 @@ export default function ScreenRecorder({
           Gravar tela
         </CardTitle>
         <CardDescription>
-          Capture a tela pelo navegador. Baixe o arquivo e, opcionalmente, salve
-          uma cópia na pasta de vídeos do app.
+          Capture a tela pelo navegador com áudio do sistema e/ou microfone.
+          Baixe o arquivo e, opcionalmente, salve uma cópia na pasta de vídeos.
         </CardDescription>
       </CardHeader>
 
@@ -258,7 +355,7 @@ export default function ScreenRecorder({
           </Alert>
         )}
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-2">
             <Label htmlFor="fileName">Nome do arquivo</Label>
             <Input
@@ -272,18 +369,43 @@ export default function ScreenRecorder({
 
           <div className="flex items-center justify-between rounded-md border px-4 py-3">
             <div>
-              <p className="text-sm font-medium">Capturar áudio</p>
+              <p className="text-sm font-medium">Áudio do sistema</p>
               <p className="text-xs text-muted-foreground">
-                Inclui áudio compartilhado pela aba/desktop
+                Som da aba/desktop
               </p>
             </div>
             <Switch
-              checked={captureAudio}
-              onCheckedChange={setCaptureAudio}
+              checked={captureSystemAudio}
+              onCheckedChange={setCaptureSystemAudio}
+              disabled={state === "recording"}
+            />
+          </div>
+
+          <div className="flex items-center justify-between rounded-md border px-4 py-3">
+            <div>
+              <p className="text-sm font-medium">Microfone</p>
+              <p className="text-xs text-muted-foreground">
+                Gravar sua voz
+              </p>
+            </div>
+            <Switch
+              checked={captureMicrophone}
+              onCheckedChange={setCaptureMicrophone}
               disabled={state === "recording"}
             />
           </div>
         </div>
+
+        {isLinux && captureSystemAudio && state !== "recording" && (
+          <Alert>
+            <AlertDescription>
+              <strong>Linux:</strong> A captura de áudio do sistema pode não
+              funcionar. Ao compartilhar, selecione uma{" "}
+              <strong>&quot;Aba do Chrome&quot;</strong> (não janela/tela) e
+              marque <strong>&quot;Compartilhar áudio&quot;</strong>.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="flex flex-wrap gap-3">
           {state !== "recording" && (
@@ -350,9 +472,10 @@ export default function ScreenRecorder({
         </div>
 
         <p className="text-sm text-muted-foreground">
-          Observações: o navegador sempre abre o diálogo padrão para salvar
-          localmente; a pasta do app recebe cópias via upload (webm). Durante a
-          captura, finalize a seleção de janela/aba para que a gravação inicie.
+          <strong>Dica:</strong> Para capturar áudio do sistema, marque
+          &quot;Compartilhar áudio&quot; no diálogo do navegador ao selecionar a
+          aba/janela. Se habilitar ambas as fontes (sistema + microfone), os
+          áudios serão mixados automaticamente.
         </p>
       </CardContent>
 
