@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react";
 import VideoCard from "@/components/common/videos/video-card";
 import VideoPlayer from "@/components/common/videos/video-player";
+import { PaginationControls } from "@/components/common/pagination";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Loader2, VideoOff, Search, RefreshCw } from "lucide-react";
+import { Loader2, VideoOff } from "lucide-react";
 import { APIURLS } from "@/lib/api-urls";
 
 interface Video {
@@ -29,7 +28,7 @@ export default function PaginatedVideoGrid() {
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [pageInput, setPageInput] = useState("1");
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const apiUrl =
@@ -63,10 +62,6 @@ export default function PaginatedVideoGrid() {
     fetchVideos(page);
   }, [apiUrl, page]);
 
-  useEffect(() => {
-    setPageInput(String(page));
-  }, [page]);
-
   const handleDelete = async (video: Video) => {
     try {
       const response = await fetch(
@@ -93,21 +88,6 @@ export default function PaginatedVideoGrid() {
     }
   };
 
-  const canPrev = page > 1;
-  const canNext = page < totalPages;
-
-  const handlePageJump = () => {
-    const parsed = parseInt(pageInput, 10);
-    if (Number.isNaN(parsed)) {
-      setPageInput(String(page));
-      return;
-    }
-
-    const target = Math.min(Math.max(parsed, 1), totalPages);
-    setPageInput(String(target));
-    setPage(target);
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -118,81 +98,13 @@ export default function PaginatedVideoGrid() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-          <div className="flex w-full flex-wrap items-center gap-3 rounded-lg border bg-card/60 px-3 py-2 shadow-sm sm:w-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-              onClick={() => fetchVideos(page)}
-              disabled={loading}
-            >
-              <RefreshCw className="h-4 w-4" />
-              <span className="hidden sm:inline">Atualizar</span>
-            </Button>
-
-            <span className="hidden sm:block h-6 w-px bg-border" aria-hidden />
-
-            <div className="flex items-center gap-2">
-              <span>Navegar Para:</span>
-
-              <div className="relative flex items-center">
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={totalPages}
-                  value={pageInput}
-                  onChange={(e) => setPageInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handlePageJump();
-                    }
-                  }}
-                  className="h-10 w-24 pr-10 text-center"
-                  aria-label="Ir para página"
-                  placeholder="Página"
-                  disabled={loading || totalPages === 0}
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2"
-                  onClick={handlePageJump}
-                  disabled={loading || totalPages === 0}
-                  aria-label="Confirmar página"
-                >
-                  <Search className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            <span className="hidden sm:block h-6 w-px bg-border" aria-hidden />
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={!canPrev || loading}
-              >
-                Anterior
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Página {page} de {totalPages}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={!canNext || loading}
-              >
-                Próxima
-              </Button>
-            </div>
-          </div>
-        </div>
+        <PaginationControls
+          page={page}
+          totalPages={totalPages}
+          loading={loading}
+          onPageChange={setPage}
+          onRefresh={() => fetchVideos(page)}
+        />
       </div>
 
       {loading ? (

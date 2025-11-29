@@ -4,16 +4,8 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
-import {
-  Loader2,
-  VideoOff,
-  Cloud,
-  Trash2,
-  RefreshCw,
-  Play,
-  Search,
-} from "lucide-react";
+import { PaginationControls } from "@/components/common/pagination";
+import { Loader2, VideoOff, Cloud, Trash2, Play } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,7 +43,6 @@ export default function DriveVideoGrid() {
     new Set()
   );
   const [page, setPage] = useState(1);
-  const [pageInput, setPageInput] = useState("1");
   const [total, setTotal] = useState(0);
 
   const apiUrl =
@@ -96,10 +87,6 @@ export default function DriveVideoGrid() {
     fetchVideos(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, apiUrl]);
-
-  useEffect(() => {
-    setPageInput(String(page));
-  }, [page]);
 
   const handleDeleteClick = (video: DriveVideo) => {
     setVideoToDelete(video);
@@ -148,21 +135,6 @@ export default function DriveVideoGrid() {
   };
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const canPrev = page > 1;
-  const canNext = page < totalPages;
-
-  const handlePageJump = () => {
-    const parsed = parseInt(pageInput, 10);
-    if (Number.isNaN(parsed)) {
-      setPageInput(String(page));
-      return;
-    }
-    const target = Math.min(Math.max(parsed, 1), totalPages);
-    setPageInput(String(target));
-    setPage(target);
-  };
-
-  const currentVideos = videos;
 
   if (loading) {
     return (
@@ -190,84 +162,13 @@ export default function DriveVideoGrid() {
           </h2>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 w-full sm:w-auto">
-            <div className="flex w-full flex-wrap items-center gap-3 rounded-lg border bg-card/60 px-3 py-2 shadow-sm sm:w-auto">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-                onClick={() => fetchVideos(page)}
-                disabled={loading}
-              >
-                <RefreshCw className="h-4 w-4" />
-                <span className="hidden sm:inline">Atualizar</span>
-              </Button>
-
-              <span
-                className="hidden sm:block h-6 w-px bg-border"
-                aria-hidden
-              />
-
-              <div className="flex items-center gap-2">
-                <div className="relative flex items-center">
-                  <span>Navegar Para:</span>
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={totalPages}
-                    value={pageInput}
-                    onChange={(e) => setPageInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handlePageJump();
-                      }
-                    }}
-                    className="h-10 w-24 pr-10 text-center"
-                    aria-label="Ir para página"
-                    placeholder="Página"
-                    disabled={loading || videos.length === 0}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 -translate-y-1/2"
-                    onClick={handlePageJump}
-                    disabled={loading || videos.length === 0}
-                    aria-label="Confirmar página"
-                  >
-                    <Search className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <span
-                className="hidden sm:block h-6 w-px bg-border"
-                aria-hidden
-              />
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={!canPrev || loading}
-                >
-                  Anterior
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Página {page} de {totalPages}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setPage((p) => p + 1)}
-                  disabled={!canNext || loading}
-                >
-                  Próxima
-                </Button>
-              </div>
-            </div>
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              loading={loading}
+              onPageChange={setPage}
+              onRefresh={() => fetchVideos(page)}
+            />
 
             <p className="text-sm text-muted-foreground sm:text-right">
               {total} {total === 1 ? "vídeo" : "vídeos"}
@@ -288,7 +189,7 @@ export default function DriveVideoGrid() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {currentVideos.map((video) => (
+            {videos.map((video) => (
               <Card
                 key={video.id}
                 className="overflow-hidden hover:shadow-lg transition-shadow group"
