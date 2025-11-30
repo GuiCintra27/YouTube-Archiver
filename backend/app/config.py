@@ -12,6 +12,9 @@ class Settings:
     APP_VERSION: str = "2.0.0"
     APP_DESCRIPTION: str = "API para download de vídeos do YouTube e streams HLS"
 
+    # Logging
+    LOG_LEVEL: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+
     # CORS
     CORS_ORIGINS: list = [
         "http://localhost:3000",

@@ -14,6 +14,9 @@ from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 
 from app.config import settings
+from app.core.logging import get_module_logger
+
+logger = get_module_logger("drive")
 
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
 DRIVE_ROOT_FOLDER = "YouTube Archiver"
@@ -97,12 +100,12 @@ class DriveManager:
                         token.write(creds.to_json())
                     return True
                 except Exception as e:
-                    print(f"[DEBUG] Failed to refresh token: {e}")
+                    logger.debug(f"Failed to refresh token: {e}")
                     return False
 
             return False
         except Exception as e:
-            print(f"[DEBUG] Error checking authentication: {e}")
+            logger.debug(f"Error checking authentication: {e}")
             return False
 
     def credentials_exist(self) -> bool:
@@ -205,19 +208,19 @@ class DriveManager:
             video_path = Path(local_path)
             base_name = video_path.stem
 
-            print(f"[DEBUG] Uploading video: {file_name}")
-            print(f"[DEBUG] Local path: {local_path}")
+            logger.debug(f"Uploading video: {file_name}")
+            logger.debug(f"Local path: {local_path}")
 
             # Check if video file already exists
             escaped_file_name = file_name.replace("'", "\\'")
             query = f"name='{escaped_file_name}' and '{current_parent}' in parents and trashed=false"
-            print(f"[DEBUG] Query: {query}")
+            logger.debug(f"Query: {query}")
 
             results = service.files().list(q=query, fields='files(id, name, size)').execute()
             existing_files = results.get('files', [])
 
             if existing_files:
-                print(f"[DEBUG] File already exists in Drive")
+                logger.debug(f"File already exists in Drive: {file_name}")
                 return {
                     "status": "skipped",
                     "message": "File already exists in Drive",
@@ -249,7 +252,7 @@ class DriveManager:
                 'parents': [current_parent]
             }
 
-            print(f"[DEBUG] Starting upload...")
+            logger.debug(f"Starting upload for {file_name}...")
             media = MediaFileUpload(
                 local_path,
                 resumable=True,
@@ -271,7 +274,7 @@ class DriveManager:
                         "progress": int(status.progress() * 100)
                     })
 
-            print(f"[DEBUG] Upload completed: {response['id']}")
+            logger.info(f"Upload completed: {file_name} (ID: {response['id']})")
 
             uploaded_related = []
             # Upload related files
@@ -297,7 +300,7 @@ class DriveManager:
                     ).execute()
                     uploaded_related.append(related_file.name)
                 except Exception as e:
-                    print(f"Warning: Failed to upload related file {related_file.name}: {e}")
+                    logger.warning(f"Failed to upload related file {related_file.name}: {e}")
 
             return {
                 "status": "success",
@@ -308,9 +311,7 @@ class DriveManager:
             }
 
         except Exception as e:
-            import traceback
-            print(f"[ERROR] Exception in upload_video: {e}")
-            print(traceback.format_exc())
+            logger.error(f"Exception in upload_video: {e}", exc_info=True)
             raise
 
     def list_videos(self) -> List[Dict]:
@@ -386,7 +387,7 @@ class DriveManager:
             service.files().delete(fileId=file_id).execute()
             return True
         except Exception as e:
-            print(f"Error deleting file: {e}")
+            logger.error(f"Error deleting file {file_id}: {e}")
             return False
 
     def get_file_metadata(self, file_id: str) -> Dict:
@@ -427,7 +428,7 @@ class DriveManager:
 
             return None
         except Exception as e:
-            print(f"Error getting thumbnail: {e}")
+            logger.error(f"Error getting thumbnail for {file_id}: {e}")
             return None
 
 

@@ -3,7 +3,10 @@ Recordings router - API endpoints for screen recording uploads
 """
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 
+from app.core.logging import get_module_logger
 from .service import save_recording
+
+logger = get_module_logger("recordings")
 
 router = APIRouter(prefix="/api/recordings", tags=["recordings"])
 
@@ -28,7 +31,5 @@ async def upload_recording(
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
-        print(f"[ERROR] {e}")
-        print(traceback.format_exc())
+        logger.error(f"Failed to upload recording: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
