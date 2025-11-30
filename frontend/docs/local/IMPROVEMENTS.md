@@ -8,6 +8,27 @@ Este documento lista melhorias identificadas para o frontend do YT-Archiver, org
 
 ---
 
+## Status das Implementações
+
+| # | Melhoria | Status | Commit |
+|---|----------|--------|--------|
+| 1 | Centralizar URL da API | ✅ Implementado | `b55ac53` |
+| 2 | Corrigir Memory Leak no Polling | ✅ Implementado | `b55ac53` |
+| 3 | Criar Camada de API Centralizada | ✅ Implementado | `b55ac53` |
+| 4 | Remover Duplicação de formatBytes | ✅ Implementado | `b55ac53` |
+| 5 | Criar Error Boundary | ✅ Implementado | `b55ac53` |
+| 6 | Substituir alert() por mensagens inline | ✅ Implementado | `b55ac53` |
+| 7 | Adicionar useCallback para Event Handlers | ✅ Implementado | `b55ac53` |
+| 8 | Adicionar AbortController às Requisições | ✅ Implementado | `b55ac53` |
+| 9 | Adicionar ARIA Labels | Pendente | - |
+| 10 | Implementar Testes Automatizados | Pendente | - |
+| 11 | Adicionar Skeleton Loaders | Pendente | - |
+| 12 | Remover dependência prop-types | Pendente | - |
+| 13 | Implementar Code Splitting | Pendente | - |
+| 14 | Anunciar Estados de Loading | Pendente | - |
+
+---
+
 ## Resumo Executivo
 
 | Categoria | Quantidade | Severidade |
@@ -30,7 +51,7 @@ Este documento lista melhorias identificadas para o frontend do YT-Archiver, org
 
 ### 1. Centralizar URL da API
 
-**Status:** Pendente
+**Status:** ✅ Implementado
 **Impacto:** Alto
 **Esforço:** Baixo
 
@@ -88,7 +109,7 @@ export function MyComponent() {
 
 ### 2. Corrigir Memory Leak no Polling
 
-**Status:** Pendente
+**Status:** ✅ Implementado
 **Impacto:** Alto (Estabilidade)
 **Esforço:** Médio
 
@@ -178,7 +199,7 @@ useEffect(() => {
 
 ### 3. Criar Camada de API Centralizada
 
-**Status:** Pendente
+**Status:** ✅ Implementado
 **Impacto:** Alto
 **Esforço:** Médio
 
@@ -298,7 +319,7 @@ const streamUrl = api.getStreamUrl(`api/videos/stream/${path}`);
 
 ### 4. Remover Duplicação de formatBytes
 
-**Status:** Pendente
+**Status:** ✅ Implementado
 **Impacto:** Médio
 **Esforço:** Baixo
 
@@ -335,7 +356,7 @@ import { formatBytes } from "@/lib/utils";
 
 ### 5. Criar Error Boundary
 
-**Status:** Pendente
+**Status:** ✅ Implementado
 **Impacto:** Alto (Estabilidade)
 **Esforço:** Baixo
 
@@ -423,7 +444,7 @@ export default function LibraryPage() {
 
 ### 6. Substituir alert() por Toast Notifications
 
-**Status:** Pendente
+**Status:** ✅ Implementado (usando mensagens inline em vez de toast)
 **Impacto:** Médio (UX)
 **Esforço:** Baixo
 
@@ -488,7 +509,7 @@ export default function RootLayout({ children }) {
 
 ### 7. Adicionar useCallback para Event Handlers
 
-**Status:** Pendente
+**Status:** ✅ Implementado
 **Impacto:** Médio (Performance)
 **Esforço:** Médio
 
@@ -597,7 +618,7 @@ function downloadFormReducer(
 
 ### 9. Adicionar AbortController às Requisições Fetch
 
-**Status:** Pendente
+**Status:** ✅ Implementado (via useFetch hook)
 **Impacto:** Médio (Estabilidade)
 **Esforço:** Médio
 
