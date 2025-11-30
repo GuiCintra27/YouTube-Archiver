@@ -29,10 +29,16 @@ O backend segue uma arquitetura modular com separação clara de responsabilidad
 ```
 backend/app/
 ├── main.py              # Entry point FastAPI (inclui routers)
-├── config.py            # Configurações globais (Settings)
+├── config.py            # Configurações globais (pydantic-settings)
 ├── core/                # Módulo central compartilhado
-│   ├── exceptions.py    # Exceções HTTP customizadas
-│   └── security.py      # Validações de path, sanitização
+│   ├── logging.py       # Sistema de logging estruturado
+│   ├── validators.py    # Validação de URLs, paths, filenames
+│   ├── errors.py        # Respostas de erro padronizadas (ErrorCode, AppException)
+│   ├── rate_limit.py    # Rate limiting com slowapi
+│   ├── constants.py     # Constantes centralizadas (MIME types, extensions)
+│   ├── types.py         # Type hints e TypedDicts
+│   ├── exceptions.py    # Exceções HTTP customizadas (legacy)
+│   └── security.py      # Validações de path, sanitização (legacy)
 ├── downloads/           # Módulo de downloads
 │   ├── router.py        # Endpoints /api/download, /api/video-info
 │   ├── service.py       # Lógica de negócio
@@ -42,11 +48,13 @@ backend/app/
 │   ├── router.py        # Endpoints /api/jobs/*
 │   ├── service.py       # Gerenciamento de jobs
 │   ├── schemas.py       # Modelos Pydantic
-│   └── store.py         # Storage in-memory
+│   ├── store.py         # Storage in-memory
+│   └── cleanup.py       # Limpeza automática de jobs antigos
 ├── library/             # Módulo de biblioteca local
 │   ├── router.py        # Endpoints /api/videos/*
 │   ├── service.py       # Scan, streaming, exclusão
-│   └── schemas.py       # Modelos Pydantic
+│   ├── schemas.py       # Modelos Pydantic
+│   └── cache.py         # Cache de scan de diretórios (TTL 30s)
 ├── recordings/          # Módulo de gravações de tela
 │   ├── router.py        # Endpoint /api/recordings/upload
 │   └── service.py       # Salvamento de gravações
@@ -64,9 +72,11 @@ backend/app/
 - **Arquivos específicos**: downloader.py, manager.py, store.py
 
 **Dependências principais:**
-- `fastapi`, `uvicorn`, `pydantic`
+- `fastapi`, `uvicorn`, `pydantic`, `pydantic-settings`
 - `yt-dlp` (download engine)
 - `google-api-python-client`, `google-auth-oauthlib` (Drive API)
+- `slowapi` (rate limiting)
+- `pytest`, `pytest-asyncio`, `pytest-cov`, `httpx` (testes)
 
 ### Frontend (`frontend/`)
 **Framework:** Next.js 15 (App Router) + TypeScript
@@ -156,10 +166,22 @@ src/
 
 ### Python (Backend)
 - **Estilo:** PEP8 onde aplicável, priorizar estabilidade sobre refatoração agressiva
-- **Tipagem:** Leve, usando Pydantic para validação de dados
+- **Tipagem:** Completa, usando TypedDicts em `app/core/types.py`
 - **Async:** Usar threading para jobs de download (não async/await para yt-dlp)
-- **Logging:** Debug logs com `print(f"[DEBUG] ...")` e `print(f"[ERROR] ...")`
-- **Tratamento de erros:** Try/except com traceback completo + HTTPException com mensagens claras
+- **Logging:** Sistema estruturado em `app/core/logging.py`:
+  ```python
+  from app.core.logging import get_module_logger
+  logger = get_module_logger("meu_modulo")
+  logger.debug("Debug message")
+  logger.info("Info message")
+  logger.error("Error message", exc_info=True)
+  ```
+- **Tratamento de erros:** Usar `app/core/errors.py`:
+  ```python
+  from app.core.errors import raise_error, ErrorCode
+  raise_error(404, ErrorCode.VIDEO_NOT_FOUND, "Video not found")
+  ```
+- **Configuração:** Via variáveis de ambiente com `pydantic-settings` (ver `.env.example`)
 
 ### TypeScript/React (Frontend)
 - **Componentes:** Função como default export
@@ -207,6 +229,31 @@ npm start            # Servir build de produção
 ```
 
 **URL do Frontend:** http://localhost:3000
+
+### Testes do Backend (pytest)
+```bash
+cd backend
+source .venv/bin/activate
+
+# Rodar todos os testes
+pytest tests/ -v
+
+# Rodar com cobertura
+pytest tests/ --cov=app --cov-report=html
+
+# Rodar apenas um arquivo de teste
+pytest tests/test_validators.py -v
+
+# Rodar teste específico
+pytest tests/test_library.py::TestListVideos::test_list_videos_empty_directory -v
+```
+
+**Testes disponíveis (46 testes):**
+- `test_cache.py` - Cache de diretórios (7 testes)
+- `test_health.py` - Health check (2 testes)
+- `test_jobs.py` - Jobs e cancelamento (8 testes)
+- `test_library.py` - Vídeos, streaming, exclusão (13 testes)
+- `test_validators.py` - Validação de URLs e paths (16 testes)
 
 ### Reiniciar Backend em Caso de Mudanças
 ```bash
@@ -291,10 +338,16 @@ git cz              # Opção 3 (se instalado globalmente)
 backend/
 ├── app/                        # ⭐ Pacote principal da aplicação
 │   ├── main.py                 # ⭐ Entry point FastAPI
-│   ├── config.py               # Configurações globais
-│   ├── core/                   # Módulo central
-│   │   ├── exceptions.py       # Exceções HTTP customizadas
-│   │   └── security.py         # Validações e sanitização
+│   ├── config.py               # ⭐ Configurações (pydantic-settings)
+│   ├── core/                   # ⭐ Módulo central
+│   │   ├── logging.py          # Sistema de logging estruturado
+│   │   ├── validators.py       # Validação de URLs, paths, filenames
+│   │   ├── errors.py           # ⭐ ErrorCode, AppException, raise_error()
+│   │   ├── rate_limit.py       # Rate limiting com slowapi
+│   │   ├── constants.py        # Constantes (MIME types, extensions)
+│   │   ├── types.py            # TypedDicts e type aliases
+│   │   ├── exceptions.py       # Exceções HTTP (legacy)
+│   │   └── security.py         # Validações e sanitização (legacy)
 │   ├── downloads/              # Módulo de downloads
 │   │   ├── router.py           # Endpoints /api/download, /api/video-info
 │   │   ├── service.py          # Lógica de negócio
@@ -304,11 +357,13 @@ backend/
 │   │   ├── router.py           # Endpoints /api/jobs/*
 │   │   ├── service.py          # Gerenciamento de jobs
 │   │   ├── schemas.py          # Modelos de jobs
-│   │   └── store.py            # Storage in-memory
+│   │   ├── store.py            # Storage in-memory
+│   │   └── cleanup.py          # ⭐ Limpeza automática de jobs
 │   ├── library/                # Módulo de biblioteca local
 │   │   ├── router.py           # ⭐ Endpoints /api/videos/* (streaming)
 │   │   ├── service.py          # Scan de diretórios
-│   │   └── schemas.py          # Modelos de vídeos
+│   │   ├── schemas.py          # Modelos de vídeos
+│   │   └── cache.py            # ⭐ Cache de scan (TTL 30s)
 │   ├── recordings/             # Módulo de gravações
 │   │   ├── router.py           # Endpoint /api/recordings/upload
 │   │   └── service.py          # Salvamento de gravações
@@ -317,7 +372,16 @@ backend/
 │       ├── service.py          # Lógica de negócio
 │       ├── schemas.py          # Modelos do Drive
 │       └── manager.py          # ⭐ DriveManager (OAuth, upload, sync)
+├── tests/                      # ⭐ Testes automatizados (pytest)
+│   ├── conftest.py             # Fixtures compartilhadas
+│   ├── test_cache.py           # Testes do cache
+│   ├── test_health.py          # Testes do health check
+│   ├── test_jobs.py            # Testes de jobs
+│   ├── test_library.py         # Testes da biblioteca
+│   └── test_validators.py      # Testes de validação
 ├── requirements.txt            # Dependências Python
+├── pytest.ini                  # Configuração do pytest
+├── .env.example                # ⭐ Exemplo de variáveis de ambiente
 ├── run.sh                      # Script de inicialização
 ├── .venv/                      # Ambiente virtual (gitignored)
 ├── downloads/                  # Vídeos baixados (gitignored)
@@ -477,6 +541,17 @@ npx shadcn@latest add <component-name>
 
 ## 🧪 Testing e Debugging
 
+### Testes Automatizados (Backend)
+```bash
+cd backend && source .venv/bin/activate
+
+# Rodar todos os 46 testes
+pytest tests/ -v
+
+# Rodar com cobertura de código
+pytest tests/ --cov=app --cov-report=html
+```
+
 ### Testar Endpoint da API
 ```bash
 # Health check
@@ -490,9 +565,10 @@ curl http://localhost:8000/api/drive/auth-status
 ```
 
 ### Logs do Backend
-- Logs aparecem no terminal onde `./run.sh` foi executado
-- Debug logs: `[DEBUG] mensagem`
-- Error logs: `[ERROR] mensagem` + traceback
+- **Sistema estruturado:** Logs com timestamp, nível, módulo e mensagem
+- **Formato:** `2025-11-29 10:30:00 | INFO     | yt-archiver.downloads:start:42 | Download started`
+- **Níveis:** DEBUG, INFO, WARNING, ERROR (configurável via `LOG_LEVEL` em `.env`)
+- **Localização:** Terminal onde `./run.sh` foi executado
 
 ### Logs do Frontend
 - Console do navegador (F12)
@@ -557,22 +633,30 @@ cat BUGS.md
 1. **Arquitetura Backend:** Modular (similar NestJS) em `backend/app/`
    - Cada módulo tem: `router.py`, `service.py`, `schemas.py`
    - Entry point: `app/main.py`
-   - Configurações: `app/config.py`
+   - Configurações: `app/config.py` (pydantic-settings + `.env`)
 2. **Iniciar Backend:** `./run.sh` (nunca `python app/main.py` diretamente)
-3. **Arquitetura Frontend:** Next.js 15 + shadcn/ui + Tailwind
-4. **Unicode/Encoding:** Sempre RFC 5987 para headers, sempre escapar `'` em queries Drive
-5. **Bugs conhecidos:** Todos corrigidos (ver BUGS.md para histórico)
-6. **Google Drive:** OAuth em `app/drive/manager.py`, streaming funcionando
-7. **Player:** Plyr com range requests (HTTP 206) funcionando local + Drive
-8. **Sistema de jobs:** Em `app/jobs/`, assíncrono com polling
+3. **Testes Backend:** `pytest tests/ -v` (46 testes)
+4. **Arquitetura Frontend:** Next.js 15 + shadcn/ui + Tailwind
+5. **Unicode/Encoding:** Sempre RFC 5987 para headers, sempre escapar `'` em queries Drive
+6. **Bugs conhecidos:** Todos corrigidos (ver BUGS.md para histórico)
+7. **Google Drive:** OAuth em `app/drive/manager.py`, streaming funcionando
+8. **Player:** Plyr com range requests (HTTP 206) funcionando local + Drive
+9. **Sistema de jobs:** Em `app/jobs/`, assíncrono com polling + limpeza automática
 
 **Localização dos arquivos principais:**
 - Downloads: `app/downloads/` (schemas.py tem DownloadRequest)
-- Jobs: `app/jobs/` (store.py tem storage in-memory)
+- Jobs: `app/jobs/` (store.py tem storage, cleanup.py tem limpeza automática)
 - Streaming: `app/library/router.py`
+- Cache de vídeos: `app/library/cache.py`
 - Google Drive: `app/drive/manager.py`
-- Exceções: `app/core/exceptions.py`
-- Validações: `app/core/security.py`
+- **Logging:** `app/core/logging.py` (usar `get_module_logger()`)
+- **Erros:** `app/core/errors.py` (usar `raise_error()`, `ErrorCode`)
+- **Validação:** `app/core/validators.py` (URLs, paths, filenames)
+- **Rate Limiting:** `app/core/rate_limit.py` (slowapi)
+- **Constantes:** `app/core/constants.py` (MIME types, extensions)
+- **Types:** `app/core/types.py` (TypedDicts)
+- Exceções (legacy): `app/core/exceptions.py`
+- Validações (legacy): `app/core/security.py`
 
 **Nunca:**
 - Suportar DRM
@@ -582,10 +666,13 @@ cat BUGS.md
 
 **Sempre:**
 - Testar com caracteres especiais
-- Validar entradas
+- Validar entradas com `app/core/validators.py`
+- Usar logging estruturado (`get_module_logger()`)
+- Usar erros padronizados (`raise_error()`)
 - Documentar mudanças
 - Preservar estabilidade
 - Seguir o padrão modular ao criar novos endpoints
+- Rodar testes antes de commitar (`pytest tests/ -v`)
 
 ---
 

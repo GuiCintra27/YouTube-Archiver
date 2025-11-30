@@ -2,36 +2,46 @@
 
 ## Status dos Testes
 
-✅ **Backend API** - Funcionando
-✅ **CLI Python** - Funcionando
-🔄 **Frontend Next.js** - Pronto para teste
+✅ **Backend API** - 46 testes automatizados (pytest)
+✅ **Frontend Next.js** - Build funcionando
 
 ---
 
-## ⚡ Testes Rápidos
+## ⚡ Testes Automatizados (Backend)
 
-### Backend (API)
-
+### Rodar Todos os Testes
 ```bash
-./test-backend.sh
+cd backend
+source .venv/bin/activate
+pytest tests/ -v
 ```
 
-**O que testa:**
-- ✅ Servidor inicia corretamente
-- ✅ Health check endpoint
-- ✅ API Docs (Swagger)
-- ✅ Endpoints REST
+**Resultado esperado:** `46 passed in ~1.5s`
 
-### CLI Python
-
+### Testes com Cobertura
 ```bash
-./test-cli.sh
+pytest tests/ --cov=app --cov-report=html
+# Abrir htmlcov/index.html no navegador
 ```
 
-**O que testa:**
-- ✅ Comandos disponíveis
-- ✅ Help funcionando
-- ✅ List e Download commands
+### Testes Disponíveis (46 total)
+
+| Arquivo | Testes | Descrição |
+|---------|--------|-----------|
+| `test_cache.py` | 7 | Cache de diretórios (TTL, invalidação, thread-safety) |
+| `test_health.py` | 2 | Health check e versão |
+| `test_jobs.py` | 8 | Jobs, cancelamento, exclusão |
+| `test_library.py` | 13 | Vídeos, streaming, thumbnails, exclusão |
+| `test_validators.py` | 16 | Validação de URLs, paths, filenames |
+
+### Rodar Teste Específico
+```bash
+# Um arquivo
+pytest tests/test_validators.py -v
+
+# Um teste específico
+pytest tests/test_library.py::TestListVideos::test_list_videos_empty_directory -v
+```
 
 ---
 
@@ -41,10 +51,9 @@
 
 ```bash
 cd backend
-python3 -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn api:app --host 0.0.0.0 --port 8000
+./run.sh
+# Ou manualmente:
+# source .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 **Acesse:**
@@ -54,7 +63,7 @@ uvicorn api:app --host 0.0.0.0 --port 8000
 ### 2. Frontend (Next.js)
 
 ```bash
-cd web-ui
+cd frontend
 npm install
 npm run dev
 ```
@@ -62,21 +71,10 @@ npm run dev
 **Acesse:**
 - Web UI: http://localhost:3000
 
-### 3. CLI Python
+### 3. Ambos (Script Automático)
 
 ```bash
-cd python
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python main.py --help
-```
-
-**Exemplo:**
-```bash
-python main.py download "https://youtube.com/watch?v=dQw4w9WgXcQ" \
-  --out-dir ./downloads \
-  --max-res 720
+./start-dev.sh
 ```
 
 ---
@@ -122,33 +120,6 @@ curl -X POST http://localhost:8000/api/download \
 curl http://localhost:8000/api/jobs/JOB_ID
 ```
 
-### CLI Python
-
-#### 1. Listar Vídeos de Playlist
-```bash
-cd python
-source .venv/bin/activate
-python main.py list "https://www.youtube.com/playlist?list=PLx..."
-```
-
-#### 2. Download com Opções
-```bash
-python main.py download "URL" \
-  --out-dir ./test-downloads \
-  --max-res 480 \
-  --audio-only \
-  --file-name "teste"
-```
-
-#### 3. Download com Headers (HLS)
-```bash
-python main.py download "https://example.com/video.m3u8" \
-  --referer "https://example.com" \
-  --origin "https://example.com" \
-  --cookies-file ./cookies.txt \
-  --concurrent-fragments 15
-```
-
 ### Frontend Next.js
 
 1. Abrir http://localhost:3000
@@ -182,16 +153,8 @@ netstat -ano | findstr :8000
 taskkill /PID <PID> /F
 ```
 
-### CLI não funciona
+### ffmpeg não encontrado
 
-**Erro: typer not found**
-```bash
-cd python
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-**Erro: ffmpeg not found**
 ```bash
 # Ubuntu/Debian
 sudo apt install ffmpeg
@@ -206,7 +169,7 @@ brew install ffmpeg
 ### Frontend não conecta ao backend
 
 1. Verificar se backend está rodando: `curl http://localhost:8000/`
-2. Verificar arquivo `web-ui/.env.local`:
+2. Verificar arquivo `frontend/.env.local`:
    ```
    NEXT_PUBLIC_API_URL=http://localhost:8000
    ```
@@ -216,9 +179,9 @@ brew install ffmpeg
 
 Se aparecer erro de CORS no navegador:
 1. Verificar se o backend está configurado para aceitar `localhost:3000`
-2. Arquivo `backend/api.py` linha 29-33 deve ter:
-   ```python
-   allow_origins=["http://localhost:3000", "http://localhost:3001"]
+2. Verificar `backend/.env` ou `backend/app/config.py`:
+   ```
+   CORS_ORIGINS=http://localhost:3000,http://localhost:3001
    ```
 
 ---
@@ -227,17 +190,21 @@ Se aparecer erro de CORS no navegador:
 
 ```
 yt-archiver/
-├── test-backend.sh      # Testa API FastAPI
-├── test-cli.sh          # Testa CLI Python
 ├── backend/
-│   ├── .venv/          # Ambiente virtual Python
-│   └── api.py          # API FastAPI
-├── python/
-│   ├── .venv/          # Ambiente virtual Python
-│   └── main.py         # CLI original
-└── web-ui/
-    ├── node_modules/   # Dependências Node
-    └── src/            # Código Next.js
+│   ├── tests/           # ⭐ Testes automatizados (pytest)
+│   │   ├── conftest.py  # Fixtures compartilhadas
+│   │   ├── test_cache.py
+│   │   ├── test_health.py
+│   │   ├── test_jobs.py
+│   │   ├── test_library.py
+│   │   └── test_validators.py
+│   ├── app/             # Código da aplicação
+│   ├── pytest.ini       # Configuração do pytest
+│   ├── .venv/           # Ambiente virtual Python
+│   └── run.sh           # Script de inicialização
+└── frontend/
+    ├── node_modules/    # Dependências Node
+    └── src/             # Código Next.js
 ```
 
 ---
@@ -246,9 +213,9 @@ yt-archiver/
 
 Antes de usar em produção, verifique:
 
-- [ ] Backend inicia sem erros
+- [ ] Testes automatizados passam (`pytest tests/ -v` → 46 passed)
+- [ ] Backend inicia sem erros (`./run.sh`)
 - [ ] API responde em `/` e `/docs`
-- [ ] CLI mostra `--help` corretamente
 - [ ] Frontend carrega em localhost:3000
 - [ ] Download de teste funciona (vídeo pequeno)
 - [ ] Barra de progresso atualiza
@@ -262,17 +229,19 @@ Antes de usar em produção, verifique:
 
 ### Backend
 ```bash
-# Logs em tempo real
-tail -f /tmp/yt-archiver-api.log
+# Logs aparecem no terminal onde ./run.sh foi executado
+# Formato: TIMESTAMP | LEVEL | MODULE:FUNCTION:LINE | MESSAGE
+
+# Exemplo de saída:
+# 2025-11-29 10:30:00 | INFO     | yt-archiver:main:27 | Starting YT-Archiver API
+# 2025-11-29 10:30:01 | DEBUG    | yt-archiver.downloads:start:42 | Download started
 ```
+
+**Configurar nível de log:** Editar `LOG_LEVEL` em `backend/.env` (DEBUG, INFO, WARNING, ERROR)
 
 ### Frontend
 - Console do navegador (F12)
 - Terminal onde rodou `npm run dev`
-
-### CLI
-- Saída direta no terminal
-- Rich progress bars com `--help`
 
 ---
 
