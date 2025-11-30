@@ -10,6 +10,7 @@ from .service import (
     exchange_auth_code,
     list_videos_paginated,
     upload_video,
+    upload_single_video,
     get_sync_status,
     sync_all_videos,
     delete_video,
@@ -84,10 +85,20 @@ async def list_videos(request: Request, page: int = 1, limit: int = 24):
 @router.post("/upload/{video_path:path}")
 @limiter.limit(RateLimits.UPLOAD)
 async def upload_to_drive(request: Request, video_path: str, base_dir: str = "./downloads"):
-    """Upload a local video to Google Drive"""
+    """
+    Inicia upload assíncrono de um vídeo local para o Google Drive.
+
+    Retorna job_id imediatamente. O upload acontece em background.
+    Use GET /api/jobs/{job_id} para acompanhar o progresso.
+    """
     try:
         _require_auth()
-        return upload_video(video_path, base_dir)
+        job_id = await upload_single_video(video_path, base_dir)
+        return {
+            "status": "success",
+            "job_id": job_id,
+            "message": "Upload iniciado em background"
+        }
     except DriveNotAuthenticatedException:
         raise
     except HTTPException:
@@ -112,10 +123,21 @@ async def sync_status(request: Request, base_dir: str = "./downloads"):
 @router.post("/sync-all")
 @limiter.limit(RateLimits.DOWNLOAD_BATCH)
 async def sync_all(request: Request, base_dir: str = "./downloads"):
-    """Sync all local videos to Drive"""
+    """
+    Inicia sincronização assíncrona de vídeos locais para o Drive.
+
+    Retorna job_id imediatamente. O upload acontece em background
+    com até 3 uploads simultâneos. Use GET /api/jobs/{job_id} para
+    acompanhar o progresso.
+    """
     try:
         _require_auth()
-        return sync_all_videos(base_dir)
+        job_id = await sync_all_videos(base_dir)
+        return {
+            "status": "success",
+            "job_id": job_id,
+            "message": "Sincronização iniciada em background"
+        }
     except DriveNotAuthenticatedException:
         raise
     except Exception as e:

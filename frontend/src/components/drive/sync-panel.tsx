@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -19,6 +19,7 @@ import {
   Upload,
   HardDrive,
   Cloud,
+  XCircle,
 } from "lucide-react";
 import {
   Accordion,
@@ -37,6 +38,27 @@ interface SyncStatus {
   total_drive: number;
 }
 
+interface UploadProgress {
+  status: string;
+  total: number;
+  uploaded: number;
+  failed: number;
+  percent: number;
+  current_file: string | null;
+  files_in_progress?: string[];
+}
+
+interface JobResponse {
+  status: string;
+  progress: UploadProgress;
+  result?: {
+    uploaded: number;
+    total: number;
+    failed: Array<{ file: string; error: string }>;
+  };
+  error?: string;
+}
+
 export default function SyncPanel() {
   const apiUrl = useApiUrl();
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
@@ -45,6 +67,19 @@ export default function SyncPanel() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [uploadingVideo, setUploadingVideo] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+
+  // Ref para cleanup do polling
+  const pollingCleanupRef = useRef<(() => void) | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingCleanupRef.current) {
+        pollingCleanupRef.current();
+      }
+    };
+  }, []);
 
   const fetchSyncStatus = useCallback(async () => {
     if (!apiUrl) return;
@@ -72,6 +107,59 @@ export default function SyncPanel() {
     fetchSyncStatus();
   }, [fetchSyncStatus]);
 
+  const pollJobProgress = useCallback(
+    async (jobId: string, onComplete: (result: JobResponse) => void) => {
+      if (!apiUrl) return;
+
+      let cancelled = false;
+      let timeoutId: NodeJS.Timeout | null = null;
+
+      const poll = async () => {
+        if (cancelled) return;
+
+        try {
+          const res = await fetch(`${apiUrl}/api/jobs/${jobId}`);
+          if (!res.ok) {
+            throw new Error("Falha ao obter progresso do job");
+          }
+
+          const job: JobResponse = await res.json();
+
+          // Atualizar progresso
+          if (job.progress) {
+            setUploadProgress(job.progress);
+          }
+
+          // Verificar se terminou
+          if (["completed", "error", "cancelled"].includes(job.status)) {
+            onComplete(job);
+            return;
+          }
+
+          // Continuar polling
+          if (!cancelled) {
+            timeoutId = setTimeout(poll, 1000);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            setError(err instanceof Error ? err.message : "Erro no polling");
+            onComplete({ status: "error", progress: uploadProgress! });
+          }
+        }
+      };
+
+      // Iniciar polling
+      poll();
+
+      // Retornar função de cleanup
+      return () => {
+        cancelled = true;
+        if (timeoutId) clearTimeout(timeoutId);
+      };
+    },
+    [apiUrl, uploadProgress]
+  );
+
   const handleSyncAll = useCallback(async () => {
     if (!syncStatus || syncStatus.local_only.length === 0 || !apiUrl) return;
 
@@ -79,27 +167,62 @@ export default function SyncPanel() {
       setSyncing(true);
       setError(null);
       setSuccessMessage(null);
+      setUploadProgress({
+        status: "initializing",
+        total: syncStatus.local_only.length,
+        uploaded: 0,
+        failed: 0,
+        percent: 0,
+        current_file: null,
+      });
 
       const response = await fetch(`${apiUrl}/api/${APIURLS.DRIVE_SYNC_ALL}`, {
         method: "POST",
       });
 
       if (!response.ok) {
-        throw new Error("Falha ao sincronizar vídeos");
+        throw new Error("Falha ao iniciar sincronização");
       }
 
       const data = await response.json();
+      const jobId = data.job_id;
 
-      // Atualizar status
-      await fetchSyncStatus();
+      if (!jobId) {
+        throw new Error("Job ID não retornado pelo servidor");
+      }
 
-      setSuccessMessage(`Sincronização concluída! ${data.total} vídeos processados.`);
+      // Iniciar polling do progresso
+      const cleanup = await pollJobProgress(jobId, async (job) => {
+        setSyncing(false);
+        setUploadProgress(null);
+
+        if (job.status === "completed" && job.result) {
+          const { uploaded, failed } = job.result;
+          await fetchSyncStatus();
+
+          if (failed.length > 0) {
+            setSuccessMessage(
+              `Sincronização concluída! ${uploaded} vídeos enviados, ${failed.length} falhas.`
+            );
+          } else {
+            setSuccessMessage(
+              `Sincronização concluída! ${uploaded} vídeos enviados com sucesso.`
+            );
+          }
+        } else if (job.status === "error") {
+          setError(job.error || "Erro durante sincronização");
+        } else if (job.status === "cancelled") {
+          setError("Sincronização cancelada");
+        }
+      });
+
+      pollingCleanupRef.current = cleanup || null;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao sincronizar");
-    } finally {
       setSyncing(false);
+      setUploadProgress(null);
     }
-  }, [syncStatus, apiUrl, fetchSyncStatus]);
+  }, [syncStatus, apiUrl, fetchSyncStatus, pollJobProgress]);
 
   const handleUploadSingle = useCallback(
     async (videoPath: string) => {
@@ -117,20 +240,35 @@ export default function SyncPanel() {
         );
 
         if (!response.ok) {
-          throw new Error("Falha ao fazer upload");
+          throw new Error("Falha ao iniciar upload");
         }
 
-        // Atualizar status
-        await fetchSyncStatus();
+        const data = await response.json();
+        const jobId = data.job_id;
 
-        setSuccessMessage("Upload concluído com sucesso!");
+        if (!jobId) {
+          throw new Error("Job ID não retornado pelo servidor");
+        }
+
+        // Iniciar polling do progresso
+        const cleanup = await pollJobProgress(jobId, async (job) => {
+          setUploadingVideo(null);
+
+          if (job.status === "completed") {
+            await fetchSyncStatus();
+            setSuccessMessage("Upload concluído com sucesso!");
+          } else if (job.status === "error") {
+            setError(job.error || "Erro no upload");
+          }
+        });
+
+        pollingCleanupRef.current = cleanup || null;
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erro ao fazer upload");
-      } finally {
         setUploadingVideo(null);
       }
     },
-    [apiUrl, fetchSyncStatus]
+    [apiUrl, fetchSyncStatus, pollJobProgress]
   );
 
   if (loading && !syncStatus) {
@@ -163,6 +301,7 @@ export default function SyncPanel() {
       <CardContent className="space-y-6">
         {error && (
           <Alert variant="destructive">
+            <XCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
@@ -174,6 +313,31 @@ export default function SyncPanel() {
               {successMessage}
             </AlertDescription>
           </Alert>
+        )}
+
+        {/* Upload Progress */}
+        {uploadProgress && syncing && (
+          <div className="space-y-3 p-4 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-blue-700 dark:text-blue-300">
+                Enviando para o Drive...
+              </span>
+              <span className="text-blue-600 dark:text-blue-400">
+                {uploadProgress.uploaded}/{uploadProgress.total} ({Math.round(uploadProgress.percent)}%)
+              </span>
+            </div>
+            <Progress value={uploadProgress.percent} className="h-2" />
+            {uploadProgress.current_file && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 truncate">
+                Arquivo atual: {uploadProgress.current_file}
+              </p>
+            )}
+            {uploadProgress.failed > 0 && (
+              <p className="text-xs text-red-600 dark:text-red-400">
+                {uploadProgress.failed} arquivo(s) com falha
+              </p>
+            )}
+          </div>
         )}
 
         {syncStatus && (
@@ -245,7 +409,7 @@ export default function SyncPanel() {
                   {syncing ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Sincronizando...
+                      Sincronizando ({uploadProgress?.uploaded || 0}/{uploadProgress?.total || 0})
                     </>
                   ) : (
                     <>

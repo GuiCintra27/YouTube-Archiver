@@ -35,7 +35,7 @@ export default function VideoCard({
   title,
   channel,
   thumbnail,
-  path,
+  path: _path,
   onPlay,
   onDelete,
 }: VideoCardProps) {
