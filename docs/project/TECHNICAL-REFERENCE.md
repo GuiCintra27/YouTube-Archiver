@@ -62,8 +62,14 @@ backend/app/
 ├── config.py                       # Configurações globais (Settings)
 │
 ├── core/                           # Módulo central compartilhado
-│   ├── exceptions.py               # HTTPExceptions customizadas
-│   └── security.py                 # Validações de path, sanitização
+│   ├── logging.py                  # ⭐ Sistema de logging estruturado
+│   ├── validators.py               # ⭐ Validação de URLs, paths, filenames
+│   ├── errors.py                   # ⭐ ErrorCode, AppException, raise_error()
+│   ├── rate_limit.py               # Rate limiting com slowapi
+│   ├── constants.py                # Constantes (MIME types, extensions)
+│   ├── types.py                    # TypedDicts e type aliases
+│   ├── exceptions.py               # HTTPExceptions customizadas (legacy)
+│   └── security.py                 # Validações de path, sanitização (legacy)
 │
 ├── downloads/                      # Módulo de downloads
 │   ├── router.py                   # Endpoints /api/download, /api/video-info
@@ -78,12 +84,14 @@ backend/app/
 │   ├── router.py                   # Endpoints /api/jobs/*
 │   ├── service.py                  # Gerenciamento de jobs
 │   ├── schemas.py                  # Modelos de jobs
-│   └── store.py                    # Storage in-memory (jobs_db)
+│   ├── store.py                    # Storage in-memory (jobs_db)
+│   └── cleanup.py                  # ⭐ Limpeza automática de jobs antigos
 │
 ├── library/                        # Módulo de biblioteca local
 │   ├── router.py                   # ⭐ Endpoints /api/videos/* (streaming)
 │   ├── service.py                  # Scan de diretórios
-│   └── schemas.py                  # Modelos de vídeos
+│   ├── schemas.py                  # Modelos de vídeos
+│   └── cache.py                    # ⭐ Cache de scan de diretórios (TTL 30s)
 │
 ├── recordings/                     # Módulo de gravações
 │   ├── router.py                   # Endpoint /api/recordings/upload
@@ -101,7 +109,16 @@ backend/app/
         └── ensure_folder():        Cria/obtém pastas
 
 backend/
+├── tests/                          # ⭐ Testes automatizados (pytest)
+│   ├── conftest.py                 # Fixtures compartilhadas
+│   ├── test_cache.py               # Testes do cache (7 testes)
+│   ├── test_health.py              # Testes do health check (2 testes)
+│   ├── test_jobs.py                # Testes de jobs (8 testes)
+│   ├── test_library.py             # Testes da biblioteca (13 testes)
+│   └── test_validators.py          # Testes de validação (16 testes)
 ├── requirements.txt                # Dependências Python
+├── pytest.ini                      # Configuração do pytest
+├── .env.example                    # ⭐ Exemplo de variáveis de ambiente
 ├── run.sh                          # ⭐ Script de inicialização
 └── credentials.json.example        # Template de credenciais
 ```
@@ -215,23 +232,30 @@ query = f"name='{escaped_name}' and '{parent_id}' in parents and trashed=false"
 
 #### Router Pattern (router.py)
 ```python
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Request
 from .service import business_logic
 from .schemas import RequestModel, ResponseModel
+from app.core.logging import get_module_logger
+from app.core.errors import raise_error, ErrorCode
+from app.core.rate_limit import limiter, RateLimits
 
+logger = get_module_logger("module")
 router = APIRouter(prefix="/api/module", tags=["module"])
 
 @router.post("/endpoint")
-async def endpoint_name(request: RequestModel) -> ResponseModel:
+@limiter.limit(RateLimits.DEFAULT)
+async def endpoint_name(request: Request, body: RequestModel) -> ResponseModel:
     """Descrição do endpoint (aparece em /docs)"""
     try:
-        result = business_logic(request)
+        result = business_logic(body)
+        logger.info(f"Processed request successfully")
         return ResponseModel(data=result)
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise_error(400, ErrorCode.VALIDATION_ERROR, str(e))
     except Exception as e:
-        import traceback
-        print(f"[ERROR] {e}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        raise_error(500, ErrorCode.INTERNAL_ERROR, "Internal server error")
 ```
 
 #### Service Pattern (service.py)
@@ -330,10 +354,22 @@ const result = await response.json();
 
 ## 🔐 Variáveis de Ambiente e Configuração
 
-### Backend
+### Backend (.env)
 ```bash
-# Nenhuma variável de ambiente necessária
-# Configuração via arquivos:
+# Copiar .env.example para .env e ajustar conforme necessário
+cp backend/.env.example backend/.env
+
+# Variáveis disponíveis:
+APP_NAME=YT-Archiver API          # Nome da aplicação
+LOG_LEVEL=INFO                     # DEBUG, INFO, WARNING, ERROR
+HOST=0.0.0.0                       # Host do servidor
+PORT=8000                          # Porta do servidor
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+DOWNLOADS_DIR=./downloads          # Diretório de downloads
+DEFAULT_MAX_RESOLUTION=1080        # Resolução padrão
+JOB_EXPIRY_HOURS=24               # Tempo para limpeza de jobs
+
+# Arquivos de configuração:
 backend/credentials.json    # OAuth Google (obter no Cloud Console)
 backend/token.json          # Gerado automaticamente após auth
 backend/archive.txt         # Gerado automaticamente
@@ -342,8 +378,8 @@ backend/archive.txt         # Gerado automaticamente
 ### Frontend
 ```bash
 # Next.js usa variáveis de ambiente
-# Nenhuma configuração necessária por padrão
-# Backend hardcoded em http://localhost:8000
+# Arquivo: frontend/.env.local
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
 ---
@@ -379,7 +415,13 @@ cd frontend && npm run dev
 
 ### Testing
 ```bash
-# Test endpoints
+# Testes automatizados (pytest) - 46 testes
+cd backend && source .venv/bin/activate
+pytest tests/ -v                    # Todos os testes
+pytest tests/ --cov=app             # Com cobertura de código
+pytest tests/test_validators.py -v  # Apenas um arquivo
+
+# Test endpoints manualmente
 curl http://localhost:8000/
 curl http://localhost:8000/api/videos
 curl http://localhost:8000/api/drive/auth-status
