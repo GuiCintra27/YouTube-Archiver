@@ -10,6 +10,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, FileResponse
 
 from app.core.logging import get_module_logger
+from app.core.rate_limit import limiter, RateLimits
 from .service import get_paginated_videos, delete_video_with_related
 from app.config import settings
 from app.core.security import sanitize_path, validate_path_within_base, validate_file_exists, encode_filename_for_header
@@ -27,7 +28,8 @@ router = APIRouter(prefix="/api/videos", tags=["library"])
 
 
 @router.get("")
-async def list_videos(base_dir: str = "./downloads", page: int = 1, limit: Optional[int] = None):
+@limiter.limit(RateLimits.LIST_VIDEOS)
+async def list_videos(request: Request, base_dir: str = "./downloads", page: int = 1, limit: Optional[int] = None):
     """Lista vídeos disponíveis na biblioteca (com paginação opcional)"""
     if page < 1:
         raise InvalidRequestException("Página deve ser >= 1")
@@ -38,7 +40,8 @@ async def list_videos(base_dir: str = "./downloads", page: int = 1, limit: Optio
 
 
 @router.get("/stream/{video_path:path}")
-async def stream_video(video_path: str, request: Request, base_dir: str = "./downloads"):
+@limiter.limit(RateLimits.STREAM_VIDEO)
+async def stream_video(request: Request, video_path: str, base_dir: str = "./downloads"):
     """
     Serve o arquivo de vídeo para streaming.
     Suporta range requests para seek/skip.
@@ -126,7 +129,8 @@ async def stream_video(video_path: str, request: Request, base_dir: str = "./dow
 
 
 @router.get("/thumbnail/{thumbnail_path:path}")
-async def get_thumbnail(thumbnail_path: str, base_dir: str = "./downloads"):
+@limiter.limit(RateLimits.DEFAULT)
+async def get_thumbnail(request: Request, thumbnail_path: str, base_dir: str = "./downloads"):
     """Serve a thumbnail do vídeo"""
     try:
         thumbnail_path = sanitize_path(thumbnail_path)
@@ -149,7 +153,8 @@ async def get_thumbnail(thumbnail_path: str, base_dir: str = "./downloads"):
 
 
 @router.delete("/{video_path:path}")
-async def delete_video(video_path: str, base_dir: str = "./downloads"):
+@limiter.limit(RateLimits.DELETE)
+async def delete_video(request: Request, video_path: str, base_dir: str = "./downloads"):
     """Exclui um vídeo e seus arquivos associados (thumbnail, legendas, etc)."""
     try:
         return delete_video_with_related(video_path, base_dir)

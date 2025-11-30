@@ -23,6 +23,7 @@ from app.core.exceptions import (
     InvalidRequestException,
     ThumbnailNotFoundException,
 )
+from app.core.rate_limit import limiter, RateLimits
 
 router = APIRouter(prefix="/api/drive", tags=["drive"])
 
@@ -34,13 +35,15 @@ def _require_auth():
 
 
 @router.get("/auth-status")
-async def auth_status():
+@limiter.limit(RateLimits.GET_STATUS)
+async def auth_status(request: Request):
     """Check if user is authenticated with Google Drive"""
     return get_auth_status()
 
 
 @router.get("/auth-url")
-async def auth_url():
+@limiter.limit(RateLimits.AUTH)
+async def auth_url(request: Request):
     """Generate OAuth authentication URL"""
     try:
         url = get_auth_url()
@@ -52,7 +55,8 @@ async def auth_url():
 
 
 @router.get("/oauth2callback")
-async def oauth2callback(code: str):
+@limiter.limit(RateLimits.AUTH)
+async def oauth2callback(request: Request, code: str):
     """OAuth callback - exchange code for tokens"""
     try:
         return exchange_auth_code(code)
@@ -61,7 +65,8 @@ async def oauth2callback(code: str):
 
 
 @router.get("/videos")
-async def list_videos(page: int = 1, limit: int = 24):
+@limiter.limit(RateLimits.LIST_VIDEOS)
+async def list_videos(request: Request, page: int = 1, limit: int = 24):
     """List videos in Google Drive with pagination"""
     try:
         _require_auth()
@@ -77,7 +82,8 @@ async def list_videos(page: int = 1, limit: int = 24):
 
 
 @router.post("/upload/{video_path:path}")
-async def upload_to_drive(video_path: str, base_dir: str = "./downloads"):
+@limiter.limit(RateLimits.UPLOAD)
+async def upload_to_drive(request: Request, video_path: str, base_dir: str = "./downloads"):
     """Upload a local video to Google Drive"""
     try:
         _require_auth()
@@ -91,7 +97,8 @@ async def upload_to_drive(video_path: str, base_dir: str = "./downloads"):
 
 
 @router.get("/sync-status")
-async def sync_status(base_dir: str = "./downloads"):
+@limiter.limit(RateLimits.GET_STATUS)
+async def sync_status(request: Request, base_dir: str = "./downloads"):
     """Get sync status between local and Drive"""
     try:
         _require_auth()
@@ -103,7 +110,8 @@ async def sync_status(base_dir: str = "./downloads"):
 
 
 @router.post("/sync-all")
-async def sync_all(base_dir: str = "./downloads"):
+@limiter.limit(RateLimits.DOWNLOAD_BATCH)
+async def sync_all(request: Request, base_dir: str = "./downloads"):
     """Sync all local videos to Drive"""
     try:
         _require_auth()
@@ -115,7 +123,8 @@ async def sync_all(base_dir: str = "./downloads"):
 
 
 @router.delete("/videos/{file_id}")
-async def delete_drive_video(file_id: str):
+@limiter.limit(RateLimits.DELETE)
+async def delete_drive_video(request: Request, file_id: str):
     """Remove a video from Google Drive"""
     try:
         _require_auth()
@@ -127,7 +136,8 @@ async def delete_drive_video(file_id: str):
 
 
 @router.get("/stream/{file_id}")
-async def stream_drive_video(file_id: str, request: Request):
+@limiter.limit(RateLimits.STREAM_VIDEO)
+async def stream_drive_video(request: Request, file_id: str):
     """
     Stream video from Google Drive with Range Request support.
     Allows direct playback in browser with seek/skip.
@@ -158,7 +168,8 @@ async def stream_drive_video(file_id: str, request: Request):
 
 
 @router.get("/thumbnail/{file_id}")
-async def get_drive_thumbnail(file_id: str):
+@limiter.limit(RateLimits.DEFAULT)
+async def get_drive_thumbnail(request: Request, file_id: str):
     """Get thumbnail for a Drive video"""
     try:
         _require_auth()

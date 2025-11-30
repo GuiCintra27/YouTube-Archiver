@@ -4,9 +4,10 @@ Jobs router - API endpoints for job management
 import asyncio
 import json
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
+from app.core.rate_limit import limiter, RateLimits
 from . import store
 from .service import cancel_job
 from app.core.exceptions import JobNotFoundException, InvalidRequestException
@@ -15,7 +16,8 @@ router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 
 @router.get("")
-async def list_jobs():
+@limiter.limit(RateLimits.GET_STATUS)
+async def list_jobs(request: Request):
     """Lista todos os jobs"""
     jobs = store.get_all_jobs()
     return {
@@ -25,7 +27,8 @@ async def list_jobs():
 
 
 @router.get("/{job_id}")
-async def get_job_status(job_id: str):
+@limiter.limit(RateLimits.GET_STATUS)
+async def get_job_status(request: Request, job_id: str):
     """Obtém o status de um job"""
     job = store.get_job(job_id)
     if not job:
@@ -34,7 +37,8 @@ async def get_job_status(job_id: str):
 
 
 @router.post("/{job_id}/cancel")
-async def cancel_job_endpoint(job_id: str):
+@limiter.limit(RateLimits.DELETE)
+async def cancel_job_endpoint(request: Request, job_id: str):
     """Cancela um job em execução"""
     job = store.get_job(job_id)
     if not job:
@@ -57,7 +61,8 @@ async def cancel_job_endpoint(job_id: str):
 
 
 @router.delete("/{job_id}")
-async def delete_job(job_id: str):
+@limiter.limit(RateLimits.DELETE)
+async def delete_job(request: Request, job_id: str):
     """Remove um job do histórico"""
     if not store.job_exists(job_id):
         raise JobNotFoundException()
@@ -73,7 +78,8 @@ async def delete_job(job_id: str):
 
 
 @router.get("/{job_id}/stream")
-async def stream_job_progress(job_id: str):
+@limiter.limit(RateLimits.GET_STATUS)
+async def stream_job_progress(request: Request, job_id: str):
     """Stream de progresso em tempo real usando Server-Sent Events (SSE)"""
     if not store.job_exists(job_id):
         raise JobNotFoundException()

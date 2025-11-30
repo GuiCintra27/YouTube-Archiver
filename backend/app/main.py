@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.core.logging import setup_logging, logger
 from app.core.errors import register_exception_handlers
+from app.core.rate_limit import setup_rate_limiting
 
 # Import routers
 from app.downloads.router import router as downloads_router
@@ -56,6 +57,9 @@ app = FastAPI(
 
 # Register exception handlers for standardized error responses
 register_exception_handlers(app)
+
+# Setup rate limiting
+setup_rate_limiting(app)
 
 # Configure CORS
 app.add_middleware(
