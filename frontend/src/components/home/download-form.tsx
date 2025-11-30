@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,13 +33,7 @@ import {
 import { formatBytes, formatSpeed, formatTime } from "@/lib/utils";
 import { validateUrl, type UrlType } from "@/lib/url-validator";
 import { APIURLS } from "@/lib/api-urls";
-
-const getApiUrl = () => {
-  if (typeof window !== "undefined") {
-    return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  }
-  return "http://localhost:8000";
-};
+import { useApiUrl } from "@/hooks/use-api-url";
 
 interface DownloadProgress {
   status: string;
@@ -66,13 +60,21 @@ interface JobStatus {
 }
 
 export default function DownloadForm() {
+  // API URL from centralized hook
+  const apiUrl = useApiUrl();
+
+  // URL and validation state
   const [url, setUrl] = useState("");
   const [urlType, setUrlType] = useState<UrlType>("video");
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Download job state
   const [isDownloading, setIsDownloading] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
-  const [apiUrl, setApiUrl] = useState("");
+
+  // Polling cleanup ref - prevents memory leaks
+  const pollingCleanupRef = useRef<(() => void) | null>(null);
 
   // Configurações avançadas
   const [outDir, setOutDir] = useState("./downloads");
@@ -93,9 +95,13 @@ export default function DownloadForm() {
   const [batchDelay, setBatchDelay] = useState("0");
   const [randomizeDelay, setRandomizeDelay] = useState(false);
 
-  // Inicializar API URL apenas no cliente
+  // Cleanup polling on unmount to prevent memory leaks
   useEffect(() => {
-    setApiUrl(getApiUrl());
+    return () => {
+      if (pollingCleanupRef.current) {
+        pollingCleanupRef.current();
+      }
+    };
   }, []);
 
   // Validar URL quando mudar
@@ -112,8 +118,14 @@ export default function DownloadForm() {
     }
   }, [url, urlType]);
 
-  const cancelDownload = async () => {
+  const cancelDownload = useCallback(async () => {
     if (!jobId || !apiUrl) return;
+
+    // Stop polling first
+    if (pollingCleanupRef.current) {
+      pollingCleanupRef.current();
+      pollingCleanupRef.current = null;
+    }
 
     try {
       const response = await fetch(
@@ -125,20 +137,80 @@ export default function DownloadForm() {
 
       if (response.ok) {
         setIsDownloading(false);
-        // Atualizar status imediatamente
-        if (jobStatus) {
-          setJobStatus({
-            ...jobStatus,
-            status: "cancelled",
-          });
-        }
+        setJobStatus((prev) =>
+          prev ? { ...prev, status: "cancelled" } : null
+        );
       }
     } catch (error) {
       console.error("Erro ao cancelar download:", error);
     }
-  };
+  }, [jobId, apiUrl]);
 
-  const startDownload = async () => {
+  /**
+   * Poll job status with automatic cleanup.
+   * Returns a cleanup function to stop polling.
+   */
+  const pollJobStatus = useCallback(
+    (id: string): (() => void) => {
+      // Polling adaptativo: mais rápido no início, depois desacelera
+      let pollInterval = 500; // Começa com 500ms
+      let pollCount = 0;
+      let timeoutId: NodeJS.Timeout | null = null;
+      let cancelled = false;
+
+      const poll = async () => {
+        if (cancelled) return;
+
+        try {
+          const response = await fetch(`${apiUrl}/api/${APIURLS.JOBS}/${id}`);
+          if (!response.ok) throw new Error("Erro ao verificar status");
+
+          const status: JobStatus = await response.json();
+
+          if (cancelled) return;
+          setJobStatus(status);
+
+          // Parar polling se completou, falhou ou foi cancelado
+          if (["completed", "error", "cancelled"].includes(status.status)) {
+            setIsDownloading(false);
+            return; // Não agendar próximo poll
+          }
+
+          // Polling adaptativo
+          pollCount++;
+          if (pollCount > 10) {
+            pollInterval = 2000; // Após 10 polls, reduzir para 2s
+          } else if (pollCount > 5) {
+            pollInterval = 1000; // Após 5 polls, 1s
+          }
+
+          // Agendar próximo poll
+          if (!cancelled) {
+            timeoutId = setTimeout(poll, pollInterval);
+          }
+        } catch (error) {
+          if (!cancelled) {
+            console.error("Erro ao verificar status:", error);
+            setIsDownloading(false);
+          }
+        }
+      };
+
+      // Iniciar primeiro poll
+      poll();
+
+      // Return cleanup function
+      return () => {
+        cancelled = true;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      };
+    },
+    [apiUrl]
+  );
+
+  const startDownload = useCallback(async () => {
     if (!url.trim() || !apiUrl) return;
 
     // Validar URL antes de iniciar
@@ -183,53 +255,35 @@ export default function DownloadForm() {
 
       if (data.job_id) {
         setJobId(data.job_id);
-        // Monitorar progresso via polling
-        pollJobStatus(data.job_id);
+        // Monitorar progresso via polling with cleanup
+        pollingCleanupRef.current = pollJobStatus(data.job_id);
       }
     } catch (error) {
       console.error("Erro ao iniciar download:", error);
       setIsDownloading(false);
       setValidationError("Erro ao conectar com o servidor");
     }
-  };
-
-  const pollJobStatus = async (id: string) => {
-    // Polling adaptativo: mais rápido no início, depois desacelera
-    let pollInterval = 500; // Começa com 500ms
-    let pollCount = 0;
-
-    const poll = async () => {
-      try {
-        const response = await fetch(`${apiUrl}/api/${APIURLS.JOBS}/${id}`);
-        const status: JobStatus = await response.json();
-
-        setJobStatus(status);
-
-        // Parar polling se completou, falhou ou foi cancelado
-        if (["completed", "error", "cancelled"].includes(status.status)) {
-          setIsDownloading(false);
-          return; // Não agendar próximo poll
-        }
-
-        // Polling adaptativo
-        pollCount++;
-        if (pollCount > 10) {
-          pollInterval = 2000; // Após 10 polls, reduzir para 2s
-        } else if (pollCount > 5) {
-          pollInterval = 1000; // Após 5 polls, 1s
-        }
-
-        // Agendar próximo poll
-        setTimeout(poll, pollInterval);
-      } catch (error) {
-        console.error("Erro ao verificar status:", error);
-        setIsDownloading(false);
-      }
-    };
-
-    // Iniciar primeiro poll
-    poll();
-  };
+  }, [
+    url,
+    urlType,
+    apiUrl,
+    outDir,
+    maxRes,
+    subs,
+    autoSubs,
+    thumbnails,
+    audioOnly,
+    customPath,
+    fileName,
+    cookiesFile,
+    referer,
+    origin,
+    delayBetweenDownloads,
+    batchSize,
+    batchDelay,
+    randomizeDelay,
+    pollJobStatus,
+  ]);
 
   const progress: any = jobStatus?.progress || {};
   const percentage = progress.percentage || 0;

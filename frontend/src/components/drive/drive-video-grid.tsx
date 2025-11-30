@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import DriveVideoPlayer from "./drive-video-player";
 import { APIURLS } from "@/lib/api-urls";
+import { useApiUrl } from "@/hooks/use-api-url";
+import { formatBytes } from "@/lib/utils";
 
 interface DriveVideo {
   id: string;
@@ -32,6 +34,7 @@ interface DriveVideo {
 const PAGE_SIZE = 12;
 
 export default function DriveVideoGrid() {
+  const apiUrl = useApiUrl();
   const [videos, setVideos] = useState<DriveVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,56 +48,54 @@ export default function DriveVideoGrid() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
-  const apiUrl =
-    typeof window !== "undefined"
-      ? process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      : "http://localhost:8000";
+  const fetchVideos = useCallback(
+    async (pageNumber = 1) => {
+      if (!apiUrl) return;
+      try {
+        setLoading(true);
+        setError(null);
+        setThumbnailErrors(new Set()); // Resetar erros ao recarregar
+        const response = await fetch(
+          `${apiUrl}/api/${APIURLS.DRIVE_VIDEOS}?page=${pageNumber}&limit=${PAGE_SIZE}`
+        );
 
-  const fetchVideos = async (pageNumber = 1) => {
-    try {
-      setLoading(true);
-      setError(null);
-      setThumbnailErrors(new Set()); // Resetar erros ao recarregar
-      const response = await fetch(
-        `${apiUrl}/api/${APIURLS.DRIVE_VIDEOS}?page=${pageNumber}&limit=${PAGE_SIZE}`
-      );
+        if (!response.ok) {
+          throw new Error("Falha ao carregar vídeos do Drive");
+        }
 
-      if (!response.ok) {
-        throw new Error("Falha ao carregar vídeos do Drive");
+        const data = await response.json();
+        const list = data.videos || [];
+        const totalCount = data.total || list.length;
+        const maxPage = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+        if (pageNumber > maxPage) {
+          setPage(maxPage);
+          return;
+        }
+
+        setVideos(list);
+        setTotal(totalCount);
+        setPage(pageNumber);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Erro desconhecido");
+      } finally {
+        setLoading(false);
       }
-
-      const data = await response.json();
-      const list = data.videos || [];
-      const totalCount = data.total || list.length;
-      const maxPage = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
-
-      if (pageNumber > maxPage) {
-        setPage(maxPage);
-        return;
-      }
-
-      setVideos(list);
-      setTotal(totalCount);
-      setPage(pageNumber);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro desconhecido");
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [apiUrl]
+  );
 
   useEffect(() => {
     fetchVideos(page);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, apiUrl]);
+  }, [page, fetchVideos]);
 
-  const handleDeleteClick = (video: DriveVideo) => {
+  const handleDeleteClick = useCallback((video: DriveVideo) => {
     setVideoToDelete(video);
     setDeleteDialogOpen(true);
-  };
+  }, []);
 
-  const handleDeleteConfirm = async () => {
-    if (!videoToDelete) return;
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!videoToDelete || !apiUrl) return;
 
     try {
       setDeleting(true);
@@ -111,28 +112,17 @@ export default function DriveVideoGrid() {
       await fetchVideos(page);
       setDeleteDialogOpen(false);
     } catch (err) {
-      alert(
-        `Erro ao excluir vídeo: ${
-          err instanceof Error ? err.message : "Erro desconhecido"
-        }`
-      );
+      console.error("Erro ao excluir vídeo:", err);
+      setError(err instanceof Error ? err.message : "Erro ao excluir vídeo");
     } finally {
       setDeleting(false);
       setVideoToDelete(null);
     }
-  };
+  }, [videoToDelete, apiUrl, page, fetchVideos]);
 
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-  };
-
-  const handleThumbnailError = (videoId: string) => {
+  const handleThumbnailError = useCallback((videoId: string) => {
     setThumbnailErrors((prev) => new Set(prev).add(videoId));
-  };
+  }, []);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -232,7 +222,7 @@ export default function DriveVideoGrid() {
                     </p>
                     <div className="flex items-center justify-between pt-2">
                       <span className="text-xs text-muted-foreground">
-                        {formatSize(video.size)}
+                        {formatBytes(video.size)}
                       </span>
                       <Button
                         variant="ghost"

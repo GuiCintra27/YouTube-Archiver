@@ -1,25 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import DriveAuth from "@/components/drive/drive-auth";
 import DriveVideoGrid from "@/components/drive/drive-video-grid";
 import SyncPanel from "@/components/drive/sync-panel";
 import { APIURLS } from "@/lib/api-urls";
+import { useApiUrl } from "@/hooks/use-api-url";
 
 export default function DrivePage() {
+  const apiUrl = useApiUrl();
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const apiUrl =
-    typeof window !== "undefined"
-      ? process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      : "http://localhost:8000";
-
-  useEffect(() => {
-    checkAuthStatus();
-  }, []);
-
-  const checkAuthStatus = async () => {
+  const checkAuthStatus = useCallback(async () => {
+    if (!apiUrl) return;
     try {
       const response = await fetch(
         `${apiUrl}/api/${APIURLS.DRIVE_AUTH_STATUS}`
@@ -31,7 +25,11 @@ export default function DrivePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiUrl]);
+
+  useEffect(() => {
+    checkAuthStatus();
+  }, [checkAuthStatus]);
 
   if (loading) {
     return (
