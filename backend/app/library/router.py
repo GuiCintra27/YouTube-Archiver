@@ -1,5 +1,11 @@
 """
-Library router - API endpoints for local video library
+Library router - API endpoints for local video library.
+
+Provides endpoints for:
+- Listing downloaded videos with pagination
+- Streaming videos with Range Request support
+- Serving thumbnails
+- Deleting videos and related files
 """
 import re
 from pathlib import Path
@@ -27,10 +33,57 @@ logger = get_module_logger("library")
 router = APIRouter(prefix="/api/videos", tags=["library"])
 
 
-@router.get("")
+@router.get(
+    "",
+    summary="Listar vídeos da biblioteca",
+    description="""
+Lista os vídeos baixados na biblioteca local.
+
+**Estrutura de diretórios:**
+Os vídeos são organizados em `downloads/[canal]/[subcategoria]/video.mp4`.
+
+**Paginação:**
+- `page`: Número da página (começa em 1)
+- `limit`: Itens por página (opcional, retorna todos se omitido)
+
+**Resposta:**
+Inclui metadados de cada vídeo: título, canal, tamanho, data de criação,
+caminho relativo e thumbnail se disponível.
+
+**Cache:**
+Os resultados são cacheados por 30 segundos para melhor performance.
+    """,
+    responses={
+        200: {
+            "description": "Lista paginada de vídeos",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "total": 150,
+                        "page": 1,
+                        "limit": 24,
+                        "videos": [
+                            {
+                                "id": "Channel/video.mp4",
+                                "title": "Video Title",
+                                "channel": "Channel",
+                                "path": "Channel/video.mp4",
+                                "thumbnail": "Channel/video.jpg",
+                                "size": 104857600,
+                                "created_at": "2024-01-15T10:30:00",
+                                "modified_at": "2024-01-15T10:30:00"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        400: {"description": "Parâmetros de paginação inválidos"},
+    }
+)
 @limiter.limit(RateLimits.LIST_VIDEOS)
 async def list_videos(request: Request, base_dir: str = "./downloads", page: int = 1, limit: Optional[int] = None):
-    """Lista vídeos disponíveis na biblioteca (com paginação opcional)"""
+    """Lista vídeos disponíveis na biblioteca (com paginação opcional)."""
     if page < 1:
         raise InvalidRequestException("Página deve ser >= 1")
     if limit is not None and limit <= 0:
@@ -39,13 +92,34 @@ async def list_videos(request: Request, base_dir: str = "./downloads", page: int
     return get_paginated_videos(base_dir, page, limit)
 
 
-@router.get("/stream/{video_path:path}")
+@router.get(
+    "/stream/{video_path:path}",
+    summary="Stream de vídeo",
+    description="""
+Serve o arquivo de vídeo para reprodução no navegador.
+
+**Range Requests (HTTP 206):**
+Suporta Range Requests para permitir seek/skip no player.
+O navegador pode solicitar partes específicas do arquivo.
+
+**Formatos suportados:**
+MP4, WebM, MKV, AVI, MOV e outros formatos de vídeo comuns.
+
+**Headers importantes:**
+- `Accept-Ranges: bytes` - indica suporte a range requests
+- `Content-Range` - indica o range sendo servido
+- `Content-Disposition` - nome do arquivo com encoding UTF-8
+    """,
+    responses={
+        200: {"description": "Arquivo de vídeo completo"},
+        206: {"description": "Conteúdo parcial (range request)"},
+        404: {"description": "Vídeo não encontrado"},
+        416: {"description": "Range não satisfatório"},
+    }
+)
 @limiter.limit(RateLimits.STREAM_VIDEO)
 async def stream_video(request: Request, video_path: str, base_dir: str = "./downloads"):
-    """
-    Serve o arquivo de vídeo para streaming.
-    Suporta range requests para seek/skip.
-    """
+    """Serve o arquivo de vídeo para streaming com suporte a Range Requests."""
     try:
         # Sanitize and validate path
         video_path = sanitize_path(video_path)
@@ -128,10 +202,26 @@ async def stream_video(request: Request, video_path: str, base_dir: str = "./dow
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/thumbnail/{thumbnail_path:path}")
+@router.get(
+    "/thumbnail/{thumbnail_path:path}",
+    summary="Obter thumbnail",
+    description="""
+Serve a thumbnail (miniatura) de um vídeo.
+
+**Formatos suportados:**
+JPG, JPEG, PNG, WebP
+
+**Cache:**
+Retorna headers de cache para otimizar carregamento.
+    """,
+    responses={
+        200: {"description": "Imagem da thumbnail"},
+        404: {"description": "Thumbnail não encontrada"},
+    }
+)
 @limiter.limit(RateLimits.DEFAULT)
 async def get_thumbnail(request: Request, thumbnail_path: str, base_dir: str = "./downloads"):
-    """Serve a thumbnail do vídeo"""
+    """Serve a thumbnail do vídeo."""
     try:
         thumbnail_path = sanitize_path(thumbnail_path)
         full_path = Path(base_dir) / thumbnail_path
@@ -152,10 +242,44 @@ async def get_thumbnail(request: Request, thumbnail_path: str, base_dir: str = "
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/{video_path:path}")
+@router.delete(
+    "/{video_path:path}",
+    summary="Excluir vídeo",
+    description="""
+Exclui um vídeo e todos os arquivos associados.
+
+**Arquivos removidos:**
+- Arquivo de vídeo principal
+- Thumbnail (se existir)
+- Legendas (.srt, .vtt)
+- Metadados (.info.json, .description)
+
+**Limpeza adicional:**
+- Remove entrada do arquivo de archive (evita re-download)
+- Remove diretórios vazios após exclusão
+
+**Atenção:** Esta ação não pode ser desfeita.
+    """,
+    responses={
+        200: {
+            "description": "Vídeo excluído com sucesso",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Vídeo excluído com sucesso",
+                        "deleted_files": ["Channel/video.mp4", "Channel/video.jpg"],
+                        "removed_from_archive": True
+                    }
+                }
+            }
+        },
+        404: {"description": "Vídeo não encontrado"},
+    }
+)
 @limiter.limit(RateLimits.DELETE)
 async def delete_video(request: Request, video_path: str, base_dir: str = "./downloads"):
-    """Exclui um vídeo e seus arquivos associados (thumbnail, legendas, etc)."""
+    """Exclui um vídeo e seus arquivos associados."""
     try:
         return delete_video_with_related(video_path, base_dir)
     except (VideoNotFoundException,):

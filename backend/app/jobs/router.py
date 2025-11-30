@@ -1,5 +1,12 @@
 """
-Jobs router - API endpoints for job management
+Jobs router - API endpoints for job management.
+
+Provides endpoints for:
+- Listing all download jobs
+- Getting individual job status
+- Cancelling running jobs
+- Deleting jobs from history
+- Real-time progress streaming via SSE
 """
 import asyncio
 import json
@@ -15,10 +22,41 @@ from app.core.exceptions import JobNotFoundException, InvalidRequestException
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 
-@router.get("")
+@router.get(
+    "",
+    summary="Listar todos os jobs",
+    description="""
+Lista todos os jobs de download registrados.
+
+**Estados possíveis:**
+- `pending`: Aguardando início
+- `downloading`: Em progresso
+- `completed`: Concluído com sucesso
+- `error`: Falhou com erro
+- `cancelled`: Cancelado pelo usuário
+
+Os jobs são automaticamente removidos após 24 horas.
+    """,
+    responses={
+        200: {
+            "description": "Lista de jobs",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "total": 2,
+                        "jobs": [
+                            {"id": "abc123", "status": "downloading", "progress": {"percent": 45.5}},
+                            {"id": "def456", "status": "completed"}
+                        ]
+                    }
+                }
+            }
+        }
+    }
+)
 @limiter.limit(RateLimits.GET_STATUS)
 async def list_jobs(request: Request):
-    """Lista todos os jobs"""
+    """Lista todos os jobs."""
     jobs = store.get_all_jobs()
     return {
         "total": len(jobs),
@@ -26,20 +64,50 @@ async def list_jobs(request: Request):
     }
 
 
-@router.get("/{job_id}")
+@router.get(
+    "/{job_id}",
+    summary="Obter status do job",
+    description="""
+Retorna o status atual de um job específico.
+
+**Campos de progresso (quando downloading):**
+- `percent`: Porcentagem concluída (0-100)
+- `speed`: Velocidade de download
+- `eta`: Tempo estimado restante
+- `filename`: Nome do arquivo atual
+    """,
+    responses={
+        200: {"description": "Detalhes do job"},
+        404: {"description": "Job não encontrado"},
+    }
+)
 @limiter.limit(RateLimits.GET_STATUS)
 async def get_job_status(request: Request, job_id: str):
-    """Obtém o status de um job"""
+    """Obtém o status de um job."""
     job = store.get_job(job_id)
     if not job:
         raise JobNotFoundException()
     return job
 
 
-@router.post("/{job_id}/cancel")
+@router.post(
+    "/{job_id}/cancel",
+    summary="Cancelar job",
+    description="""
+Cancela um job em execução.
+
+Apenas jobs com status `pending` ou `downloading` podem ser cancelados.
+Jobs já finalizados (`completed`, `error`, `cancelled`) não podem ser cancelados.
+    """,
+    responses={
+        200: {"description": "Job cancelado com sucesso"},
+        400: {"description": "Job não está em execução"},
+        404: {"description": "Job não encontrado"},
+    }
+)
 @limiter.limit(RateLimits.DELETE)
 async def cancel_job_endpoint(request: Request, job_id: str):
-    """Cancela um job em execução"""
+    """Cancela um job em execução."""
     job = store.get_job(job_id)
     if not job:
         raise JobNotFoundException()
@@ -60,10 +128,23 @@ async def cancel_job_endpoint(request: Request, job_id: str):
     return {"status": "success", "message": "Download cancelado"}
 
 
-@router.delete("/{job_id}")
+@router.delete(
+    "/{job_id}",
+    summary="Remover job do histórico",
+    description="""
+Remove um job do histórico.
+
+Se o job ainda estiver em execução, ele será cancelado primeiro.
+Esta ação não pode ser desfeita.
+    """,
+    responses={
+        200: {"description": "Job removido com sucesso"},
+        404: {"description": "Job não encontrado"},
+    }
+)
 @limiter.limit(RateLimits.DELETE)
 async def delete_job(request: Request, job_id: str):
-    """Remove um job do histórico"""
+    """Remove um job do histórico."""
     if not store.job_exists(job_id):
         raise JobNotFoundException()
 
@@ -77,10 +158,37 @@ async def delete_job(request: Request, job_id: str):
     return {"status": "success", "message": "Job removido"}
 
 
-@router.get("/{job_id}/stream")
+@router.get(
+    "/{job_id}/stream",
+    summary="Stream de progresso (SSE)",
+    description="""
+Stream de progresso em tempo real usando Server-Sent Events (SSE).
+
+**Conexão:**
+- Use `EventSource` no JavaScript para conectar
+- O stream envia atualizações a cada 500ms quando há mudanças
+- O stream fecha automaticamente quando o job finaliza
+
+**Exemplo JavaScript:**
+```javascript
+const eventSource = new EventSource('/api/jobs/abc123/stream');
+eventSource.onmessage = (e) => {
+    const job = JSON.parse(e.data);
+    console.log(job.progress.percent);
+};
+```
+    """,
+    responses={
+        200: {
+            "description": "Stream SSE de eventos",
+            "content": {"text/event-stream": {}}
+        },
+        404: {"description": "Job não encontrado"},
+    }
+)
 @limiter.limit(RateLimits.GET_STATUS)
 async def stream_job_progress(request: Request, job_id: str):
-    """Stream de progresso em tempo real usando Server-Sent Events (SSE)"""
+    """Stream de progresso em tempo real usando Server-Sent Events (SSE)."""
     if not store.job_exists(job_id):
         raise JobNotFoundException()
 
