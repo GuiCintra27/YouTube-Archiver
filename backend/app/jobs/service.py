@@ -1,14 +1,20 @@
 """
-Jobs service - business logic for async job management
+Jobs service - business logic for async job management.
+
+Provides functions for:
+- Creating and managing download jobs
+- Updating job progress and status
+- Executing downloads in background tasks
 """
 import os
 import uuid
 import asyncio
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Dict, Any
 
 from . import store
 from app.downloads.service import create_download_settings, execute_download
+from app.core.types import JobData, JobProgress, DownloadResult
 
 if TYPE_CHECKING:
     from app.downloads.schemas import DownloadRequest
@@ -19,14 +25,14 @@ def create_job(url: str, request: "DownloadRequest") -> str:
     Create a new download job.
 
     Args:
-        url: Video URL
-        request: Download request parameters
+        url: Video URL to download
+        request: Download request parameters from API
 
     Returns:
-        Job ID
+        Unique job ID (UUID string)
     """
-    job_id = str(uuid.uuid4())
-    store.set_job(job_id, {
+    job_id: str = str(uuid.uuid4())
+    job_data: JobData = {
         "job_id": job_id,
         "status": "pending",
         "created_at": datetime.now().isoformat(),
@@ -35,22 +41,35 @@ def create_job(url: str, request: "DownloadRequest") -> str:
         "progress": {},
         "result": None,
         "error": None,
-    })
+    }
+    store.set_job(job_id, job_data)
     return job_id
 
 
-def update_job_progress(job_id: str, progress: dict) -> None:
-    """Update the progress of a job"""
-    job = store.get_job(job_id)
+def update_job_progress(job_id: str, progress: Dict[str, Any]) -> None:
+    """
+    Update the progress of a job.
+
+    Args:
+        job_id: Job identifier
+        progress: Progress data from downloader (percent, speed, eta, etc.)
+    """
+    job: Optional[Dict[str, Any]] = store.get_job(job_id)
     if job:
         job["progress"] = progress
         if progress.get("status") == "downloading":
             job["status"] = "downloading"
 
 
-def complete_job(job_id: str, result: dict) -> None:
-    """Mark a job as completed"""
-    job = store.get_job(job_id)
+def complete_job(job_id: str, result: Dict[str, Any]) -> None:
+    """
+    Mark a job as completed.
+
+    Args:
+        job_id: Job identifier
+        result: Download result data
+    """
+    job: Optional[Dict[str, Any]] = store.get_job(job_id)
     if job:
         job["status"] = "completed"
         job["result"] = result
@@ -59,8 +78,14 @@ def complete_job(job_id: str, result: dict) -> None:
 
 
 def fail_job(job_id: str, error: str) -> None:
-    """Mark a job as failed"""
-    job = store.get_job(job_id)
+    """
+    Mark a job as failed.
+
+    Args:
+        job_id: Job identifier
+        error: Error message describing the failure
+    """
+    job: Optional[Dict[str, Any]] = store.get_job(job_id)
     if job:
         job["status"] = "error"
         job["error"] = error
@@ -68,8 +93,13 @@ def fail_job(job_id: str, error: str) -> None:
 
 
 def cancel_job(job_id: str) -> None:
-    """Mark a job as cancelled"""
-    job = store.get_job(job_id)
+    """
+    Mark a job as cancelled.
+
+    Args:
+        job_id: Job identifier
+    """
+    job: Optional[Dict[str, Any]] = store.get_job(job_id)
     if job:
         job["status"] = "cancelled"
         job["error"] = "Download cancelado pelo usuário"
