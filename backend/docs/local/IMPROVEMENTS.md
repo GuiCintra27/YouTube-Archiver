@@ -8,11 +8,29 @@ Este documento lista melhorias identificadas para o backend do YT-Archiver, orga
 
 ---
 
+## Status das Implementações
+
+| # | Melhoria | Status | Commit |
+|---|----------|--------|--------|
+| 1 | Sistema de Logging Estruturado | ✅ Implementado | `32bd81f` |
+| 2 | Validação de Input Robusta | ✅ Implementado | `05c65e4` |
+| 3 | Variáveis de Ambiente com pydantic-settings | ✅ Implementado | `b999a6c` |
+| 4 | Limpeza Automática de Jobs | ✅ Implementado | `a76c959` |
+| 5 | Respostas de Erro Padronizadas | ✅ Implementado | `9face73` |
+| 6 | Rate Limiting com slowapi | ✅ Implementado | `6db3165` |
+| 7 | Cache de Scan de Diretórios | ✅ Implementado | `eb51dcd` |
+| 8 | Documentação de API (Swagger) | ✅ Implementado | `bf2f92b` |
+| 9 | Testes Automatizados | ✅ Implementado | `0e3ca51` |
+| 10 | Constantes Centralizadas | ✅ Implementado | `e0fbcf6` |
+| 11 | Type Hints Completas | ✅ Implementado | `1a2ac4b` |
+
+---
+
 ## Prioridade Alta
 
 ### 1. Sistema de Logging Estruturado
 
-**Status:** Pendente
+**Status:** ✅ Implementado
 **Impacto:** Alto
 **Esforço:** Médio
 
@@ -70,7 +88,7 @@ logger.error(f"Failed to download: {url}", exc_info=True)
 
 ### 2. Validação de Input Robusta
 
-**Status:** Pendente
+**Status:** ✅ Implementado
 **Impacto:** Alto (Segurança)
 **Esforço:** Médio
 
@@ -135,7 +153,7 @@ class PathValidator:
 
 ### 3. Variáveis de Ambiente com pydantic-settings
 
-**Status:** Pendente
+**Status:** ✅ Implementado
 **Impacto:** Alto
 **Esforço:** Baixo
 
@@ -217,7 +235,7 @@ pip install pydantic-settings python-dotenv
 
 ### 4. Limpeza Automática de Jobs
 
-**Status:** Pendente
+**Status:** ✅ Implementado
 **Impacto:** Alto (Memory)
 **Esforço:** Baixo
 
@@ -276,7 +294,7 @@ async def startup_event():
 
 ### 5. Respostas de Erro Padronizadas
 
-**Status:** Pendente
+**Status:** ✅ Implementado
 **Impacto:** Médio
 **Esforço:** Baixo
 
@@ -353,7 +371,7 @@ raise_error(404, AppError.VIDEO_NOT_FOUND, "Video not found", {"path": video_pat
 
 ### 6. Rate Limiting com slowapi
 
-**Status:** Pendente
+**Status:** ✅ Implementado
 **Impacto:** Médio (Segurança)
 **Esforço:** Baixo
 
@@ -401,7 +419,7 @@ pip install slowapi
 
 ### 7. Cache de Scan de Diretórios
 
-**Status:** Pendente
+**Status:** ✅ Implementado
 **Impacto:** Médio (Performance)
 **Esforço:** Médio
 
@@ -472,7 +490,7 @@ def delete_video(path: str):
 
 ### 8. Documentação de API (Swagger)
 
-**Status:** Parcialmente Implementado
+**Status:** ✅ Implementado
 **Impacto:** Médio
 **Esforço:** Baixo
 
@@ -526,7 +544,7 @@ async def start_download(request: DownloadRequest):
 
 ### 9. Testes Automatizados
 
-**Status:** Não Implementado
+**Status:** ✅ Implementado
 **Impacto:** Alto
 **Esforço:** Alto
 
@@ -606,7 +624,7 @@ pytest tests/test_library.py -v
 
 ### 10. Constantes Centralizadas
 
-**Status:** Pendente
+**Status:** ✅ Implementado
 **Impacto:** Baixo
 **Esforço:** Baixo
 
@@ -666,7 +684,7 @@ UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024  # 8MB
 
 ### 11. Type Hints Completas
 
-**Status:** Parcialmente Implementado
+**Status:** ✅ Implementado
 **Impacto:** Baixo
 **Esforço:** Médio
 
