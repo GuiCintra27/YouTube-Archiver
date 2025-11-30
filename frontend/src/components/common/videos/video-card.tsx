@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Trash2, Play, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useApiUrl } from "@/hooks/use-api-url";
 
 interface VideoCardProps {
   id: string;
@@ -38,21 +39,18 @@ export default function VideoCard({
   onPlay,
   onDelete,
 }: VideoCardProps) {
+  const apiUrl = useApiUrl();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [imageError, setImageError] = useState(false);
 
-  const apiUrl = typeof window !== "undefined"
-    ? process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-    : "http://localhost:8000";
-
-  const thumbnailUrl = thumbnail
+  const thumbnailUrl = thumbnail && apiUrl
     ? `${apiUrl}/api/videos/thumbnail/${encodeURIComponent(thumbnail)}`
     : null;
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     setShowDeleteDialog(false);
     onDelete();
-  };
+  }, [onDelete]);
 
   return (
     <>

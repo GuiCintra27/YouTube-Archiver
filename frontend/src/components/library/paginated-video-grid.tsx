@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import VideoCard from "@/components/common/videos/video-card";
 import VideoPlayer from "@/components/common/videos/video-player";
 import { PaginationControls } from "@/components/common/pagination";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, VideoOff } from "lucide-react";
 import { APIURLS } from "@/lib/api-urls";
+import { useApiUrl } from "@/hooks/use-api-url";
 
 interface Video {
   id: string;
@@ -22,6 +23,7 @@ interface Video {
 const PAGE_SIZE = 12;
 
 export default function PaginatedVideoGrid() {
+  const apiUrl = useApiUrl();
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,62 +33,60 @@ export default function PaginatedVideoGrid() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const apiUrl =
-    typeof window !== "undefined"
-      ? process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      : "http://localhost:8000";
+  const fetchVideos = useCallback(
+    async (pageNumber: number) => {
+      if (!apiUrl) return;
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await fetch(
+          `${apiUrl}/api/${APIURLS.VIDEOS}?page=${pageNumber}&limit=${PAGE_SIZE}`
+        );
 
-  const fetchVideos = async (pageNumber: number) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch(
-        `${apiUrl}/api/${APIURLS.VIDEOS}?page=${pageNumber}&limit=${PAGE_SIZE}`
-      );
+        if (!response.ok) {
+          throw new Error("Falha ao carregar vídeos");
+        }
 
-      if (!response.ok) {
-        throw new Error("Falha ao carregar vídeos");
+        const data = await response.json();
+        setVideos(data.videos || []);
+        setTotal(data.total || 0);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Erro desconhecido");
+      } finally {
+        setLoading(false);
       }
-
-      const data = await response.json();
-      setVideos(data.videos || []);
-      setTotal(data.total || 0);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro desconhecido");
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [apiUrl]
+  );
 
   useEffect(() => {
     fetchVideos(page);
-  }, [apiUrl, page]);
+  }, [fetchVideos, page]);
 
-  const handleDelete = async (video: Video) => {
-    try {
-      const response = await fetch(
-        `${apiUrl}/api/${APIURLS.VIDEOS}/${encodeURIComponent(video.path)}`,
-        { method: "DELETE" }
-      );
+  const handleDelete = useCallback(
+    async (video: Video) => {
+      if (!apiUrl) return;
+      try {
+        const response = await fetch(
+          `${apiUrl}/api/${APIURLS.VIDEOS}/${encodeURIComponent(video.path)}`,
+          { method: "DELETE" }
+        );
 
-      if (!response.ok) {
-        throw new Error("Falha ao excluir vídeo");
+        if (!response.ok) {
+          throw new Error("Falha ao excluir vídeo");
+        }
+
+        // Recarregar página atual
+        fetchVideos(page);
+
+        setSelectedVideo((prev) => (prev?.id === video.id ? null : prev));
+      } catch (err) {
+        console.error("Erro ao excluir vídeo:", err);
+        setError(err instanceof Error ? err.message : "Erro ao excluir vídeo");
       }
-
-      // Recarregar página atual
-      fetchVideos(page);
-
-      if (selectedVideo?.id === video.id) {
-        setSelectedVideo(null);
-      }
-    } catch (err) {
-      alert(
-        `Erro ao excluir vídeo: ${
-          err instanceof Error ? err.message : "Erro desconhecido"
-        }`
-      );
-    }
-  };
+    },
+    [apiUrl, page, fetchVideos]
+  );
 
   return (
     <div className="space-y-4">

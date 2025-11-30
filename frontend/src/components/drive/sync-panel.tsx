@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -27,6 +27,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { APIURLS } from "@/lib/api-urls";
+import { useApiUrl } from "@/hooks/use-api-url";
 
 interface SyncStatus {
   local_only: string[];
@@ -37,18 +38,16 @@ interface SyncStatus {
 }
 
 export default function SyncPanel() {
+  const apiUrl = useApiUrl();
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [uploadingVideo, setUploadingVideo] = useState<string | null>(null);
 
-  const apiUrl =
-    typeof window !== "undefined"
-      ? process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      : "http://localhost:8000";
-
-  const fetchSyncStatus = async () => {
+  const fetchSyncStatus = useCallback(async () => {
+    if (!apiUrl) return;
     try {
       setLoading(true);
       setError(null);
@@ -67,18 +66,19 @@ export default function SyncPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiUrl]);
 
   useEffect(() => {
     fetchSyncStatus();
-  }, []);
+  }, [fetchSyncStatus]);
 
-  const handleSyncAll = async () => {
-    if (!syncStatus || syncStatus.local_only.length === 0) return;
+  const handleSyncAll = useCallback(async () => {
+    if (!syncStatus || syncStatus.local_only.length === 0 || !apiUrl) return;
 
     try {
       setSyncing(true);
       setError(null);
+      setSuccessMessage(null);
 
       const response = await fetch(`${apiUrl}/api/${APIURLS.DRIVE_SYNC_ALL}`, {
         method: "POST",
@@ -93,40 +93,45 @@ export default function SyncPanel() {
       // Atualizar status
       await fetchSyncStatus();
 
-      alert(`Sincronização concluída! ${data.total} vídeos processados.`);
+      setSuccessMessage(`Sincronização concluída! ${data.total} vídeos processados.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao sincronizar");
     } finally {
       setSyncing(false);
     }
-  };
+  }, [syncStatus, apiUrl, fetchSyncStatus]);
 
-  const handleUploadSingle = async (videoPath: string) => {
-    try {
-      setUploadingVideo(videoPath);
-      setError(null);
+  const handleUploadSingle = useCallback(
+    async (videoPath: string) => {
+      if (!apiUrl) return;
+      try {
+        setUploadingVideo(videoPath);
+        setError(null);
+        setSuccessMessage(null);
 
-      const response = await fetch(
-        `${apiUrl}/api/${APIURLS.DRIVE_UPLOAD}/${encodeURIComponent(
-          videoPath
-        )}`,
-        { method: "POST" }
-      );
+        const response = await fetch(
+          `${apiUrl}/api/${APIURLS.DRIVE_UPLOAD}/${encodeURIComponent(
+            videoPath
+          )}`,
+          { method: "POST" }
+        );
 
-      if (!response.ok) {
-        throw new Error("Falha ao fazer upload");
+        if (!response.ok) {
+          throw new Error("Falha ao fazer upload");
+        }
+
+        // Atualizar status
+        await fetchSyncStatus();
+
+        setSuccessMessage("Upload concluído com sucesso!");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Erro ao fazer upload");
+      } finally {
+        setUploadingVideo(null);
       }
-
-      // Atualizar status
-      await fetchSyncStatus();
-
-      alert("Upload concluído com sucesso!");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao fazer upload");
-    } finally {
-      setUploadingVideo(null);
-    }
-  };
+    },
+    [apiUrl, fetchSyncStatus]
+  );
 
   if (loading && !syncStatus) {
     return (
@@ -159,6 +164,15 @@ export default function SyncPanel() {
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {successMessage && (
+          <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-700 dark:text-green-300">
+              {successMessage}
+            </AlertDescription>
           </Alert>
         )}
 

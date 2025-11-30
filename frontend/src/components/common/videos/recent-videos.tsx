@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Loader2, VideoOff, LibraryBig } from "lucide-react";
 import VideoCard from "@/components/common/videos/video-card";
@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PATHS } from "@/lib/paths";
 import { APIURLS } from "@/lib/api-urls";
+import { useApiUrl } from "@/hooks/use-api-url";
 
 interface Video {
   id: string;
@@ -36,17 +37,14 @@ export default function RecentVideos({
   ctaLabel = "Ver biblioteca completa",
   ctaHref = PATHS.LIBRARY,
 }: RecentVideosProps) {
+  const apiUrl = useApiUrl();
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
 
-  const apiUrl =
-    typeof window !== "undefined"
-      ? process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      : "http://localhost:8000";
-
-  const fetchVideos = async () => {
+  const fetchVideos = useCallback(async () => {
+    if (!apiUrl) return;
     try {
       setLoading(true);
       setError(null);
@@ -62,29 +60,29 @@ export default function RecentVideos({
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiUrl, limit]);
 
   useEffect(() => {
     fetchVideos();
-  }, [apiUrl, limit, refreshToken]);
+  }, [fetchVideos, refreshToken]);
 
-  const handleDelete = async (video: Video) => {
-    try {
-      const response = await fetch(
-        `${apiUrl}/api/${APIURLS.VIDEOS}/${encodeURIComponent(video.path)}`,
-        { method: "DELETE" }
-      );
-      if (!response.ok) throw new Error("Falha ao excluir vídeo");
-      setVideos((prev) => prev.filter((v) => v.id !== video.id));
-      if (selectedVideo?.id === video.id) setSelectedVideo(null);
-    } catch (err) {
-      alert(
-        `Erro ao excluir vídeo: ${
-          err instanceof Error ? err.message : "Erro desconhecido"
-        }`
-      );
-    }
-  };
+  const handleDelete = useCallback(
+    async (video: Video) => {
+      if (!apiUrl) return;
+      try {
+        const response = await fetch(
+          `${apiUrl}/api/${APIURLS.VIDEOS}/${encodeURIComponent(video.path)}`,
+          { method: "DELETE" }
+        );
+        if (!response.ok) throw new Error("Falha ao excluir vídeo");
+        setVideos((prev) => prev.filter((v) => v.id !== video.id));
+        setSelectedVideo((prev) => (prev?.id === video.id ? null : prev));
+      } catch (err) {
+        console.error("Erro ao excluir vídeo:", err);
+      }
+    },
+    [apiUrl]
+  );
 
   return (
     <div className="space-y-4">

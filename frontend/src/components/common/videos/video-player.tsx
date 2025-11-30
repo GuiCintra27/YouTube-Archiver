@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Trash2, Download, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useApiUrl } from "@/hooks/use-api-url";
+import { formatBytes } from "@/lib/utils";
 
 interface Video {
   id: string;
@@ -30,14 +32,13 @@ interface VideoPlayerProps {
 }
 
 export default function VideoPlayer({ video, onClose, onDelete }: VideoPlayerProps) {
+  const apiUrl = useApiUrl();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  const apiUrl = typeof window !== "undefined"
-    ? process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-    : "http://localhost:8000";
-
-  const videoUrl = `${apiUrl}/api/videos/stream/${encodeURIComponent(video.path)}`;
+  const videoUrl = apiUrl
+    ? `${apiUrl}/api/videos/stream/${encodeURIComponent(video.path)}`
+    : "";
 
   // Fechar com ESC
   useEffect(() => {
@@ -51,30 +52,22 @@ export default function VideoPlayer({ video, onClose, onDelete }: VideoPlayerPro
     return () => window.removeEventListener("keydown", handleEscape);
   }, [onClose]);
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     setShowDeleteDialog(false);
     onDelete();
-  };
+  }, [onDelete]);
 
-  const handleFullscreen = () => {
-    if (videoRef.current) {
-      if (videoRef.current.requestFullscreen) {
-        videoRef.current.requestFullscreen();
-      }
+  const handleFullscreen = useCallback(() => {
+    if (videoRef.current?.requestFullscreen) {
+      videoRef.current.requestFullscreen();
     }
-  };
+  }, []);
 
-  const handleDownload = () => {
-    window.open(videoUrl, "_blank");
-  };
-
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
-  };
+  const handleDownload = useCallback(() => {
+    if (videoUrl) {
+      window.open(videoUrl, "_blank");
+    }
+  }, [videoUrl]);
 
   return (
     <>

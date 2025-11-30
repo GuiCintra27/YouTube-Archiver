@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,21 +12,19 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Cloud, Loader2, ShieldAlert } from "lucide-react";
 import { APIURLS } from "@/lib/api-urls";
+import { useApiUrl } from "@/hooks/use-api-url";
 
 interface DriveAuthProps {
   onAuthenticated: () => void;
 }
 
 export default function DriveAuth({ onAuthenticated }: DriveAuthProps) {
+  const apiUrl = useApiUrl();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const apiUrl =
-    typeof window !== "undefined"
-      ? process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      : "http://localhost:8000";
-
-  const handleAuth = async () => {
+  const handleAuth = useCallback(async () => {
+    if (!apiUrl) return;
     try {
       setLoading(true);
       setError(null);
@@ -97,7 +95,7 @@ export default function DriveAuth({ onAuthenticated }: DriveAuthProps) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
       setLoading(false);
     }
-  };
+  }, [apiUrl, onAuthenticated]);
 
   return (
     <div className="flex items-center justify-center min-h-[500px]">
