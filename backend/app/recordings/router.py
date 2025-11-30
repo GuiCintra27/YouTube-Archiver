@@ -1,9 +1,10 @@
 """
 Recordings router - API endpoints for screen recording uploads
 """
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 
 from app.core.logging import get_module_logger
+from app.core.rate_limit import limiter, RateLimits
 from .service import save_recording
 
 logger = get_module_logger("recordings")
@@ -12,7 +13,9 @@ router = APIRouter(prefix="/api/recordings", tags=["recordings"])
 
 
 @router.post("/upload")
+@limiter.limit(RateLimits.UPLOAD)
 async def upload_recording(
+    request: Request,
     file: UploadFile = File(...),
     target_path: str = Form(default=""),
     base_dir: str = "./downloads",
