@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.core.logging import setup_logging, logger
 
 # Import routers
 from app.downloads.router import router as downloads_router
@@ -12,6 +13,10 @@ from app.jobs.router import router as jobs_router
 from app.library.router import router as library_router
 from app.recordings.router import router as recordings_router
 from app.drive.router import router as drive_router
+
+# Configure logging with settings
+setup_logging(level=settings.LOG_LEVEL)
+logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
 
 # Create FastAPI application
 app = FastAPI(

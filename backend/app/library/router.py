@@ -9,6 +9,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, FileResponse
 
+from app.core.logging import get_module_logger
 from .service import get_paginated_videos, delete_video_with_related
 from app.config import settings
 from app.core.security import sanitize_path, validate_path_within_base, validate_file_exists, encode_filename_for_header
@@ -19,6 +20,8 @@ from app.core.exceptions import (
     InvalidRangeHeaderException,
     RangeNotSatisfiableException,
 )
+
+logger = get_module_logger("library")
 
 router = APIRouter(prefix="/api/videos", tags=["library"])
 
@@ -46,8 +49,8 @@ async def stream_video(video_path: str, request: Request, base_dir: str = "./dow
         full_path = Path(base_dir) / video_path
         base_path = Path(base_dir)
 
-        print(f"[DEBUG] Streaming video: {video_path}")
-        print(f"[DEBUG] Full path: {full_path}")
+        logger.debug(f"Streaming video: {video_path}")
+        logger.debug(f"Full path: {full_path}")
 
         validate_file_exists(full_path)
         validate_path_within_base(full_path, base_path)
@@ -56,8 +59,7 @@ async def stream_video(video_path: str, request: Request, base_dir: str = "./dow
         file_ext = full_path.suffix.lower()
         media_type = settings.VIDEO_MIME_TYPES.get(file_ext, 'video/mp4')
 
-        print(f"[DEBUG] Media type: {media_type}")
-        print(f"[DEBUG] File size: {full_path.stat().st_size}")
+        logger.debug(f"Media type: {media_type}, File size: {full_path.stat().st_size}")
 
         # Check for range request
         range_header = request.headers.get("range")
@@ -119,9 +121,7 @@ async def stream_video(video_path: str, request: Request, base_dir: str = "./dow
     except (VideoNotFoundException, InvalidRangeHeaderException, RangeNotSatisfiableException):
         raise
     except Exception as e:
-        import traceback
-        print(f"[ERROR] Exception in stream_video: {e}")
-        print(traceback.format_exc())
+        logger.error(f"Exception in stream_video: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
