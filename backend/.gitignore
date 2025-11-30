@@ -19,6 +19,10 @@ token.json
 *.jsonl
 cookies.txt
 
+# Environment
+.env
+!.env.example
+
 # IDE
 .vscode/
 .idea/
