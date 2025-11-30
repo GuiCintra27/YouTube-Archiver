@@ -126,8 +126,10 @@ class Settings(BaseSettings):
         """CORS origins as a list"""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
-    # Static configurations (not from env)
-    VIDEO_EXTENSIONS: Set[str] = {'.mp4', '.mkv', '.webm', '.avi', '.mov', '.flv', '.wmv'}
+    # Static configurations - imported from core.constants for consistency
+    # These are duplicated here for backward compatibility with existing code
+    # that accesses them via settings.VIDEO_EXTENSIONS etc.
+    VIDEO_EXTENSIONS: Set[str] = {'.mp4', '.mkv', '.webm', '.avi', '.mov', '.flv', '.wmv', '.m4v'}
     THUMBNAIL_EXTENSIONS: List[str] = ['.jpg', '.jpeg', '.png', '.webp']
 
     VIDEO_MIME_TYPES: Dict[str, str] = {
@@ -136,6 +138,9 @@ class Settings(BaseSettings):
         '.mkv': 'video/x-matroska',
         '.avi': 'video/x-msvideo',
         '.mov': 'video/quicktime',
+        '.flv': 'video/x-flv',
+        '.wmv': 'video/x-ms-wmv',
+        '.m4v': 'video/x-m4v',
     }
 
     IMAGE_MIME_TYPES: Dict[str, str] = {
@@ -143,6 +148,7 @@ class Settings(BaseSettings):
         '.jpeg': 'image/jpeg',
         '.png': 'image/png',
         '.webp': 'image/webp',
+        '.gif': 'image/gif',
     }
 
 
