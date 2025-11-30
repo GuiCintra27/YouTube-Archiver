@@ -4,28 +4,44 @@ Library service - business logic for local video library
 import re
 from pathlib import Path
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from app.config import settings
+from app.core.logging import get_module_logger
 from app.core.security import validate_path_within_base, validate_file_exists, sanitize_path
+from .cache import video_cache
+
+logger = get_module_logger("library")
 
 
-def scan_videos_directory(base_dir: str = "./downloads") -> List[dict]:
+def scan_videos_directory(base_dir: str = "./downloads", use_cache: bool = True) -> List[Dict[str, Any]]:
     """
     Scan the downloads directory and return list of videos with metadata.
     Structure expected: downloads/[channel]/[subcategory]/video.mp4
 
+    Uses caching to avoid repeated I/O operations. Cache is invalidated
+    automatically after TTL or when videos are added/deleted.
+
     Args:
         base_dir: Base directory to scan
+        use_cache: Whether to use cached results (default True)
 
     Returns:
         List of video metadata dicts
     """
+    # Check cache first
+    if use_cache:
+        cached = video_cache.get(base_dir)
+        if cached is not None:
+            return cached
+
     videos = []
     base_path = Path(base_dir)
 
     if not base_path.exists():
         return videos
+
+    logger.debug(f"Scanning directory: {base_dir}")
 
     # Scan recursively
     for video_file in base_path.rglob('*'):
@@ -64,6 +80,10 @@ def scan_videos_directory(base_dir: str = "./downloads") -> List[dict]:
 
     # Sort by modification date (newest first)
     videos.sort(key=lambda x: x["modified_at"], reverse=True)
+
+    # Cache the results
+    video_cache.set(base_dir, videos)
+    logger.debug(f"Scanned {len(videos)} videos from {base_dir}")
 
     return videos
 
@@ -149,7 +169,7 @@ def delete_video_with_related(
             file.unlink()
             deleted_files.append(str(file.relative_to(base_path)))
         except Exception as e:
-            print(f"Error deleting {file}: {e}")
+            logger.error(f"Error deleting {file}: {e}")
 
     # Remove from archive file if ID found
     if video_id:
@@ -157,6 +177,10 @@ def delete_video_with_related(
 
     # Try to remove empty directories (cleanup)
     _cleanup_empty_dirs(parent_dir, base_path)
+
+    # Invalidate cache after deletion
+    video_cache.invalidate(base_dir)
+    logger.info(f"Deleted video: {video_path} ({len(deleted_files)} files)")
 
     return {
         "status": "success",
@@ -181,9 +205,9 @@ def _remove_from_archive(archive_file: str, video_id: str) -> None:
         with open(archive_path, "w") as f:
             f.writelines(filtered_lines)
 
-        print(f"Removed '{video_id}' from archive file")
+        logger.debug(f"Removed '{video_id}' from archive file")
     except Exception as e:
-        print(f"Error removing from archive: {e}")
+        logger.error(f"Error removing from archive: {e}")
 
 
 def _cleanup_empty_dirs(directory: Path, base_dir: Path) -> None:
