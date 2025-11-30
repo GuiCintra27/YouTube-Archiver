@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.core.logging import setup_logging, logger
+from app.core.errors import register_exception_handlers
 
 # Import routers
 from app.downloads.router import router as downloads_router
@@ -52,6 +53,9 @@ app = FastAPI(
     description="API para download e gerenciamento de vídeos do YouTube",
     lifespan=lifespan,
 )
+
+# Register exception handlers for standardized error responses
+register_exception_handlers(app)
 
 # Configure CORS
 app.add_middleware(
