@@ -60,3 +60,17 @@ def job_exists(job_id: str) -> bool:
 def task_exists(job_id: str) -> bool:
     """Check if a task exists"""
     return job_id in active_tasks
+
+
+def create_job(job_id: str, job_data: dict) -> dict:
+    """Create a new job in the store"""
+    jobs_db[job_id] = job_data
+    return job_data
+
+
+def clear_all_jobs() -> int:
+    """Clear all jobs from the store (for testing)"""
+    count = len(jobs_db)
+    jobs_db.clear()
+    active_tasks.clear()
+    return count
