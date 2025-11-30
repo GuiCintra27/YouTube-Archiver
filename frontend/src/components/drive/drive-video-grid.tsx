@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import DriveVideoPlayer from "./drive-video-player";
+import VideoPlayer from "@/components/common/videos/video-player";
 import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
 import { formatBytes } from "@/lib/utils";
@@ -123,6 +123,27 @@ export default function DriveVideoGrid() {
   const handleThumbnailError = useCallback((videoId: string) => {
     setThumbnailErrors((prev) => new Set(prev).add(videoId));
   }, []);
+
+  // Função para deletar vídeo diretamente (chamada pelo VideoPlayer)
+  const handleDeleteFromPlayer = useCallback(
+    async (video: DriveVideo) => {
+      if (!apiUrl) return;
+
+      const response = await fetch(
+        `${apiUrl}/api/${APIURLS.DRIVE_VIDEOS}/${video.id}`,
+        { method: "DELETE" }
+      );
+
+      if (!response.ok) {
+        throw new Error("Falha ao excluir vídeo");
+      }
+
+      // Recarregar lista
+      await fetchVideos(page);
+      setSelectedVideo(null);
+    },
+    [apiUrl, page, fetchVideos]
+  );
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -277,10 +298,11 @@ export default function DriveVideoGrid() {
 
       {/* Video Player Modal */}
       {selectedVideo && (
-        <DriveVideoPlayer
+        <VideoPlayer
           video={selectedVideo}
+          source="drive"
           onClose={() => setSelectedVideo(null)}
-          onDelete={() => handleDeleteClick(selectedVideo)}
+          onDelete={() => handleDeleteFromPlayer(selectedVideo)}
         />
       )}
     </>
