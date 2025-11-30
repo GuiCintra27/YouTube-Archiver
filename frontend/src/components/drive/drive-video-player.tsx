@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { X, Trash2, Loader2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { X, Trash2, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,8 +19,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import dynamic from "next/dynamic";
 import { APIURLS } from "@/lib/api-urls";
+import { useApiUrl } from "@/hooks/use-api-url";
 
 // Importar Plyr dinamicamente para evitar SSR
 const Plyr = dynamic(() => import("plyr-react"), {
@@ -53,16 +55,13 @@ export default function DriveVideoPlayer({
   onClose,
   onDelete,
 }: DriveVideoPlayerProps) {
+  const apiUrl = useApiUrl();
   const plyrRef = useRef<any>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const apiUrl =
-    typeof window !== "undefined"
-      ? process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      : "http://localhost:8000";
-
-  const videoUrl = `${apiUrl}/api/${APIURLS.DRIVE_STREAM}/${video.id}`;
+  const videoUrl = apiUrl ? `${apiUrl}/api/${APIURLS.DRIVE_STREAM}/${video.id}` : "";
 
   // Configuração do Plyr
   const plyrOptions = {
@@ -90,13 +89,15 @@ export default function DriveVideoPlayer({
 
   const handleDelete = async () => {
     setDeleting(true);
+    setError(null);
     try {
       await onDelete();
       setDeleteDialogOpen(false);
       onClose();
-    } catch (error) {
-      console.error("Error deleting video:", error);
-      alert("Erro ao excluir vídeo");
+    } catch (err) {
+      console.error("Error deleting video:", err);
+      setError("Erro ao excluir vídeo. Tente novamente.");
+      setDeleteDialogOpen(false);
     } finally {
       setDeleting(false);
     }
@@ -129,6 +130,15 @@ export default function DriveVideoPlayer({
               </div>
             </div>
           </DialogHeader>
+
+          {error && (
+            <div className="px-6 pt-4">
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            </div>
+          )}
 
           <div className="p-6 pt-4">
             <div

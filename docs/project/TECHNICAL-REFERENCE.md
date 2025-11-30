@@ -46,6 +46,7 @@ Guia de consulta rápida para desenvolvimento e troubleshooting.
 | CSS | Tailwind CSS | 3.4+ | Styling |
 | Video Player | Plyr | 3.8.3 | HTML5 player |
 | Icons | Lucide React | Latest | Icon system |
+| Linter | ESLint | 9.x | Flat config |
 | Runtime | Node.js | 18+ | Frontend runtime |
 
 ---
@@ -126,35 +127,54 @@ backend/
 ### Frontend (TypeScript/React)
 
 ```
-frontend/src/
-├── app/
-│   ├── page.tsx                    # ⭐ Página principal
-│   │   └── Componentes: DownloadForm, VideoGrid
+frontend/
+├── src/
+│   ├── app/
+│   │   ├── page.tsx                    # ⭐ Página principal (downloads)
+│   │   ├── drive/page.tsx              # ⭐ Página Google Drive
+│   │   ├── library/page.tsx            # Biblioteca de vídeos
+│   │   ├── record/page.tsx             # Gravação de tela
+│   │   ├── layout.tsx                  # ⭐ Layout global
+│   │   └── globals.css                 # Estilos Tailwind
 │   │
-│   ├── drive/page.tsx              # ⭐ Página Google Drive
-│   │   └── Componentes: DriveAuth, DriveVideoGrid, SyncPanel
+│   ├── components/
+│   │   ├── common/                     # Componentes compartilhados
+│   │   │   ├── error-boundary.tsx      # ⭐ Error Boundary com retry
+│   │   │   ├── navigation.tsx          # Menu de navegação
+│   │   │   ├── theme-provider.tsx      # Tema dark/light
+│   │   │   ├── pagination.tsx          # Controles de paginação
+│   │   │   └── videos/                 # VideoCard, VideoPlayer
+│   │   ├── drive/                      # Componentes Google Drive
+│   │   │   ├── drive-auth.tsx
+│   │   │   ├── drive-video-grid.tsx
+│   │   │   ├── drive-video-player.tsx
+│   │   │   └── sync-panel.tsx
+│   │   ├── home/                       # Componentes da Home
+│   │   │   └── download-form.tsx       # ⭐ Formulário de download
+│   │   ├── library/                    # Componentes da Biblioteca
+│   │   │   └── paginated-video-grid.tsx
+│   │   ├── record/                     # Gravação de tela
+│   │   │   └── screen-recorder.tsx
+│   │   └── ui/                         # shadcn/ui (30+ componentes)
 │   │
-│   ├── layout.tsx                  # ⭐ Layout global
-│   │   └── Imports: Plyr CSS, Navigation
+│   ├── hooks/                          # ⭐ Hooks customizados
+│   │   ├── index.ts                    # Barrel export
+│   │   ├── use-api-url.ts              # ⭐ URL da API (SSR-safe)
+│   │   └── use-fetch.ts                # Fetch com AbortController
 │   │
-│   └── globals.css                 # Estilos Tailwind
+│   └── lib/
+│       ├── api-config.ts               # ⭐ Configuração da API
+│       ├── api-client.ts               # Cliente HTTP tipado
+│       ├── api-urls.ts                 # Constantes de endpoints
+│       ├── url-validator.ts            # Validação de URLs
+│       └── utils.ts                    # cn(), formatBytes()
 │
-├── components/
-│   ├── download-form.tsx           # Formulário de download (500+ linhas)
-│   ├── video-grid.tsx              # Grid + player local (400+ linhas)
-│   ├── drive-video-grid.tsx        # Grid de vídeos do Drive
-│   ├── drive-video-player.tsx      # Player de vídeos do Drive
-│   ├── sync-panel.tsx              # Painel de sincronização
-│   ├── navigation.tsx              # Menu de navegação
-│   └── ui/                         # Componentes shadcn/ui
-│       ├── button.tsx
-│       ├── card.tsx
-│       ├── dialog.tsx
-│       └── ... (30+ componentes)
-│
-└── lib/
-    ├── utils.ts                    # cn(), helpers
-    └── url-validator.ts            # Validação de URLs YouTube
+├── eslint.config.mjs                   # ⭐ ESLint 9 flat config
+├── package.json
+├── next.config.ts
+├── tailwind.config.ts
+└── docs/local/
+    └── IMPROVEMENTS.md                 # Status das melhorias
 ```
 
 ---
@@ -415,11 +435,17 @@ cd frontend && npm run dev
 
 ### Testing
 ```bash
-# Testes automatizados (pytest) - 46 testes
+# Backend - Testes automatizados (pytest) - 46 testes
 cd backend && source .venv/bin/activate
 pytest tests/ -v                    # Todos os testes
 pytest tests/ --cov=app             # Com cobertura de código
 pytest tests/test_validators.py -v  # Apenas um arquivo
+
+# Frontend - Lint e Build
+cd frontend
+npm run lint                        # ESLint (0 errors, ~7 warnings)
+npm run build                       # Build de produção
+npx tsc --noEmit                    # TypeScript check
 
 # Test endpoints manualmente
 curl http://localhost:8000/

@@ -82,28 +82,54 @@ backend/app/
 **Framework:** Next.js 15 (App Router) + TypeScript
 **Porta:** 3000
 **UI Library:** shadcn/ui (Radix UI primitives) + Tailwind CSS
+**Linter:** ESLint 9 (flat config)
 
 **Estrutura:**
 ```
 src/
 ├── app/
-│   ├── page.tsx                 # Página principal (downloads + biblioteca)
+│   ├── page.tsx                 # Página principal (downloads)
 │   ├── drive/page.tsx           # Página Google Drive
+│   ├── library/page.tsx         # Biblioteca de vídeos
+│   ├── record/page.tsx          # Gravação de tela
 │   ├── layout.tsx               # Layout global
 │   └── globals.css
 ├── components/
-│   ├── download-form.tsx        # Formulário de download
-│   ├── video-grid.tsx           # Grid de vídeos locais + player
-│   ├── drive-auth.tsx           # Autenticação OAuth
-│   ├── drive-video-grid.tsx     # Grid de vídeos do Drive
-│   ├── drive-video-player.tsx   # Player de vídeos do Drive
-│   ├── sync-panel.tsx           # Painel de sincronização
-│   ├── navigation.tsx           # Navegação entre páginas
-│   └── ui/                      # Componentes shadcn/ui
+│   ├── common/                  # Componentes compartilhados
+│   │   ├── error-boundary.tsx   # Error Boundary com retry
+│   │   ├── navigation.tsx       # Navegação
+│   │   ├── theme-provider.tsx   # Tema dark/light
+│   │   ├── pagination.tsx       # Controles de paginação
+│   │   └── videos/              # Componentes de vídeo
+│   ├── drive/                   # Componentes Google Drive
+│   │   ├── drive-auth.tsx
+│   │   ├── drive-video-grid.tsx
+│   │   ├── drive-video-player.tsx
+│   │   └── sync-panel.tsx
+│   ├── home/                    # Componentes da Home
+│   │   └── download-form.tsx
+│   ├── library/                 # Componentes da Biblioteca
+│   │   └── paginated-video-grid.tsx
+│   ├── record/                  # Gravação de tela
+│   │   └── screen-recorder.tsx
+│   └── ui/                      # shadcn/ui components
+├── hooks/                       # Hooks customizados
+│   ├── index.ts                 # Barrel export
+│   ├── use-api-url.ts           # URL da API (SSR-safe)
+│   └── use-fetch.ts             # Fetch com AbortController
 └── lib/
-    ├── utils.ts                 # Funções helper
-    └── url-validator.ts         # Validação de URLs
+    ├── api-config.ts            # Configuração centralizada da API
+    ├── api-client.ts            # Cliente HTTP tipado
+    ├── api-urls.ts              # Constantes de endpoints
+    ├── url-validator.ts         # Validação de URLs
+    └── utils.ts                 # Utilitários (cn, formatBytes)
 ```
+
+**Arquivos de Configuração:**
+- `eslint.config.mjs` - ESLint flat config (ESLint 9)
+- `next.config.ts` - Configuração Next.js
+- `tailwind.config.ts` - Configuração Tailwind
+- `tsconfig.json` - TypeScript config
 
 **Player de vídeo:** Plyr (HTML5 video player)
 
@@ -185,11 +211,13 @@ src/
 
 ### TypeScript/React (Frontend)
 - **Componentes:** Função como default export
-- **Hooks:** Preferir hooks modernos (useState, useEffect, etc.)
+- **Hooks:** Preferir hooks modernos (useState, useEffect, useCallback, useMemo)
+- **URL da API:** Usar `useApiUrl()` hook de `@/hooks/use-api-url` (SSR-safe)
+- **Fetch:** Usar `useFetch()` ou fetch nativo com AbortController
 - **Estilo:** Tailwind utility-first + shadcn/ui components
 - **Estado:** useState para estado local, sem Redux/Zustand
-- **Fetch:** Usar fetch nativo, sem libraries adicionais
 - **Tipos:** Type safety rigoroso, evitar `any`
+- **Linting:** ESLint 9 flat config (`eslint.config.mjs`)
 
 ### Naming Conventions
 - **Python:** `snake_case` para funções/variáveis, `PascalCase` para classes
@@ -315,16 +343,26 @@ git cz              # Opção 3 (se instalado globalmente)
    - Server Components por padrão
    - `suppressHydrationWarning` necessário para temas dinâmicos
 
-2. **Plyr CSS**
+2. **URL da API (SSR-safe)**
+   - Usar `useApiUrl()` hook de `@/hooks/use-api-url`
+   - Retorna string vazia no servidor, URL real no cliente
+   - Evita erros de hidratação
+
+3. **Plyr CSS**
    - Importar em `layout.tsx`: `import "plyr-react/plyr.css"`
    - Necessário para estilos corretos do player
 
-3. **API Calls**
+4. **API Calls**
    - Backend em `http://localhost:8000`
    - Usar paths absolutos: `/api/videos` não `api/videos`
-   - Polling de jobs a cada 1 segundo durante downloads
+   - Polling de jobs com cleanup (pollingCleanupRef)
 
-4. **shadcn/ui**
+5. **ESLint**
+   - Flat config em `eslint.config.mjs` (ESLint 9)
+   - Comando: `npm run lint` (usa ESLint CLI diretamente)
+   - Warnings de `any` são aceitáveis para refs do Plyr
+
+6. **shadcn/ui**
    - Componentes instalados sob demanda em `components/ui/`
    - Usar Radix UI primitives via shadcn CLI
    - Não modificar arquivos em `components/ui/` diretamente
@@ -399,23 +437,40 @@ backend/
 frontend/
 ├── src/
 │   ├── app/
-│   │   ├── page.tsx                  # ⭐ Página principal
+│   │   ├── page.tsx                  # ⭐ Página principal (downloads)
 │   │   ├── drive/page.tsx            # ⭐ Página Google Drive
+│   │   ├── library/page.tsx          # Biblioteca de vídeos
+│   │   ├── record/page.tsx           # Gravação de tela
 │   │   ├── layout.tsx                # ⭐ Layout global
 │   │   └── globals.css
 │   ├── components/
-│   │   ├── download-form.tsx         # Formulário de download
-│   │   ├── video-grid.tsx            # ⭐ Grid + player local
-│   │   ├── drive-video-grid.tsx      # Grid de vídeos do Drive
-│   │   ├── sync-panel.tsx            # Painel de sincronização
+│   │   ├── common/                   # Componentes compartilhados
+│   │   │   ├── error-boundary.tsx    # ⭐ Error Boundary
+│   │   │   ├── navigation.tsx        # Navegação
+│   │   │   ├── theme-provider.tsx    # Tema dark/light
+│   │   │   └── videos/               # VideoCard, VideoPlayer
+│   │   ├── drive/                    # Componentes Google Drive
+│   │   ├── home/                     # Componentes da Home
+│   │   │   └── download-form.tsx     # ⭐ Formulário de download
+│   │   ├── library/                  # Biblioteca
+│   │   │   └── paginated-video-grid.tsx
 │   │   └── ui/                       # shadcn/ui components
+│   ├── hooks/                        # ⭐ Hooks customizados
+│   │   ├── index.ts                  # Barrel export
+│   │   ├── use-api-url.ts            # ⭐ URL da API (SSR-safe)
+│   │   └── use-fetch.ts              # Fetch com AbortController
 │   └── lib/
-│       └── utils.ts                  # Helpers (cn, etc.)
+│       ├── api-config.ts             # ⭐ Configuração da API
+│       ├── api-client.ts             # Cliente HTTP tipado
+│       ├── api-urls.ts               # Constantes de endpoints
+│       ├── url-validator.ts          # Validação de URLs
+│       └── utils.ts                  # Helpers (cn, formatBytes)
+├── eslint.config.mjs                 # ⭐ ESLint flat config
 ├── package.json
 ├── next.config.ts
 ├── tailwind.config.ts
-└── docs/project/           # Documentações específicas do frontend
-    └── WEB-UI-README.md
+└── docs/local/                       # Documentações locais
+    └── IMPROVEMENTS.md               # Status das melhorias
 ```
 
 ### Documentação

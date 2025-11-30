@@ -8,7 +8,16 @@ For production use, consider implementing persistent storage
 (Redis, database, etc.) by implementing the same interface.
 """
 import asyncio
+from enum import Enum
 from typing import Dict, List, Optional, Any
+
+
+class JobType(str, Enum):
+    """Types of background jobs supported by the system."""
+    DOWNLOAD = "download"
+    DRIVE_UPLOAD = "drive_upload"
+    DRIVE_SYNC = "drive_sync"
+
 
 # Type aliases for clarity
 JobId = str
@@ -176,6 +185,19 @@ def get_jobs_by_status(status: str) -> List[JobDict]:
         List of jobs matching the status
     """
     return [job for job in _jobs_db.values() if job.get("status") == status]
+
+
+def get_jobs_by_type(job_type: JobType) -> List[JobDict]:
+    """
+    Get all jobs with a specific type.
+
+    Args:
+        job_type: Job type to filter by
+
+    Returns:
+        List of jobs matching the type
+    """
+    return [job for job in _jobs_db.values() if job.get("type") == job_type.value]
 
 
 def count_jobs() -> int:
