@@ -190,12 +190,13 @@ export default function DriveVideoGrid() {
                     className="aspect-video bg-muted flex items-center justify-center relative cursor-pointer overflow-hidden"
                     onClick={() => setSelectedVideo(video)}
                   >
-                    {!thumbnailErrors.has(video.id) ? (
+                    {video.thumbnail && !thumbnailErrors.has(video.id) ? (
                       <img
-                        src={`${apiUrl}/api/${APIURLS.DRIVE_THUMBNAIL}/${video.id}`}
+                        src={video.thumbnail}
                         alt={video.name}
                         className="w-full h-full object-cover"
                         onError={() => handleThumbnailError(video.id)}
+                        referrerPolicy="no-referrer"
                       />
                     ) : (
                       <VideoOff className="h-12 w-12 text-muted-foreground" />

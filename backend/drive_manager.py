@@ -8,7 +8,7 @@ import json
 import threading
 from pathlib import Path
 from typing import Optional, List, Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
@@ -19,6 +19,46 @@ from google.auth.transport.requests import Request
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
 DRIVE_ROOT_FOLDER = "YouTube Archiver"
 SYNC_FILE_NAME = ".yt-archiver-sync.json"
+CACHE_TTL_SECONDS = 60  # Cache válido por 60 segundos
+
+
+class DriveCache:
+    """Cache em memória para respostas da API do Drive"""
+
+    def __init__(self, ttl_seconds: int = CACHE_TTL_SECONDS):
+        self._videos_cache: Optional[List[Dict]] = None
+        self._videos_timestamp: Optional[datetime] = None
+        self._ttl = timedelta(seconds=ttl_seconds)
+        self._lock = threading.Lock()
+
+    def get_videos(self) -> Optional[List[Dict]]:
+        """Retorna lista de vídeos cacheada ou None se expirou"""
+        with self._lock:
+            if self._videos_cache is None:
+                return None
+            if self._videos_timestamp is None:
+                return None
+            if datetime.now() - self._videos_timestamp > self._ttl:
+                self._videos_cache = None
+                self._videos_timestamp = None
+                return None
+            return self._videos_cache
+
+    def set_videos(self, videos: List[Dict]) -> None:
+        """Cacheia lista de vídeos"""
+        with self._lock:
+            self._videos_cache = videos
+            self._videos_timestamp = datetime.now()
+
+    def invalidate(self) -> None:
+        """Invalida o cache"""
+        with self._lock:
+            self._videos_cache = None
+            self._videos_timestamp = None
+
+
+# Cache global
+_drive_cache = DriveCache()
 
 
 class DriveManager:
@@ -307,6 +347,10 @@ class DriveManager:
                 except Exception as e:
                     print(f"Warning: Failed to upload related file {related_file.name}: {e}")
 
+            # Invalidar cache após upload bem-sucedido
+            _drive_cache.invalidate()
+            print("[DEBUG] Cache invalidado após upload")
+
             return {
                 "status": "success",
                 "file_id": response['id'],
@@ -321,8 +365,24 @@ class DriveManager:
             print(traceback.format_exc())
             raise
 
-    def list_videos(self) -> List[Dict]:
-        """Lista todos os vídeos na pasta do Drive"""
+    def list_videos(self, use_cache: bool = True) -> List[Dict]:
+        """
+        Lista todos os vídeos na pasta do Drive.
+
+        Args:
+            use_cache: Se True, usa cache (default). Se False, força refresh.
+
+        Returns:
+            Lista de dicts com metadados dos vídeos
+        """
+        # Verificar cache primeiro
+        if use_cache:
+            cached = _drive_cache.get_videos()
+            if cached is not None:
+                print(f"[DEBUG] Cache hit: {len(cached)} vídeos")
+                return cached
+
+        print("[DEBUG] Cache miss - buscando vídeos do Drive...")
         service = self._get_service()
         root_id = self.get_or_create_root_folder()
 
@@ -341,12 +401,11 @@ class DriveManager:
 
             for item in items:
                 if item['mimeType'] == 'application/vnd.google-apps.folder':
-                    # Recursão em subpastas
+                    # Recursar para subpastas
                     new_path = f"{path_prefix}/{item['name']}" if path_prefix else item['name']
                     scan_folder(item['id'], new_path)
                 else:
                     # É um arquivo
-                    # Filtrar apenas vídeos
                     ext = Path(item['name']).suffix.lower()
                     if ext in {'.mp4', '.mkv', '.webm', '.avi', '.mov'}:
                         videos.append({
@@ -360,6 +419,11 @@ class DriveManager:
                         })
 
         scan_folder(root_id)
+
+        # Salvar no cache
+        _drive_cache.set_videos(videos)
+        print(f"[DEBUG] Cache atualizado: {len(videos)} vídeos")
+
         return videos
 
     def get_sync_state(self, local_base_dir: str = "./downloads") -> Dict:
@@ -400,6 +464,9 @@ class DriveManager:
         service = self._get_service()
         try:
             service.files().delete(fileId=file_id).execute()
+            # Invalidar cache após delete
+            _drive_cache.invalidate()
+            print("[DEBUG] Cache invalidado após delete")
             return True
         except Exception as e:
             print(f"Error deleting file: {e}")
