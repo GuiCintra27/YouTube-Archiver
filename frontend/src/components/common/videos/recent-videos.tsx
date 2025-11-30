@@ -131,11 +131,9 @@ export default function RecentVideos({
       {selectedVideo && (
         <VideoPlayer
           video={selectedVideo}
+          source="local"
           onClose={() => setSelectedVideo(null)}
-          onDelete={() => {
-            handleDelete(selectedVideo);
-            setSelectedVideo(null);
-          }}
+          onDelete={() => handleDelete(selectedVideo)}
         />
       )}
     </div>

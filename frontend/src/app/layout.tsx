@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import "plyr-react/plyr.css";
+
+// Vidstack CSS
+import "@vidstack/react/player/styles/default/theme.css";
+import "@vidstack/react/player/styles/default/layouts/video.css";
+
 import Navigation from "@/components/common/navigation";
 import ThemeToggle from "@/components/common/theme-toggle";
 import { ThemeProvider } from "@/components/common/theme-provider";
