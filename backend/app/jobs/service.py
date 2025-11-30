@@ -55,6 +55,7 @@ def complete_job(job_id: str, result: dict) -> None:
         job["status"] = "completed"
         job["result"] = result
         job["progress"] = {"status": "completed", "percentage": 100}
+        job["completed_at"] = datetime.now().isoformat()
 
 
 def fail_job(job_id: str, error: str) -> None:
@@ -63,6 +64,7 @@ def fail_job(job_id: str, error: str) -> None:
     if job:
         job["status"] = "error"
         job["error"] = error
+        job["completed_at"] = datetime.now().isoformat()
 
 
 def cancel_job(job_id: str) -> None:
@@ -71,6 +73,7 @@ def cancel_job(job_id: str) -> None:
     if job:
         job["status"] = "cancelled"
         job["error"] = "Download cancelado pelo usuário"
+        job["completed_at"] = datetime.now().isoformat()
 
 
 async def run_download_job(job_id: str, url: str, request: "DownloadRequest") -> None:
