@@ -29,6 +29,7 @@ interface DriveVideo {
   created_at: string;
   modified_at: string;
   thumbnail?: string;
+  custom_thumbnail_id?: string;
 }
 
 const PAGE_SIZE = 12;
@@ -211,17 +212,27 @@ export default function DriveVideoGrid() {
                     className="aspect-video bg-muted flex items-center justify-center relative cursor-pointer overflow-hidden"
                     onClick={() => setSelectedVideo(video)}
                   >
-                    {video.thumbnail && !thumbnailErrors.has(video.id) ? (
-                      <img
-                        src={video.thumbnail}
-                        alt={video.name}
-                        className="w-full h-full object-cover"
-                        onError={() => handleThumbnailError(video.id)}
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <VideoOff className="h-12 w-12 text-muted-foreground" />
-                    )}
+                    {(() => {
+                      // Determine thumbnail source: Drive auto-generated or custom uploaded
+                      const thumbnailSrc = video.thumbnail
+                        ? video.thumbnail
+                        : video.custom_thumbnail_id
+                          ? `${apiUrl}/api/drive/custom-thumbnail/${video.custom_thumbnail_id}`
+                          : null;
+
+                      if (thumbnailSrc && !thumbnailErrors.has(video.id)) {
+                        return (
+                          <img
+                            src={thumbnailSrc}
+                            alt={video.name}
+                            className="w-full h-full object-cover"
+                            onError={() => handleThumbnailError(video.id)}
+                            referrerPolicy="no-referrer"
+                          />
+                        );
+                      }
+                      return <VideoOff className="h-12 w-12 text-muted-foreground" />;
+                    })()}
 
                     {/* Play Button Overlay */}
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

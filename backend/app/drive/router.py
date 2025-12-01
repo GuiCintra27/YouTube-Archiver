@@ -22,6 +22,7 @@ from .service import (
     delete_video,
     stream_video,
     get_thumbnail,
+    get_custom_thumbnail,
     download_single_from_drive,
     download_all_from_drive,
 )
@@ -212,6 +213,37 @@ async def get_drive_thumbnail(request: Request, file_id: str):
         return Response(
             content=thumbnail_bytes,
             media_type="image/jpeg",
+            headers={
+                "Cache-Control": "public, max-age=86400"  # Cache for 1 day
+            }
+        )
+    except (DriveNotAuthenticatedException, ThumbnailNotFoundException):
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/custom-thumbnail/{file_id}")
+@limiter.limit(RateLimits.DEFAULT)
+async def get_drive_custom_thumbnail(request: Request, file_id: str):
+    """
+    Get custom thumbnail image file directly from Drive.
+    Used for serving uploaded thumbnail files (e.g., .webp, .jpg) that
+    are stored alongside videos.
+    """
+    try:
+        _require_auth()
+
+        result = get_custom_thumbnail(file_id)
+
+        if not result:
+            raise ThumbnailNotFoundException()
+
+        thumbnail_bytes, mime_type = result
+
+        return Response(
+            content=thumbnail_bytes,
+            media_type=mime_type,
             headers={
                 "Cache-Control": "public, max-age=86400"  # Cache for 1 day
             }

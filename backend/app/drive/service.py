@@ -454,6 +454,14 @@ def get_thumbnail(file_id: str) -> Optional[bytes]:
     return drive_manager.get_thumbnail(file_id)
 
 
+def get_custom_thumbnail(file_id: str) -> Optional[tuple[bytes, str]]:
+    """
+    Get custom thumbnail file (image) directly from Drive.
+    Returns tuple of (bytes, mime_type) or None if not available.
+    """
+    return drive_manager.get_image_file(file_id)
+
+
 async def upload_external_files(
     folder_name: str,
     temp_files: List[str],
@@ -541,6 +549,9 @@ async def _run_external_upload_job(
             progress_callback
         )
 
+        # Get generated thumbnails for cleanup
+        generated_thumbnails = result.get("generated_thumbnails", [])
+
         # Completar job
         _complete_job(job_id, {
             "status": result.get("status", "success"),
@@ -550,20 +561,30 @@ async def _run_external_upload_job(
             "skipped": result.get("total_skipped", 0),
             "total": total,
             "failed": result.get("failed", []),
-            "files": result.get("uploaded", [])
+            "files": result.get("uploaded", []),
+            "thumbnails_generated": len(generated_thumbnails),
         })
 
     except Exception as e:
         _fail_job(job_id, str(e))
+        generated_thumbnails = []
 
     finally:
         # Limpar arquivos temporários
-        import shutil
         for temp_file in temp_files:
             try:
                 temp_path = Path(temp_file)
                 if temp_path.exists():
                     temp_path.unlink()
+            except Exception:
+                pass
+
+        # Limpar thumbnails geradas automaticamente
+        for thumb_file in generated_thumbnails:
+            try:
+                thumb_path = Path(thumb_file)
+                if thumb_path.exists():
+                    thumb_path.unlink()
             except Exception:
                 pass
 

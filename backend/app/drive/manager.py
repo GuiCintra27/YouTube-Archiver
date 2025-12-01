@@ -16,6 +16,7 @@ from google.auth.transport.requests import Request
 
 from app.config import settings
 from app.core.logging import get_module_logger
+from app.core.thumbnail import ensure_thumbnail
 
 logger = get_module_logger("drive")
 
@@ -229,6 +230,11 @@ class DriveManager:
                     "file_name": file_name,
                 }
 
+            # Ensure thumbnail exists (generate if missing)
+            thumbnail_path, thumbnail_generated = ensure_thumbnail(video_path)
+            if thumbnail_generated:
+                logger.info(f"Auto-generated thumbnail for: {file_name}")
+
             # Find related files (thumbnail, metadata, subtitles)
             parent_dir = video_path.parent
             related_files = []
@@ -309,6 +315,7 @@ class DriveManager:
                 "file_name": response['name'],
                 "size": response.get('size', 0),
                 "related_files": uploaded_related,
+                "thumbnail_generated": thumbnail_generated,
             }
 
         except Exception as e:
@@ -321,6 +328,8 @@ class DriveManager:
         root_id = self.get_or_create_root_folder()
 
         videos = []
+        # Store thumbnails by folder_id and base_name for matching
+        thumbnails_by_folder: Dict[str, Dict[str, Dict]] = {}
 
         def scan_folder(folder_id: str, path_prefix: str = ""):
             """Recursively scan a folder"""
@@ -333,6 +342,22 @@ class DriveManager:
 
             items = results.get('files', [])
 
+            # First pass: collect thumbnails
+            for item in items:
+                if item['mimeType'] != 'application/vnd.google-apps.folder':
+                    ext = Path(item['name']).suffix.lower()
+                    if ext in settings.THUMBNAIL_EXTENSIONS:
+                        # Store thumbnail by folder and base name
+                        base_name = Path(item['name']).stem
+                        if folder_id not in thumbnails_by_folder:
+                            thumbnails_by_folder[folder_id] = {}
+                        thumbnails_by_folder[folder_id][base_name] = {
+                            'id': item['id'],
+                            'name': item['name'],
+                            'mimeType': item.get('mimeType', 'image/jpeg')
+                        }
+
+            # Second pass: collect videos and folders
             for item in items:
                 if item['mimeType'] == 'application/vnd.google-apps.folder':
                     # Recurse into subfolders
@@ -342,6 +367,16 @@ class DriveManager:
                     # It's a file
                     ext = Path(item['name']).suffix.lower()
                     if ext in settings.VIDEO_EXTENSIONS:
+                        video_base_name = Path(item['name']).stem
+                        drive_thumbnail = item.get('thumbnailLink')
+                        custom_thumbnail_id = None
+
+                        # If no Drive thumbnail, look for custom thumbnail
+                        if not drive_thumbnail and folder_id in thumbnails_by_folder:
+                            custom_thumb = thumbnails_by_folder[folder_id].get(video_base_name)
+                            if custom_thumb:
+                                custom_thumbnail_id = custom_thumb['id']
+
                         videos.append({
                             "id": item['id'],
                             "name": item['name'],
@@ -349,7 +384,8 @@ class DriveManager:
                             "size": int(item.get('size', 0)),
                             "created_at": item.get('createdTime'),
                             "modified_at": item.get('modifiedTime'),
-                            "thumbnail": item.get('thumbnailLink'),
+                            "thumbnail": drive_thumbnail,
+                            "custom_thumbnail_id": custom_thumbnail_id,
                         })
 
         scan_folder(root_id)
@@ -406,11 +442,33 @@ class DriveManager:
             # Create/get the target folder
             target_folder_id = self.ensure_folder(folder_name, root_id)
 
+            # Generate thumbnails for videos that don't have one
+            files_to_upload = list(files)  # Make a copy
+            generated_thumbnails = []
+
+            for file_path in files:
+                file_path = Path(file_path)
+                if file_path.suffix.lower() in settings.VIDEO_EXTENSIONS:
+                    # Check if there's already a thumbnail in the list
+                    base_name = file_path.stem
+                    has_thumbnail = any(
+                        Path(f).stem == base_name and Path(f).suffix.lower() in settings.THUMBNAIL_EXTENSIONS
+                        for f in files
+                    )
+
+                    if not has_thumbnail:
+                        # Generate thumbnail
+                        thumbnail_path, generated = ensure_thumbnail(file_path)
+                        if thumbnail_path and generated:
+                            files_to_upload.append(str(thumbnail_path))
+                            generated_thumbnails.append(str(thumbnail_path))
+                            logger.info(f"Auto-generated thumbnail for external upload: {file_path.name}")
+
             uploaded_files = []
             failed_files = []
-            total_files = len(files)
+            total_files = len(files_to_upload)
 
-            for index, file_path in enumerate(files):
+            for index, file_path in enumerate(files_to_upload):
                 try:
                     file_path = Path(file_path)
                     if not file_path.exists():
@@ -512,7 +570,8 @@ class DriveManager:
                 "failed": failed_files,
                 "total_uploaded": len([f for f in uploaded_files if f.get("status") == "success"]),
                 "total_skipped": len([f for f in uploaded_files if f.get("status") == "skipped"]),
-                "total_failed": len(failed_files)
+                "total_failed": len(failed_files),
+                "generated_thumbnails": generated_thumbnails,
             }
 
         except Exception as e:
@@ -761,6 +820,44 @@ class DriveManager:
             return None
         except Exception as e:
             logger.error(f"Error getting thumbnail for {file_id}: {e}")
+            return None
+
+    def get_image_file(self, file_id: str) -> Optional[tuple[bytes, str]]:
+        """
+        Download an image file directly from Drive.
+        Returns tuple of (bytes, mime_type) or None if not available.
+        Used for serving custom thumbnail files.
+        """
+        service = self.get_service()
+        try:
+            # Get file metadata to check mime type
+            file_metadata = service.files().get(
+                fileId=file_id,
+                fields='mimeType, name, size'
+            ).execute()
+
+            mime_type = file_metadata.get('mimeType', 'image/jpeg')
+
+            # Verify it's an image file
+            if not mime_type.startswith('image/'):
+                logger.warning(f"File {file_id} is not an image: {mime_type}")
+                return None
+
+            # Download the file
+            import requests
+            creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
+            headers = {'Authorization': f'Bearer {creds.token}'}
+            download_url = f'https://www.googleapis.com/drive/v3/files/{file_id}?alt=media'
+
+            response = requests.get(download_url, headers=headers)
+
+            if response.status_code == 200:
+                return response.content, mime_type
+
+            logger.warning(f"Failed to download image {file_id}: HTTP {response.status_code}")
+            return None
+        except Exception as e:
+            logger.error(f"Error getting image file {file_id}: {e}")
             return None
 
 
