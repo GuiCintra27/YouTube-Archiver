@@ -59,7 +59,7 @@ class Settings(BaseSettings):
 
     # CORS - comma-separated string for env var, converted to list
     CORS_ORIGINS: str = Field(
-        default="http://localhost:3000,http://localhost:3001",
+        default="http://localhost:3000,http://localhost:3001,http://localhost:3002",
         description="Allowed CORS origins (comma-separated)"
     )
 

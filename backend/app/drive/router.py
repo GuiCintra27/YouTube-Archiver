@@ -1,7 +1,12 @@
 """
 Drive router - API endpoints for Google Drive integration
 """
-from fastapi import APIRouter, HTTPException, Request
+import shutil
+import uuid
+from pathlib import Path
+from typing import List
+
+from fastapi import APIRouter, HTTPException, Request, File, Form, UploadFile
 from fastapi.responses import StreamingResponse, Response
 
 from .service import (
@@ -11,6 +16,7 @@ from .service import (
     list_videos_paginated,
     upload_video,
     upload_single_video,
+    upload_external_files,
     get_sync_status,
     sync_all_videos,
     delete_video,
@@ -209,6 +215,70 @@ async def get_drive_thumbnail(request: Request, file_id: str):
             }
         )
     except (DriveNotAuthenticatedException, ThumbnailNotFoundException):
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/upload-external")
+@limiter.limit(RateLimits.UPLOAD)
+async def upload_external_to_drive(
+    request: Request,
+    folder_name: str = Form(...),
+    video: UploadFile = File(...),
+    extra_files: List[UploadFile] = File(default=[]),
+):
+    """
+    Upload de arquivos externos para o Google Drive.
+
+    Permite fazer upload de qualquer vídeo do PC para o Drive,
+    com possibilidade de adicionar arquivos extras (thumbnail, legendas, etc.).
+    A pasta é criada automaticamente se não existir.
+
+    Retorna job_id para tracking de progresso via GET /api/jobs/{job_id}.
+    """
+    try:
+        _require_auth()
+
+        # Criar diretório temporário único
+        temp_dir = Path(f"/tmp/yt-archiver-upload/{uuid.uuid4()}")
+        temp_dir.mkdir(parents=True, exist_ok=True)
+
+        temp_files = []
+
+        try:
+            # Salvar vídeo principal
+            video_path = temp_dir / video.filename
+            with open(video_path, "wb") as f:
+                shutil.copyfileobj(video.file, f)
+            temp_files.append(str(video_path))
+
+            # Salvar arquivos extras
+            for extra in extra_files:
+                if extra.filename:  # Ignorar arquivos vazios
+                    extra_path = temp_dir / extra.filename
+                    with open(extra_path, "wb") as f:
+                        shutil.copyfileobj(extra.file, f)
+                    temp_files.append(str(extra_path))
+
+            # Iniciar upload em background
+            job_id = await upload_external_files(folder_name, temp_files)
+
+            return {
+                "status": "success",
+                "job_id": job_id,
+                "message": "Upload iniciado em background",
+                "folder_name": folder_name,
+                "files_count": len(temp_files)
+            }
+
+        except Exception as e:
+            # Limpar arquivos temporários em caso de erro
+            if temp_dir.exists():
+                shutil.rmtree(temp_dir)
+            raise
+
+    except DriveNotAuthenticatedException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

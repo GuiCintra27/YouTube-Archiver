@@ -9,6 +9,7 @@ export enum APIURLS {
   DRIVE_SYNC_STATUS = "drive/sync-status",
   DRIVE_THUMBNAIL = "drive/thumbnail",
   DRIVE_UPLOAD = "drive/upload",
+  DRIVE_UPLOAD_EXTERNAL = "drive/upload-external",
   DRIVE_VIDEOS = "drive/videos",
 
   JOBS = "jobs",
