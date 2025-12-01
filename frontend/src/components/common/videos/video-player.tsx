@@ -25,7 +25,7 @@ import { useApiUrl } from "@/hooks/use-api-url";
 import { formatBytes } from "@/lib/utils";
 
 // Vidstack imports
-import { MediaPlayer, MediaProvider, Poster } from "@vidstack/react";
+import { MediaPlayer, MediaProvider } from "@vidstack/react";
 import {
   DefaultVideoLayout,
   defaultLayoutIcons,
@@ -91,9 +91,6 @@ export default function VideoPlayer({
       : `${apiUrl}/api/videos/stream/${encodeURIComponent(video.path)}`
     : "";
 
-  // Thumbnail URL
-  const thumbnailUrl = video.thumbnail || undefined;
-
   const handleDelete = async () => {
     setDeleting(true);
     setError(null);
@@ -153,21 +150,13 @@ export default function VideoPlayer({
               {videoUrl && (
                 <MediaPlayer
                   title={videoTitle}
-                  src={videoUrl}
+                  src={{ src: videoUrl, type: "video/mp4" }}
                   aspectRatio="16/9"
                   crossOrigin
                   playsInline
                   className="w-full"
                 >
-                  <MediaProvider>
-                    {thumbnailUrl && (
-                      <Poster
-                        className="vds-poster"
-                        src={thumbnailUrl}
-                        alt={videoTitle}
-                      />
-                    )}
-                  </MediaProvider>
+                  <MediaProvider />
                   <DefaultVideoLayout
                     icons={defaultLayoutIcons}
                     // Configurações de velocidade de reprodução
