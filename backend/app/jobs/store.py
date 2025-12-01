@@ -17,6 +17,7 @@ class JobType(str, Enum):
     DOWNLOAD = "download"
     DRIVE_UPLOAD = "drive_upload"
     DRIVE_SYNC = "drive_sync"
+    DRIVE_DOWNLOAD = "drive_download"
 
 
 # Type aliases for clarity

@@ -22,6 +22,8 @@ from .service import (
     delete_video,
     stream_video,
     get_thumbnail,
+    download_single_from_drive,
+    download_all_from_drive,
 )
 from .manager import drive_manager
 from app.core.exceptions import (
@@ -278,6 +280,76 @@ async def upload_external_to_drive(
                 shutil.rmtree(temp_dir)
             raise
 
+    except DriveNotAuthenticatedException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/download")
+@limiter.limit(RateLimits.DOWNLOAD_BATCH)
+async def download_from_drive(
+    request: Request,
+    path: str,
+    base_dir: str = "./downloads"
+):
+    """
+    Download assíncrono de um vídeo do Drive para o armazenamento local.
+
+    Retorna job_id imediatamente. O download acontece em background.
+    Use GET /api/jobs/{job_id} para acompanhar o progresso.
+
+    Args:
+        path: Caminho relativo do arquivo no Drive (e.g., "Channel/video.mp4")
+        base_dir: Diretório base local para downloads
+    """
+    try:
+        _require_auth()
+
+        # Buscar file_id pelo path
+        video = drive_manager.get_video_by_path(path)
+        if not video:
+            raise HTTPException(status_code=404, detail=f"Vídeo não encontrado no Drive: {path}")
+
+        file_id = video['id']
+        job_id = await download_single_from_drive(file_id, path, base_dir)
+        return {
+            "status": "success",
+            "job_id": job_id,
+            "message": "Download iniciado em background"
+        }
+    except DriveNotAuthenticatedException:
+        raise
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/download-all")
+@limiter.limit(RateLimits.DOWNLOAD_BATCH)
+async def download_all_from_drive_endpoint(
+    request: Request,
+    base_dir: str = "./downloads"
+):
+    """
+    Download assíncrono de todos os vídeos que estão apenas no Drive.
+
+    Retorna job_id imediatamente. O download acontece em background
+    com até 3 downloads simultâneos. Use GET /api/jobs/{job_id} para
+    acompanhar o progresso.
+
+    Args:
+        base_dir: Diretório base local para downloads
+    """
+    try:
+        _require_auth()
+        job_id = await download_all_from_drive(base_dir)
+        return {
+            "status": "success",
+            "job_id": job_id,
+            "message": "Download de todos os vídeos iniciado em background"
+        }
     except DriveNotAuthenticatedException:
         raise
     except Exception as e:

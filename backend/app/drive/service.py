@@ -574,3 +574,313 @@ async def _run_external_upload_job(
                 temp_dir.rmdir()
         except Exception:
             pass
+
+
+# ==================== Download Functions ====================
+
+# Semaphore para limitar downloads concorrentes (3 simultâneos)
+DOWNLOAD_SEMAPHORE: Optional[asyncio.Semaphore] = None
+
+
+def _get_download_semaphore() -> asyncio.Semaphore:
+    """Get or create the download semaphore (must be created in event loop context)."""
+    global DOWNLOAD_SEMAPHORE
+    if DOWNLOAD_SEMAPHORE is None:
+        DOWNLOAD_SEMAPHORE = asyncio.Semaphore(3)
+    return DOWNLOAD_SEMAPHORE
+
+
+async def download_single_from_drive(
+    file_id: str,
+    relative_path: str,
+    base_dir: str = "./downloads"
+) -> str:
+    """
+    Download assíncrono de um único vídeo do Drive para o local.
+
+    Args:
+        file_id: ID do arquivo no Drive
+        relative_path: Caminho relativo do arquivo no Drive
+        base_dir: Diretório base local
+
+    Returns:
+        job_id: ID único do job para acompanhamento via polling
+    """
+    job_id = str(uuid.uuid4())
+
+    # Criar job no store
+    job_data = {
+        "job_id": job_id,
+        "type": JobType.DRIVE_DOWNLOAD.value,
+        "status": "pending",
+        "created_at": datetime.now().isoformat(),
+        "progress": {
+            "status": "initializing",
+            "total": 1,
+            "downloaded": 0,
+            "failed": 0,
+            "percent": 0,
+            "current_file": relative_path
+        },
+        "result": None,
+        "error": None
+    }
+    store.set_job(job_id, job_data)
+
+    # Iniciar task em background
+    task = asyncio.create_task(
+        _run_single_download_job(job_id, file_id, relative_path, base_dir)
+    )
+    store.set_task(job_id, task)
+
+    return job_id
+
+
+async def _run_single_download_job(
+    job_id: str,
+    file_id: str,
+    relative_path: str,
+    base_dir: str
+) -> None:
+    """Executa download de um único arquivo em background."""
+    try:
+        # Atualizar progresso
+        _update_download_progress(job_id, {
+            "status": "downloading",
+            "total": 1,
+            "downloaded": 0,
+            "failed": 0,
+            "percent": 0,
+            "current_file": relative_path
+        })
+
+        def progress_callback(progress: Dict) -> None:
+            _update_download_progress(job_id, {
+                "status": "downloading",
+                "total": 1,
+                "downloaded": 0,
+                "failed": 0,
+                "percent": progress.get("progress", 0),
+                "current_file": progress.get("file_name", relative_path)
+            })
+
+        # Download usando thread para não bloquear event loop
+        result = await asyncio.to_thread(
+            drive_manager.download_file,
+            file_id,
+            relative_path,
+            base_dir,
+            progress_callback
+        )
+
+        if result.get("status") != "error":
+            _complete_download_job(job_id, {
+                "status": "success",
+                "downloaded": 1,
+                "total": 1,
+                "failed": [],
+                "files": [result]
+            })
+        else:
+            _fail_job(job_id, result.get("message", "Download failed"))
+
+    except Exception as e:
+        _fail_job(job_id, str(e))
+
+
+async def download_all_from_drive(base_dir: str = "./downloads") -> str:
+    """
+    Download assíncrono de todos os vídeos que estão apenas no Drive.
+
+    Retorna job_id imediatamente. O download acontece em background
+    com até 3 downloads simultâneos controlados por semaphore.
+
+    Args:
+        base_dir: Diretório base local para downloads
+
+    Returns:
+        job_id: ID único do job para acompanhamento via polling
+    """
+    job_id = str(uuid.uuid4())
+
+    # Criar job no store
+    job_data = {
+        "job_id": job_id,
+        "type": JobType.DRIVE_DOWNLOAD.value,
+        "status": "pending",
+        "created_at": datetime.now().isoformat(),
+        "progress": {
+            "status": "initializing",
+            "total": 0,
+            "downloaded": 0,
+            "failed": 0,
+            "percent": 0,
+            "current_file": None,
+            "files_in_progress": []
+        },
+        "result": None,
+        "error": None
+    }
+    store.set_job(job_id, job_data)
+
+    # Iniciar task em background
+    task = asyncio.create_task(_run_batch_download_job(job_id, base_dir))
+    store.set_task(job_id, task)
+
+    return job_id
+
+
+async def _run_batch_download_job(job_id: str, base_dir: str) -> None:
+    """
+    Executa downloads em paralelo com limite de 3 simultâneos.
+    """
+    try:
+        # Obter lista de arquivos para download (apenas no Drive)
+        sync_state = drive_manager.get_sync_state(base_dir)
+        drive_only = sync_state["drive_only"]
+        total = len(drive_only)
+
+        if total == 0:
+            _complete_download_job(job_id, {
+                "status": "success",
+                "downloaded": 0,
+                "total": 0,
+                "failed": []
+            })
+            return
+
+        # Atualizar progresso inicial
+        _update_download_progress(job_id, {
+            "status": "downloading",
+            "total": total,
+            "downloaded": 0,
+            "failed": 0,
+            "percent": 0,
+            "current_file": None,
+            "files_in_progress": []
+        })
+
+        # Obter lista de vídeos do Drive com IDs
+        drive_videos = drive_manager.list_videos()
+        path_to_video = {v['path']: v for v in drive_videos}
+
+        # Contadores thread-safe
+        results = {"downloaded": 0, "failed": [], "files": []}
+        results_lock = asyncio.Lock()
+        files_in_progress: List[str] = []
+        progress_lock = asyncio.Lock()
+
+        semaphore = _get_download_semaphore()
+
+        async def download_with_semaphore(video_path: str) -> None:
+            """Download um arquivo com controle de concorrência."""
+            async with semaphore:
+                # Verificar se job foi cancelado
+                job = store.get_job(job_id)
+                if job and job.get("status") == "cancelled":
+                    return
+
+                # Obter ID do arquivo
+                video_info = path_to_video.get(video_path)
+                if not video_info:
+                    async with results_lock:
+                        results["failed"].append({
+                            "file": video_path,
+                            "error": "Video not found in Drive"
+                        })
+                    return
+
+                file_id = video_info['id']
+
+                # Marcar arquivo como em progresso
+                async with progress_lock:
+                    files_in_progress.append(video_path)
+                    current_job = store.get_job(job_id)
+                    if current_job:
+                        current_job["progress"]["current_file"] = video_path
+                        current_job["progress"]["files_in_progress"] = files_in_progress.copy()
+
+                try:
+                    # Download usando thread para não bloquear event loop
+                    result = await asyncio.to_thread(
+                        drive_manager.download_file,
+                        file_id,
+                        video_path,
+                        base_dir,
+                        None  # No progress callback for batch
+                    )
+
+                    async with results_lock:
+                        if result.get("status") != "error":
+                            results["downloaded"] += 1
+                            results["files"].append(result)
+                        else:
+                            results["failed"].append({
+                                "file": video_path,
+                                "error": result.get("message", "Unknown error")
+                            })
+
+                        # Atualizar progresso geral
+                        done = results["downloaded"] + len(results["failed"])
+                        _update_download_progress(job_id, {
+                            "status": "downloading",
+                            "total": total,
+                            "downloaded": results["downloaded"],
+                            "failed": len(results["failed"]),
+                            "percent": (done / total) * 100,
+                            "current_file": None,
+                            "files_in_progress": []
+                        })
+
+                except Exception as e:
+                    async with results_lock:
+                        results["failed"].append({
+                            "file": video_path,
+                            "error": str(e)
+                        })
+                finally:
+                    # Remover arquivo da lista de em progresso
+                    async with progress_lock:
+                        if video_path in files_in_progress:
+                            files_in_progress.remove(video_path)
+
+        # Criar todas as tasks (semaphore controla concorrência)
+        tasks = [
+            download_with_semaphore(video_path)
+            for video_path in drive_only
+        ]
+
+        # Aguardar todas completarem
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Completar job
+        _complete_download_job(job_id, {
+            "status": "success",
+            "downloaded": results["downloaded"],
+            "total": total,
+            "failed": results["failed"],
+            "files": results["files"]
+        })
+
+    except Exception as e:
+        _fail_job(job_id, str(e))
+
+
+def _update_download_progress(job_id: str, progress: Dict) -> None:
+    """Update the progress of a drive download job."""
+    job = store.get_job(job_id)
+    if job:
+        job["progress"] = progress
+        if progress.get("status") == "downloading":
+            job["status"] = "downloading"
+
+
+def _complete_download_job(job_id: str, result: Dict) -> None:
+    """Mark a drive download job as completed."""
+    job = store.get_job(job_id)
+    if job:
+        job["status"] = "completed"
+        job["result"] = result
+        job["progress"]["status"] = "completed"
+        job["progress"]["percent"] = 100
+        job["completed_at"] = datetime.now().isoformat()
