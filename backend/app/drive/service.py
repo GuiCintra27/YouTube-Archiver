@@ -452,3 +452,125 @@ def stream_video(
 def get_thumbnail(file_id: str) -> Optional[bytes]:
     """Get thumbnail bytes for a video"""
     return drive_manager.get_thumbnail(file_id)
+
+
+async def upload_external_files(
+    folder_name: str,
+    temp_files: List[str],
+) -> str:
+    """
+    Upload de arquivos externos para uma pasta específica no Drive.
+
+    Args:
+        folder_name: Nome da pasta de destino no Drive
+        temp_files: Lista de caminhos dos arquivos temporários
+
+    Returns:
+        job_id: ID único do job para acompanhamento via polling
+    """
+    job_id = str(uuid.uuid4())
+
+    # Criar job no store
+    job_data = {
+        "job_id": job_id,
+        "type": JobType.DRIVE_UPLOAD.value,
+        "status": "pending",
+        "created_at": datetime.now().isoformat(),
+        "progress": {
+            "status": "initializing",
+            "total": len(temp_files),
+            "uploaded": 0,
+            "failed": 0,
+            "percent": 0,
+            "current_file": None,
+            "folder_name": folder_name
+        },
+        "result": None,
+        "error": None
+    }
+    store.set_job(job_id, job_data)
+
+    # Iniciar task em background
+    task = asyncio.create_task(_run_external_upload_job(job_id, folder_name, temp_files))
+    store.set_task(job_id, task)
+
+    return job_id
+
+
+async def _run_external_upload_job(
+    job_id: str,
+    folder_name: str,
+    temp_files: List[str]
+) -> None:
+    """
+    Executa upload de arquivos externos em background.
+
+    Após o upload, limpa os arquivos temporários.
+    """
+    try:
+        total = len(temp_files)
+
+        # Atualizar progresso
+        _update_job_progress(job_id, {
+            "status": "uploading",
+            "total": total,
+            "uploaded": 0,
+            "failed": 0,
+            "percent": 0,
+            "current_file": None,
+            "folder_name": folder_name
+        })
+
+        def progress_callback(progress: Dict) -> None:
+            """Callback para atualizar progresso durante upload."""
+            _update_job_progress(job_id, {
+                "status": "uploading",
+                "total": total,
+                "uploaded": progress.get("files_uploaded", 0),
+                "failed": 0,
+                "percent": progress.get("overall_progress", 0),
+                "current_file": progress.get("current_file"),
+                "folder_name": folder_name
+            })
+
+        # Upload usando thread para não bloquear event loop
+        result = await asyncio.to_thread(
+            drive_manager.upload_to_folder,
+            folder_name,
+            temp_files,
+            progress_callback
+        )
+
+        # Completar job
+        _complete_job(job_id, {
+            "status": result.get("status", "success"),
+            "folder_name": folder_name,
+            "folder_id": result.get("folder_id"),
+            "uploaded": result.get("total_uploaded", 0),
+            "skipped": result.get("total_skipped", 0),
+            "total": total,
+            "failed": result.get("failed", []),
+            "files": result.get("uploaded", [])
+        })
+
+    except Exception as e:
+        _fail_job(job_id, str(e))
+
+    finally:
+        # Limpar arquivos temporários
+        import shutil
+        for temp_file in temp_files:
+            try:
+                temp_path = Path(temp_file)
+                if temp_path.exists():
+                    temp_path.unlink()
+            except Exception:
+                pass
+
+        # Limpar diretório temporário se estiver vazio
+        try:
+            temp_dir = Path("/tmp/yt-archiver-upload")
+            if temp_dir.exists() and not any(temp_dir.iterdir()):
+                temp_dir.rmdir()
+        except Exception:
+            pass

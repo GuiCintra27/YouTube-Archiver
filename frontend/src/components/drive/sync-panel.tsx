@@ -20,7 +20,9 @@ import {
   HardDrive,
   Cloud,
   XCircle,
+  FolderUp,
 } from "lucide-react";
+import ExternalUploadModal from "./external-upload-modal";
 import {
   Accordion,
   AccordionContent,
@@ -68,6 +70,7 @@ export default function SyncPanel() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [uploadingVideo, setUploadingVideo] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+  const [showExternalUpload, setShowExternalUpload] = useState(false);
 
   // Ref para cleanup do polling
   const pollingCleanupRef = useRef<(() => void) | null>(null);
@@ -391,7 +394,7 @@ export default function SyncPanel() {
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button
                 variant="outline"
                 onClick={fetchSyncStatus}
@@ -399,6 +402,15 @@ export default function SyncPanel() {
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Atualizar
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => setShowExternalUpload(true)}
+                disabled={syncing || uploadingVideo !== null}
+              >
+                <FolderUp className="h-4 w-4 mr-2" />
+                Upload Externo
               </Button>
 
               {syncStatus.local_only.length > 0 && (
@@ -512,6 +524,13 @@ export default function SyncPanel() {
             </Accordion>
           </>
         )}
+
+        {/* External Upload Modal */}
+        <ExternalUploadModal
+          open={showExternalUpload}
+          onOpenChange={setShowExternalUpload}
+          onUploadComplete={fetchSyncStatus}
+        />
       </CardContent>
     </Card>
   );

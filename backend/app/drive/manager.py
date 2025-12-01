@@ -380,6 +380,144 @@ class DriveManager:
             "total_drive": len(drive_videos),
         }
 
+    def upload_to_folder(
+        self,
+        folder_name: str,
+        files: List[str],
+        progress_callback: Optional[Callable] = None
+    ) -> Dict:
+        """
+        Upload multiple files to a specific folder in Drive.
+        Creates folder inside "YouTube Archiver" if it doesn't exist.
+
+        Args:
+            folder_name: Name of the folder to create/use inside root
+            files: List of local file paths to upload
+            progress_callback: Optional callback for progress updates
+
+        Returns:
+            Dict with status, uploaded files, and any errors
+        """
+        try:
+            service = self.get_service()
+            root_id = self.get_or_create_root_folder()
+
+            # Create/get the target folder
+            target_folder_id = self.ensure_folder(folder_name, root_id)
+
+            uploaded_files = []
+            failed_files = []
+            total_files = len(files)
+
+            for index, file_path in enumerate(files):
+                try:
+                    file_path = Path(file_path)
+                    if not file_path.exists():
+                        failed_files.append({
+                            "file": str(file_path),
+                            "error": "File not found"
+                        })
+                        continue
+
+                    file_name = file_path.name
+
+                    # Check if file already exists
+                    escaped_name = file_name.replace("'", "\\'")
+                    query = f"name='{escaped_name}' and '{target_folder_id}' in parents and trashed=false"
+                    results = service.files().list(q=query, fields='files(id)').execute()
+
+                    if results.get('files', []):
+                        logger.debug(f"File already exists, skipping: {file_name}")
+                        uploaded_files.append({
+                            "name": file_name,
+                            "status": "skipped",
+                            "message": "Already exists"
+                        })
+                        continue
+
+                    # Upload file
+                    file_metadata = {
+                        'name': file_name,
+                        'parents': [target_folder_id]
+                    }
+
+                    # Use resumable upload for larger files
+                    file_size = file_path.stat().st_size
+                    if file_size > 5 * 1024 * 1024:  # > 5MB
+                        media = MediaFileUpload(
+                            str(file_path),
+                            resumable=True,
+                            chunksize=8 * 1024 * 1024
+                        )
+
+                        request = service.files().create(
+                            body=file_metadata,
+                            media_body=media,
+                            fields='id, name, size'
+                        )
+
+                        response = None
+                        while response is None:
+                            status, response = request.next_chunk()
+                            if status and progress_callback:
+                                file_progress = int(status.progress() * 100)
+                                overall_progress = int(((index + status.progress()) / total_files) * 100)
+                                progress_callback({
+                                    "current_file": file_name,
+                                    "file_progress": file_progress,
+                                    "overall_progress": overall_progress,
+                                    "files_uploaded": index,
+                                    "total_files": total_files
+                                })
+                    else:
+                        media = MediaFileUpload(str(file_path))
+                        response = service.files().create(
+                            body=file_metadata,
+                            media_body=media,
+                            fields='id, name, size'
+                        ).execute()
+
+                    uploaded_files.append({
+                        "name": file_name,
+                        "file_id": response['id'],
+                        "size": int(response.get('size', 0)),
+                        "status": "success"
+                    })
+
+                    logger.info(f"Uploaded: {file_name} (ID: {response['id']})")
+
+                    # Update progress after file completion
+                    if progress_callback:
+                        progress_callback({
+                            "current_file": file_name,
+                            "file_progress": 100,
+                            "overall_progress": int(((index + 1) / total_files) * 100),
+                            "files_uploaded": index + 1,
+                            "total_files": total_files
+                        })
+
+                except Exception as e:
+                    logger.error(f"Failed to upload {file_path}: {e}")
+                    failed_files.append({
+                        "file": str(file_path),
+                        "error": str(e)
+                    })
+
+            return {
+                "status": "success" if not failed_files else "partial",
+                "folder_name": folder_name,
+                "folder_id": target_folder_id,
+                "uploaded": uploaded_files,
+                "failed": failed_files,
+                "total_uploaded": len([f for f in uploaded_files if f.get("status") == "success"]),
+                "total_skipped": len([f for f in uploaded_files if f.get("status") == "skipped"]),
+                "total_failed": len(failed_files)
+            }
+
+        except Exception as e:
+            logger.error(f"Error in upload_to_folder: {e}", exc_info=True)
+            raise
+
     def delete_video(self, file_id: str) -> bool:
         """Remove a video from Drive"""
         service = self.get_service()
