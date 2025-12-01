@@ -1,7 +1,7 @@
 # Frontend Improvements - Status Final
 
 **Data de Criação:** 2025-11-29
-**Última Atualização:** 2025-11-29
+**Última Atualização:** 2025-11-30
 **Stack:** Next.js 15 + TypeScript + shadcn/ui + Tailwind CSS
 
 Este documento lista as melhorias implementadas no frontend do YT-Archiver.
@@ -21,6 +21,107 @@ Este documento lista as melhorias implementadas no frontend do YT-Archiver.
 | 7 | Adicionar useCallback para Event Handlers | ✅ Implementado | 8+ componentes |
 | 8 | Adicionar AbortController às Requisições | ✅ Implementado | `hooks/use-fetch.ts` |
 | 9 | Migrar ESLint para Flat Config | ✅ Implementado | `eslint.config.mjs` |
+| 10 | Migrar Video Player de Plyr para Vidstack | ✅ Implementado | `components/common/videos/video-player.tsx` |
+| 11 | Upload Externo para o Drive | ✅ Implementado | `components/drive/external-upload-modal.tsx`, `sync-panel.tsx` |
+| 12 | Download do Drive para Local | ✅ Implementado | `components/drive/sync-panel.tsx`, `lib/api-urls.ts` |
+
+---
+
+## Funcionalidades Recentes (v2.2+)
+
+### 10. Migração do Video Player de Plyr para Vidstack
+
+**Status:** ✅ Implementado
+**Commit:** `9b9f4a5`
+**Impacto:** Alto (UX)
+
+**Implementação:**
+- Substituição do player Plyr (deprecado) pelo Vidstack para uma experiência moderna
+- Componente `VideoPlayer` unificado para vídeos locais e do Drive
+- Remoção do componente `DriveVideoPlayer` duplicado (code deduplication)
+
+**Novas Features:**
+- Toggle de loop para repetição de vídeo
+- Controle de velocidade de reprodução (0.25x - 2x)
+- Seek step de 10 segundos
+- Suporte a Picture-in-Picture
+- Integração com Google Cast
+- Atalhos de teclado (k/Space, m, i, f)
+- Tema escuro com esquema de cores automático
+- Acessibilidade melhorada (ARIA labels, roles)
+
+**Arquivos Modificados:**
+- `components/common/videos/video-player.tsx` - Reescrito com Vidstack
+- `app/layout.tsx` - Atualização de CSS imports
+
+**Dependências Adicionadas:**
+- `@vidstack/react` (v1.12.13)
+
+---
+
+### 11. Upload Externo para o Drive
+
+**Status:** ✅ Implementado
+**Commit:** `6ab1e18`
+**Impacto:** Médio (Feature)
+
+**Implementação:**
+- Modal para upload de arquivos externos do PC para o Google Drive
+- Suporte a arquivos extras (thumbnails, legendas, transcrições)
+- Auto-preenchimento do nome da pasta baseado no nome do vídeo
+- Barra de progresso durante upload com indicador de arquivo atual
+
+**Arquivos Criados/Modificados:**
+- `components/drive/external-upload-modal.tsx` - Novo componente modal
+- `components/drive/sync-panel.tsx` - Botão "Upload Externo" adicionado
+
+---
+
+### 12. Download do Drive para Local
+
+**Status:** ✅ Implementado
+**Commit:** `dcf5e89`
+**Impacto:** Alto (Feature)
+
+**Implementação:**
+- Download de vídeos do Google Drive para armazenamento local
+- Botão "Baixar Todos" para downloads em lote
+- Botões individuais de download na seção "Apenas Drive"
+- Barra de progresso de download (tema roxo para diferenciar do upload azul)
+- Atualizações de progresso em tempo real via job polling
+- Progresso exibido tanto para downloads em lote quanto individuais
+
+**Arquivos Modificados:**
+- `components/drive/sync-panel.tsx` - Interface de download completa
+- `lib/api-urls.ts` - URLs `DRIVE_DOWNLOAD` e `DRIVE_DOWNLOAD_ALL`
+
+**Estados Adicionados:**
+```typescript
+const [downloading, setDownloading] = useState(false);
+const [downloadingVideo, setDownloadingVideo] = useState<string | null>(null);
+const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+```
+
+**Funções Adicionadas:**
+- `pollDownloadProgress()` - Polling de progresso de download
+- `handleDownloadAll()` - Download de todos os vídeos do Drive
+- `handleDownloadSingle()` - Download de vídeo individual
+
+---
+
+### Bug Fixes (v2.2+)
+
+#### Fix: Vídeos do Drive não reproduziam após migração para Vidstack
+
+**Commit:** `e2e2823`
+**Problema:** Vidstack enviava requisição HEAD para detectar tipo de mídia, backend retornava 405
+**Solução:** Especificar tipo explicitamente: `src={{ src: videoUrl, type: "video/mp4" }}`
+
+#### Fix: Poster aparecia como faixa no meio do player
+
+**Commit:** `e2e2823`
+**Problema:** Componente Poster do Vidstack renderizando incorretamente
+**Solução:** Remoção do componente Poster do video-player.tsx
 
 ---
 
@@ -312,4 +413,4 @@ frontend/
 
 ---
 
-**Última atualização:** 2025-11-29
+**Última atualização:** 2025-11-30

@@ -1,7 +1,7 @@
 # Backend Improvements Roadmap
 
 **Data de Criação:** 2025-11-29
-**Última Atualização:** 2025-11-29
+**Última Atualização:** 2025-11-30
 **Arquitetura Atual:** FastAPI modular (NestJS-like)
 
 Este documento lista melhorias identificadas para o backend do YT-Archiver, organizadas por prioridade e categoria.
@@ -23,6 +23,97 @@ Este documento lista melhorias identificadas para o backend do YT-Archiver, orga
 | 9 | Testes Automatizados | ✅ Implementado | `0e3ca51` |
 | 10 | Constantes Centralizadas | ✅ Implementado | `e0fbcf6` |
 | 11 | Type Hints Completas | ✅ Implementado | `1a2ac4b` |
+| 12 | Fila Assíncrona de Upload com Processamento Paralelo | ✅ Implementado | `35ca3c5` |
+| 13 | Cache em Memória para Drive API | ✅ Implementado | `6c87ed3` |
+| 14 | Upload de Arquivos Externos para o Drive | ✅ Implementado | `6ab1e18` |
+| 15 | Download do Drive para Local | ✅ Implementado | `dcf5e89` |
+
+---
+
+## Funcionalidades Recentes (v2.2+)
+
+### 12. Fila Assíncrona de Upload com Processamento Paralelo
+
+**Status:** ✅ Implementado
+**Commit:** `35ca3c5`
+**Impacto:** Alto (Performance)
+
+**Implementação:**
+- Sistema de fila assíncrona para uploads do Google Drive com `asyncio.Semaphore(3)`
+- Endpoints retornam `job_id` imediatamente (não-bloqueante)
+- Tasks de upload executam em background com `asyncio.create_task()`
+- Uso de `asyncio.to_thread()` para operações de I/O bloqueantes
+- Frontend faz polling em `/api/jobs/{id}` para progresso em tempo real
+
+**Arquivos Modificados:**
+- `app/drive/service.py` - Funções de upload assíncrono
+- `app/drive/router.py` - Endpoints não-bloqueantes
+- `app/jobs/store.py` - Storage de jobs
+
+---
+
+### 13. Cache em Memória para Drive API
+
+**Status:** ✅ Implementado
+**Commit:** `6c87ed3`
+**Impacto:** Alto (Performance)
+
+**Implementação:**
+- Classe `DriveCache` com TTL de 60 segundos para listagem de vídeos
+- Reduz chamadas repetidas à API de ~15s para ~10ms em requests cacheados
+- Correção no carregamento de thumbnails usando URLs diretas do Google (evita erros ORB)
+- Invalidação automática do cache após operações de upload/delete
+
+**Arquivos Criados/Modificados:**
+- `app/drive/manager.py` - Classe `DriveCache` e integração
+
+---
+
+### 14. Upload de Arquivos Externos para o Drive
+
+**Status:** ✅ Implementado
+**Commit:** `6ab1e18`
+**Impacto:** Médio (Feature)
+
+**Implementação:**
+- Permite upload de qualquer vídeo do PC para o Google Drive
+- Suporte para arquivos extras (thumbnails, legendas, transcrições)
+- Método `upload_to_folder()` no DriveManager
+- Função assíncrona `upload_external_files()` no serviço
+- Endpoint `POST /api/drive/upload-external`
+- Arquivos salvos em `/tmp` e limpos após upload
+- Tracking de progresso via job polling
+
+**Arquivos Modificados:**
+- `app/drive/manager.py` - Método `upload_to_folder()`
+- `app/drive/service.py` - Função `upload_external_files()`
+- `app/drive/router.py` - Endpoint `/upload-external`
+
+---
+
+### 15. Download do Drive para Local
+
+**Status:** ✅ Implementado
+**Commit:** `dcf5e89`
+**Impacto:** Alto (Feature)
+
+**Implementação:**
+- Download de vídeos do Google Drive para armazenamento local
+- Sincronização bidirecional entre biblioteca local e Drive
+- Método `download_file()` no DriveManager com callback de progresso
+- Método `_download_related_files()` para baixar thumbnails, metadata, legendas
+- Método `get_video_by_path()` para resolução path-to-ID
+- Funções `download_single_from_drive()` e `download_all_from_drive()`
+- Tipo de job `DRIVE_DOWNLOAD` para tracking de progresso
+- Endpoints `POST /api/drive/download` e `POST /api/drive/download-all`
+- Suporte a até 3 downloads simultâneos com `asyncio.Semaphore`
+- Progresso em tempo real durante o download (atualizado a cada chunk de 8MB)
+
+**Arquivos Modificados:**
+- `app/drive/manager.py` - Métodos de download
+- `app/drive/service.py` - Funções de serviço de download
+- `app/drive/router.py` - Endpoints de download
+- `app/jobs/store.py` - Tipo `DRIVE_DOWNLOAD`
 
 ---
 
@@ -767,4 +858,4 @@ httpx>=0.24.0
 
 ---
 
-**Última atualização:** 2025-11-29
+**Última atualização:** 2025-11-30
