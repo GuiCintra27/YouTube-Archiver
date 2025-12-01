@@ -21,6 +21,7 @@ import {
   Cloud,
   XCircle,
   FolderUp,
+  Download,
 } from "lucide-react";
 import ExternalUploadModal from "./external-upload-modal";
 import {
@@ -50,11 +51,22 @@ interface UploadProgress {
   files_in_progress?: string[];
 }
 
+interface DownloadProgress {
+  status: string;
+  total: number;
+  downloaded: number;
+  failed: number;
+  percent: number;
+  current_file: string | null;
+  files_in_progress?: string[];
+}
+
 interface JobResponse {
   status: string;
-  progress: UploadProgress;
+  progress: UploadProgress | DownloadProgress;
   result?: {
-    uploaded: number;
+    uploaded?: number;
+    downloaded?: number;
     total: number;
     failed: Array<{ file: string; error: string }>;
   };
@@ -71,6 +83,11 @@ export default function SyncPanel() {
   const [uploadingVideo, setUploadingVideo] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [showExternalUpload, setShowExternalUpload] = useState(false);
+
+  // Download states
+  const [downloading, setDownloading] = useState(false);
+  const [downloadingVideo, setDownloadingVideo] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
 
   // Ref para cleanup do polling
   const pollingCleanupRef = useRef<(() => void) | null>(null);
@@ -274,6 +291,179 @@ export default function SyncPanel() {
     [apiUrl, fetchSyncStatus, pollJobProgress]
   );
 
+  // Download polling function
+  const pollDownloadProgress = useCallback(
+    async (jobId: string, onComplete: (result: JobResponse) => void) => {
+      if (!apiUrl) return;
+
+      let cancelled = false;
+      let timeoutId: NodeJS.Timeout | null = null;
+
+      const poll = async () => {
+        if (cancelled) return;
+
+        try {
+          const res = await fetch(`${apiUrl}/api/jobs/${jobId}`);
+          if (!res.ok) {
+            throw new Error("Falha ao obter progresso do download");
+          }
+
+          const job: JobResponse = await res.json();
+
+          // Atualizar progresso
+          if (job.progress && "downloaded" in job.progress) {
+            setDownloadProgress(job.progress as DownloadProgress);
+          }
+
+          // Verificar se terminou
+          if (["completed", "error", "cancelled"].includes(job.status)) {
+            onComplete(job);
+            return;
+          }
+
+          // Continuar polling
+          if (!cancelled) {
+            timeoutId = setTimeout(poll, 1000);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            setError(err instanceof Error ? err.message : "Erro no polling");
+            onComplete({ status: "error", progress: downloadProgress! });
+          }
+        }
+      };
+
+      poll();
+
+      return () => {
+        cancelled = true;
+        if (timeoutId) clearTimeout(timeoutId);
+      };
+    },
+    [apiUrl, downloadProgress]
+  );
+
+  // Download all videos from Drive to local
+  const handleDownloadAll = useCallback(async () => {
+    if (!syncStatus || syncStatus.drive_only.length === 0 || !apiUrl) return;
+
+    try {
+      setDownloading(true);
+      setError(null);
+      setSuccessMessage(null);
+      setDownloadProgress({
+        status: "initializing",
+        total: syncStatus.drive_only.length,
+        downloaded: 0,
+        failed: 0,
+        percent: 0,
+        current_file: null,
+      });
+
+      const response = await fetch(`${apiUrl}/api/${APIURLS.DRIVE_DOWNLOAD_ALL}`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Falha ao iniciar download");
+      }
+
+      const data = await response.json();
+      const jobId = data.job_id;
+
+      if (!jobId) {
+        throw new Error("Job ID não retornado pelo servidor");
+      }
+
+      const cleanup = await pollDownloadProgress(jobId, async (job) => {
+        setDownloading(false);
+        setDownloadProgress(null);
+
+        if (job.status === "completed" && job.result) {
+          const downloaded = job.result.downloaded || 0;
+          const failed = job.result.failed || [];
+          await fetchSyncStatus();
+
+          if (failed.length > 0) {
+            setSuccessMessage(
+              `Download concluído! ${downloaded} vídeos baixados, ${failed.length} falhas.`
+            );
+          } else {
+            setSuccessMessage(
+              `Download concluído! ${downloaded} vídeos baixados com sucesso.`
+            );
+          }
+        } else if (job.status === "error") {
+          setError(job.error || "Erro durante download");
+        } else if (job.status === "cancelled") {
+          setError("Download cancelado");
+        }
+      });
+
+      pollingCleanupRef.current = cleanup || null;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao baixar");
+      setDownloading(false);
+      setDownloadProgress(null);
+    }
+  }, [syncStatus, apiUrl, fetchSyncStatus, pollDownloadProgress]);
+
+  // Download single video from Drive to local
+  const handleDownloadSingle = useCallback(
+    async (videoPath: string) => {
+      if (!apiUrl) return;
+      try {
+        setDownloadingVideo(videoPath);
+        setError(null);
+        setSuccessMessage(null);
+        // Inicializar progresso para download individual
+        setDownloadProgress({
+          status: "initializing",
+          total: 1,
+          downloaded: 0,
+          failed: 0,
+          percent: 0,
+          current_file: videoPath,
+        });
+
+        const response = await fetch(
+          `${apiUrl}/api/${APIURLS.DRIVE_DOWNLOAD}?path=${encodeURIComponent(videoPath)}`,
+          { method: "POST" }
+        );
+
+        if (!response.ok) {
+          throw new Error("Falha ao iniciar download");
+        }
+
+        const data = await response.json();
+        const jobId = data.job_id;
+
+        if (!jobId) {
+          throw new Error("Job ID não retornado pelo servidor");
+        }
+
+        const cleanup = await pollDownloadProgress(jobId, async (job) => {
+          setDownloadingVideo(null);
+          setDownloadProgress(null);
+
+          if (job.status === "completed") {
+            await fetchSyncStatus();
+            setSuccessMessage("Download concluído com sucesso!");
+          } else if (job.status === "error") {
+            setError(job.error || "Erro no download");
+          }
+        });
+
+        pollingCleanupRef.current = cleanup || null;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Erro ao fazer download");
+        setDownloadingVideo(null);
+        setDownloadProgress(null);
+      }
+    },
+    [apiUrl, fetchSyncStatus, pollDownloadProgress]
+  );
+
   if (loading && !syncStatus) {
     return (
       <Card>
@@ -338,6 +528,31 @@ export default function SyncPanel() {
             {uploadProgress.failed > 0 && (
               <p className="text-xs text-red-600 dark:text-red-400">
                 {uploadProgress.failed} arquivo(s) com falha
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Download Progress */}
+        {downloadProgress && (downloading || downloadingVideo !== null) && (
+          <div className="space-y-3 p-4 rounded-lg bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-purple-700 dark:text-purple-300">
+                {downloading ? "Baixando do Drive..." : "Baixando vídeo..."}
+              </span>
+              <span className="text-purple-600 dark:text-purple-400">
+                {downloadProgress.downloaded}/{downloadProgress.total} ({Math.round(downloadProgress.percent)}%)
+              </span>
+            </div>
+            <Progress value={downloadProgress.percent} className="h-2" />
+            {downloadProgress.current_file && (
+              <p className="text-xs text-purple-600 dark:text-purple-400 truncate">
+                Arquivo atual: {downloadProgress.current_file}
+              </p>
+            )}
+            {downloadProgress.failed > 0 && (
+              <p className="text-xs text-red-600 dark:text-red-400">
+                {downloadProgress.failed} arquivo(s) com falha
               </p>
             )}
           </div>
@@ -416,7 +631,7 @@ export default function SyncPanel() {
               {syncStatus.local_only.length > 0 && (
                 <Button
                   onClick={handleSyncAll}
-                  disabled={syncing || uploadingVideo !== null}
+                  disabled={syncing || uploadingVideo !== null || downloading || downloadingVideo !== null}
                 >
                   {syncing ? (
                     <>
@@ -427,6 +642,26 @@ export default function SyncPanel() {
                     <>
                       <Upload className="h-4 w-4 mr-2" />
                       Sincronizar Todos ({syncStatus.local_only.length})
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {syncStatus.drive_only.length > 0 && (
+                <Button
+                  variant="secondary"
+                  onClick={handleDownloadAll}
+                  disabled={downloading || downloadingVideo !== null || syncing || uploadingVideo !== null}
+                >
+                  {downloading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Baixando ({downloadProgress?.downloaded || 0}/{downloadProgress?.total || 0})
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Baixar Todos ({syncStatus.drive_only.length})
                     </>
                   )}
                 </Button>
@@ -487,9 +722,23 @@ export default function SyncPanel() {
                       {syncStatus.drive_only.map((video) => (
                         <div
                           key={video}
-                          className="flex items-center p-2 rounded bg-muted"
+                          className="flex items-center justify-between p-2 rounded bg-muted"
                         >
-                          <span className="text-sm truncate">{video}</span>
+                          <span className="text-sm truncate flex-1">
+                            {video}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDownloadSingle(video)}
+                            disabled={downloadingVideo !== null || downloading || syncing || uploadingVideo !== null}
+                          >
+                            {downloadingVideo === video ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Download className="h-4 w-4" />
+                            )}
+                          </Button>
                         </div>
                       ))}
                     </div>

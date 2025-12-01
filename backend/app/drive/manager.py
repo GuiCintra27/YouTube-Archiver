@@ -8,8 +8,9 @@ from pathlib import Path
 from typing import Optional, List, Dict, Callable
 
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from google.oauth2.credentials import Credentials
+import io
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 
@@ -517,6 +518,199 @@ class DriveManager:
         except Exception as e:
             logger.error(f"Error in upload_to_folder: {e}", exc_info=True)
             raise
+
+    def download_file(
+        self,
+        file_id: str,
+        relative_path: str,
+        local_base_dir: str = "./downloads",
+        progress_callback: Optional[Callable] = None
+    ) -> Dict:
+        """
+        Download a file from Drive to local storage.
+
+        Args:
+            file_id: Google Drive file ID
+            relative_path: Relative path in Drive (e.g., "Channel/video.mp4")
+            local_base_dir: Local base directory for downloads
+            progress_callback: Optional callback for progress updates
+
+        Returns:
+            Dict with status and file info
+        """
+        try:
+            service = self.get_service()
+
+            # Get file metadata
+            file_metadata = service.files().get(
+                fileId=file_id,
+                fields='name, size, mimeType'
+            ).execute()
+
+            file_name = file_metadata.get('name', 'unknown')
+            file_size = int(file_metadata.get('size', 0))
+
+            # Create local directory structure
+            local_path = Path(local_base_dir) / relative_path
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Check if file already exists locally
+            if local_path.exists():
+                local_size = local_path.stat().st_size
+                if local_size == file_size:
+                    logger.debug(f"File already exists locally: {relative_path}")
+                    return {
+                        "status": "skipped",
+                        "message": "File already exists locally",
+                        "file_name": file_name,
+                        "path": str(local_path)
+                    }
+
+            logger.debug(f"Downloading: {file_name} to {local_path}")
+
+            # Download file
+            request = service.files().get_media(fileId=file_id)
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request, chunksize=8 * 1024 * 1024)
+
+            done = False
+            while not done:
+                status, done = downloader.next_chunk()
+                if status and progress_callback:
+                    progress_callback({
+                        "file_name": file_name,
+                        "progress": int(status.progress() * 100)
+                    })
+
+            # Write to file
+            with open(local_path, 'wb') as f:
+                fh.seek(0)
+                f.write(fh.read())
+
+            logger.info(f"Download completed: {file_name}")
+
+            # Also download related files (thumbnails, metadata, subtitles)
+            downloaded_related = self._download_related_files(
+                file_id, file_name, local_path.parent
+            )
+
+            return {
+                "status": "success",
+                "file_name": file_name,
+                "path": str(local_path),
+                "size": file_size,
+                "related_files": downloaded_related
+            }
+
+        except Exception as e:
+            logger.error(f"Exception in download_file: {e}", exc_info=True)
+            raise
+
+    def _download_related_files(
+        self,
+        video_file_id: str,
+        video_name: str,
+        local_dir: Path
+    ) -> List[str]:
+        """
+        Download related files (thumbnails, metadata, subtitles) for a video.
+
+        Args:
+            video_file_id: The video file ID to find parent folder
+            video_name: Video filename to match related files
+            local_dir: Local directory to save files
+
+        Returns:
+            List of downloaded related file names
+        """
+        try:
+            service = self.get_service()
+            base_name = Path(video_name).stem
+
+            # Get parent folder ID
+            file_info = service.files().get(
+                fileId=video_file_id,
+                fields='parents'
+            ).execute()
+
+            parents = file_info.get('parents', [])
+            if not parents:
+                return []
+
+            parent_id = parents[0]
+
+            # Related file extensions
+            related_extensions = [
+                '.jpg', '.jpeg', '.png', '.webp',  # Thumbnails
+                '.info.json',  # Metadata
+                '.vtt', '.srt', '.ass',  # Subtitles
+                '.description',  # Description
+            ]
+
+            # Search for related files in same folder
+            escaped_base_name = base_name.replace("'", "\\'")
+            query = f"'{parent_id}' in parents and name contains '{escaped_base_name}' and trashed=false"
+            results = service.files().list(
+                q=query,
+                fields='files(id, name, size, mimeType)'
+            ).execute()
+
+            downloaded = []
+            for item in results.get('files', []):
+                item_name = item['name']
+                # Skip the video itself
+                if item_name == video_name:
+                    continue
+
+                # Check if it's a related file
+                if any(item_name.endswith(ext) for ext in related_extensions):
+                    local_file_path = local_dir / item_name
+
+                    # Skip if already exists
+                    if local_file_path.exists():
+                        continue
+
+                    try:
+                        # Download related file
+                        request = service.files().get_media(fileId=item['id'])
+                        fh = io.BytesIO()
+                        downloader = MediaIoBaseDownload(fh, request)
+
+                        done = False
+                        while not done:
+                            _, done = downloader.next_chunk()
+
+                        with open(local_file_path, 'wb') as f:
+                            fh.seek(0)
+                            f.write(fh.read())
+
+                        downloaded.append(item_name)
+                        logger.debug(f"Downloaded related file: {item_name}")
+
+                    except Exception as e:
+                        logger.warning(f"Failed to download related file {item_name}: {e}")
+
+            return downloaded
+
+        except Exception as e:
+            logger.warning(f"Error downloading related files: {e}")
+            return []
+
+    def get_video_by_path(self, relative_path: str) -> Optional[Dict]:
+        """
+        Find a video in Drive by its relative path.
+
+        Args:
+            relative_path: Path like "Channel/video.mp4"
+
+        Returns:
+            Video metadata dict or None if not found
+        """
+        videos = self.list_videos()
+        for video in videos:
+            if video['path'] == relative_path:
+                return video
+        return None
 
     def delete_video(self, file_id: str) -> bool:
         """Remove a video from Drive"""

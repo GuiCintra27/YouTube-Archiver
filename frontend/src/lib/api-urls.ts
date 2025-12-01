@@ -4,6 +4,8 @@ export enum APIURLS {
 
   DRIVE_AUTH_STATUS = "drive/auth-status",
   DRIVE_AUTH_URL = "drive/auth-url",
+  DRIVE_DOWNLOAD = "drive/download",
+  DRIVE_DOWNLOAD_ALL = "drive/download-all",
   DRIVE_STREAM = "drive/stream",
   DRIVE_SYNC_ALL = "drive/sync-all",
   DRIVE_SYNC_STATUS = "drive/sync-status",
