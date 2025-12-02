@@ -18,7 +18,13 @@ from fastapi.responses import StreamingResponse, FileResponse
 from app.core.logging import get_module_logger
 from app.core.rate_limit import limiter, RateLimits
 from typing import List
-from .service import get_paginated_videos, delete_video_with_related, delete_videos_batch
+from fastapi import UploadFile, File, Form
+from pydantic import BaseModel
+from .service import get_paginated_videos, delete_video_with_related, delete_videos_batch, rename_video, update_video_thumbnail
+
+
+class RenameRequest(BaseModel):
+    new_name: str
 from app.config import settings
 from app.core.security import sanitize_path, validate_path_within_base, validate_file_exists, encode_filename_for_header
 from app.core.exceptions import (
@@ -290,6 +296,118 @@ async def delete_videos_batch_endpoint(request: Request, video_paths: List[str],
     except InvalidRequestException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch(
+    "/{video_path:path}/rename",
+    summary="Renomear vídeo",
+    description="""
+Renomeia um vídeo e todos os arquivos associados.
+
+**Arquivos renomeados:**
+- Arquivo de vídeo principal
+- Thumbnail (se existir)
+- Legendas (.srt, .vtt)
+- Metadados (.info.json, .description)
+
+**Validação:**
+- O novo nome não pode estar vazio
+- Caracteres inválidos são removidos automaticamente
+    """,
+    responses={
+        200: {
+            "description": "Vídeo renomeado com sucesso",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Vídeo renomeado com sucesso",
+                        "new_path": "Channel/New Name.mp4",
+                        "renamed_files": [
+                            {"old": "Channel/Old Name.mp4", "new": "Channel/New Name.mp4"}
+                        ]
+                    }
+                }
+            }
+        },
+        404: {"description": "Vídeo não encontrado"},
+        400: {"description": "Nome inválido"},
+    }
+)
+@limiter.limit(RateLimits.DEFAULT)
+async def rename_video_endpoint(request: Request, video_path: str, body: RenameRequest, base_dir: str = "./downloads"):
+    """Renomeia um vídeo e seus arquivos associados."""
+    try:
+        return rename_video(video_path, body.new_name, base_dir)
+    except ValueError as e:
+        raise InvalidRequestException(str(e))
+    except (VideoNotFoundException,):
+        raise
+    except Exception as e:
+        logger.error(f"Error renaming video: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/{video_path:path}/thumbnail",
+    summary="Atualizar thumbnail",
+    description="""
+Atualiza a thumbnail (miniatura) de um vídeo.
+
+**Formatos suportados:**
+JPG, JPEG, PNG, WebP
+
+**Comportamento:**
+- Remove thumbnails antigas automaticamente
+- Salva a nova thumbnail com o mesmo nome base do vídeo
+    """,
+    responses={
+        200: {
+            "description": "Thumbnail atualizada com sucesso",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Thumbnail atualizada com sucesso",
+                        "thumbnail_path": "Channel/video.jpg"
+                    }
+                }
+            }
+        },
+        404: {"description": "Vídeo não encontrado"},
+        400: {"description": "Formato de imagem inválido"},
+    }
+)
+@limiter.limit(RateLimits.DEFAULT)
+async def update_thumbnail_endpoint(
+    request: Request,
+    video_path: str,
+    thumbnail: UploadFile = File(...),
+    base_dir: str = "./downloads"
+):
+    """Atualiza a thumbnail de um vídeo."""
+    try:
+        # Get file extension from uploaded file
+        if not thumbnail.filename:
+            raise InvalidRequestException("Thumbnail filename is required")
+
+        file_ext = Path(thumbnail.filename).suffix.lower()
+        if file_ext not in settings.THUMBNAIL_EXTENSIONS:
+            raise InvalidRequestException(f"Invalid image format: {file_ext}. Supported: {', '.join(settings.THUMBNAIL_EXTENSIONS)}")
+
+        # Read file content
+        thumbnail_data = await thumbnail.read()
+
+        return update_video_thumbnail(video_path, thumbnail_data, file_ext, base_dir)
+    except InvalidRequestException:
+        raise
+    except ValueError as e:
+        raise InvalidRequestException(str(e))
+    except (VideoNotFoundException,):
+        raise
+    except Exception as e:
+        logger.error(f"Error updating thumbnail: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

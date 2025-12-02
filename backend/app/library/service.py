@@ -283,6 +283,150 @@ def _cleanup_empty_dirs(directory: Path, base_dir: Path) -> None:
         pass
 
 
+def rename_video(
+    video_path: str,
+    new_name: str,
+    base_dir: str = "./downloads"
+) -> dict:
+    """
+    Rename a video and all its related files.
+
+    Args:
+        video_path: Relative path to video
+        new_name: New name for the video (without extension)
+        base_dir: Base directory
+
+    Returns:
+        Dict with rename results
+    """
+    # Sanitize and validate path
+    video_path = sanitize_path(video_path)
+    full_path = Path(base_dir) / video_path
+    base_path = Path(base_dir)
+
+    # Validate path is within base_dir
+    validate_path_within_base(full_path, base_path)
+    validate_file_exists(full_path)
+
+    # Get current base name and directory
+    parent_dir = full_path.parent
+    old_base_name = full_path.stem
+    video_ext = full_path.suffix
+
+    # Sanitize new name (remove problematic characters)
+    new_name = new_name.strip()
+    # Remove characters that are problematic in filenames
+    for char in ['/', '\\', ':', '*', '?', '"', '<', '>', '|']:
+        new_name = new_name.replace(char, '')
+
+    if not new_name:
+        raise ValueError("New name cannot be empty")
+
+    # Find all related files (same base name, different extensions)
+    related_files = []
+    for file in parent_dir.iterdir():
+        if file.is_file() and file.name.startswith(old_base_name + "."):
+            related_files.append(file)
+
+    # Rename all related files
+    renamed_files = []
+    new_video_path = None
+
+    for file in related_files:
+        old_ext = file.suffix
+        # Handle compound extensions like .info.json or .pt-BR.vtt
+        remaining_name = file.name[len(old_base_name):]  # Gets ".mp4", ".info.json", etc.
+        new_file_path = parent_dir / (new_name + remaining_name)
+
+        try:
+            file.rename(new_file_path)
+            renamed_files.append({
+                "old": str(file.relative_to(base_path)),
+                "new": str(new_file_path.relative_to(base_path))
+            })
+
+            # Track the new video path
+            if file.suffix.lower() in settings.VIDEO_EXTENSIONS:
+                new_video_path = str(new_file_path.relative_to(base_path))
+
+        except Exception as e:
+            logger.error(f"Error renaming {file}: {e}")
+            raise
+
+    # Invalidate cache after rename
+    video_cache.invalidate(base_dir)
+    logger.info(f"Renamed video: {video_path} -> {new_name} ({len(renamed_files)} files)")
+
+    return {
+        "status": "success",
+        "message": "Vídeo renomeado com sucesso",
+        "new_path": new_video_path,
+        "renamed_files": renamed_files,
+    }
+
+
+def update_video_thumbnail(
+    video_path: str,
+    thumbnail_data: bytes,
+    thumbnail_extension: str,
+    base_dir: str = "./downloads"
+) -> dict:
+    """
+    Update the thumbnail for a video.
+
+    Args:
+        video_path: Relative path to video
+        thumbnail_data: Binary data of the new thumbnail
+        thumbnail_extension: Extension of the thumbnail (e.g., '.jpg', '.png')
+        base_dir: Base directory
+
+    Returns:
+        Dict with update results
+    """
+    # Sanitize and validate path
+    video_path = sanitize_path(video_path)
+    full_path = Path(base_dir) / video_path
+    base_path = Path(base_dir)
+
+    # Validate path is within base_dir
+    validate_path_within_base(full_path, base_path)
+    validate_file_exists(full_path)
+
+    # Get video base name and directory
+    parent_dir = full_path.parent
+    video_base_name = full_path.stem
+
+    # Normalize extension
+    if not thumbnail_extension.startswith('.'):
+        thumbnail_extension = '.' + thumbnail_extension
+
+    # Validate extension
+    if thumbnail_extension.lower() not in settings.THUMBNAIL_EXTENSIONS:
+        raise ValueError(f"Invalid thumbnail extension: {thumbnail_extension}")
+
+    # Remove old thumbnails
+    for thumb_ext in settings.THUMBNAIL_EXTENSIONS:
+        old_thumb = parent_dir / (video_base_name + thumb_ext)
+        if old_thumb.exists():
+            old_thumb.unlink()
+            logger.debug(f"Removed old thumbnail: {old_thumb}")
+
+    # Save new thumbnail
+    new_thumb_path = parent_dir / (video_base_name + thumbnail_extension.lower())
+    with open(new_thumb_path, 'wb') as f:
+        f.write(thumbnail_data)
+
+    # Invalidate cache after update
+    video_cache.invalidate(base_dir)
+    logger.info(f"Updated thumbnail for: {video_path}")
+
+    return {
+        "status": "success",
+        "message": "Thumbnail atualizada com sucesso",
+        "thumbnail_path": str(new_thumb_path.relative_to(base_path)),
+    }
+
+
 def delete_videos_batch(
     video_paths: List[str],
     base_dir: str = "./downloads",

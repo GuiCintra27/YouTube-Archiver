@@ -35,6 +35,13 @@ from app.core.exceptions import (
     ThumbnailNotFoundException,
 )
 from app.core.rate_limit import limiter, RateLimits
+from app.config import settings
+from pydantic import BaseModel
+
+
+class RenameRequest(BaseModel):
+    new_name: str
+
 
 router = APIRouter(prefix="/api/drive", tags=["drive"])
 
@@ -189,6 +196,58 @@ async def delete_drive_videos_batch(request: Request, file_ids: List[str]):
             raise InvalidRequestException("Cannot delete more than 100 files at once")
 
         return delete_videos_batch(file_ids)
+    except (DriveNotAuthenticatedException, InvalidRequestException):
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/videos/{file_id}/rename")
+@limiter.limit(RateLimits.DEFAULT)
+async def rename_drive_video(request: Request, file_id: str, body: RenameRequest):
+    """
+    Rename a video in Google Drive.
+    Also renames related files (thumbnails, metadata, subtitles).
+    """
+    try:
+        _require_auth()
+
+        if not body.new_name or not body.new_name.strip():
+            raise InvalidRequestException("New name cannot be empty")
+
+        return drive_manager.rename_file(file_id, body.new_name.strip())
+    except (DriveNotAuthenticatedException, InvalidRequestException):
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/videos/{file_id}/thumbnail")
+@limiter.limit(RateLimits.DEFAULT)
+async def update_drive_thumbnail(
+    request: Request,
+    file_id: str,
+    thumbnail: UploadFile = File(...)
+):
+    """
+    Update/upload a new thumbnail for a video in Google Drive.
+    Replaces any existing thumbnail.
+    """
+    try:
+        _require_auth()
+
+        if not thumbnail.filename:
+            raise InvalidRequestException("Thumbnail filename is required")
+
+        file_ext = Path(thumbnail.filename).suffix.lower()
+        if file_ext not in settings.THUMBNAIL_EXTENSIONS:
+            raise InvalidRequestException(
+                f"Invalid image format: {file_ext}. Supported: {', '.join(settings.THUMBNAIL_EXTENSIONS)}"
+            )
+
+        thumbnail_data = await thumbnail.read()
+
+        return drive_manager.update_thumbnail(file_id, thumbnail_data, file_ext)
     except (DriveNotAuthenticatedException, InvalidRequestException):
         raise
     except Exception as e:
