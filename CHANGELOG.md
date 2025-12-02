@@ -1,5 +1,65 @@
 # Changelog
 
+## [2.3.0] - 2025-12-01
+
+### 🎨 UI/UX - Redesign de Video Cards
+
+**Cards de vídeo estilo YouTube com experiência aprimorada.**
+
+### ✨ Adicionado
+
+#### Video Cards Redesenhados
+- **Layout estilo YouTube** com thumbnails arredondadas e efeito de zoom no hover
+- **Duração do vídeo** exibida como badge sobre a thumbnail
+- **Modal de informações** com detalhes do vídeo (título, duração, tamanho, data)
+- **Seleção múltipla** com checkboxes que aparecem suavemente no hover
+- **Card clicável** - clicar em qualquer área inicia o player
+- **Grid 3 colunas** - layout mais espaçoso e visual
+
+#### Exclusão em Lote
+- **Biblioteca local** (`POST /api/videos/delete-batch`)
+  - Selecionar múltiplos vídeos com checkboxes
+  - Barra de ações flutuante com contador de selecionados
+  - Botões "Selecionar todos", "Limpar" e "Excluir"
+  - Confirmação antes da exclusão
+- **Google Drive** (`POST /api/drive/videos/delete-batch`)
+  - Mesma funcionalidade da biblioteca local
+  - Exclusão em lote de vídeos no Drive
+
+#### Duração de Vídeos
+- **Extração automática** usando ffprobe no backend
+- **Formato inteligente** - exibe HH:MM:SS ou MM:SS conforme duração
+- **Badge visual** sobre a thumbnail do vídeo
+
+#### Componente VideoCard Unificado
+- **Componente único** usado tanto na biblioteca local quanto no Drive
+- **Props flexíveis** - aceita thumbnail por path ou URL direta
+- **Menu de ações** com opções de Info e Excluir
+- **Transições suaves** em todos os estados interativos
+
+### 🔧 Modificado
+
+#### Backend
+- `library/service.py` - Adicionado `get_video_duration()` e `format_duration()`
+- `library/service.py` - Adicionado `delete_videos_batch()` para exclusão em lote
+- `library/router.py` - Novo endpoint `POST /api/videos/delete-batch`
+- `drive/service.py` - Adicionado `delete_videos_batch()` para exclusão em lote
+- `drive/router.py` - Novo endpoint `POST /api/drive/videos/delete-batch`
+- `drive/manager.py` - Adicionado `delete_files_batch()` para exclusão em lote
+
+#### Frontend
+- `video-card.tsx` - Redesenhado completamente com novo layout
+- `paginated-video-grid.tsx` - Adicionada seleção múltipla e exclusão em lote
+- `drive-video-grid.tsx` - Refatorado para usar VideoCard unificado
+- `api-urls.ts` - Adicionadas constantes `VIDEOS_DELETE_BATCH` e `DRIVE_DELETE_BATCH`
+
+### 📦 Dependências
+
+#### Frontend
+- `@/components/ui/checkbox` - Novo componente shadcn/ui para seleção
+
+---
+
 ## [2.0.0] - 2025-10-06
 
 ### 🎉 Major Release - Interface Web Completa
