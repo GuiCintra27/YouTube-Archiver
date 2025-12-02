@@ -21,6 +21,8 @@
    - `GET /api/drive/sync-status` - Status de sincronização
    - `POST /api/drive/sync-all` - Sincronizar todos os vídeos
    - `DELETE /api/drive/videos/{id}` - Remover vídeo do Drive
+   - `POST /api/drive/videos/delete-batch` - Excluir múltiplos vídeos em lote
+   - `POST /api/drive/download/{id}` - Download de vídeo para local
 
 ### Frontend (Web UI)
 
@@ -45,10 +47,13 @@
      - Vídeos sincronizados
 
 4. **Componente `DriveVideoGrid`**
-   - Grid de vídeos do Drive
-   - Thumbnails automáticas
-   - Informações de tamanho
-   - Botão de exclusão
+   - Grid de vídeos do Drive (3 colunas, estilo YouTube)
+   - Thumbnails automáticas com efeito de zoom no hover
+   - Informações de tamanho e duração
+   - Modal de informações detalhadas do vídeo
+   - Seleção múltipla com checkboxes
+   - Exclusão individual ou em lote
+   - Componente VideoCard unificado (mesmo usado na biblioteca local)
 
 5. **Componente `Navigation`**
    - Menu de navegação Local / Drive
@@ -213,7 +218,9 @@ rm backend/token.json
 
 ## 📈 Próximas Melhorias Possíveis
 
-- [ ] Download de vídeos do Drive para local
+- [x] Download de vídeos do Drive para local ✅ (v2.2)
+- [x] Exclusão em lote de vídeos do Drive ✅ (v2.3)
+- [x] Cards estilo YouTube com duração e info modal ✅ (v2.3)
 - [ ] Sincronização bidirecional automática
 - [ ] Conflitos de versão
 - [ ] Progress bar durante uploads grandes
@@ -224,10 +231,13 @@ rm backend/token.json
 ## 🎉 Conclusão
 
 Agora você tem:
-- ✅ Visualização de vídeos locais e do Drive
+- ✅ Visualização de vídeos locais e do Drive (cards estilo YouTube)
 - ✅ Upload manual ou automático
+- ✅ Download de vídeos do Drive para local
 - ✅ Status de sincronização em tempo real
 - ✅ Gerenciamento completo via interface web
+- ✅ Seleção múltipla e exclusão em lote
+- ✅ Modal de informações detalhadas do vídeo
 - ✅ Autenticação segura OAuth 2.0
 
 **Aproveite!** 🚀

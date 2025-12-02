@@ -86,18 +86,21 @@ npm run dev
 **Página Principal (`/`):**
 - 📥 Formulário de download com todas as opções configuráveis
 - 📊 Barra de progresso em tempo real durante downloads
-- 📚 Biblioteca de vídeos locais com thumbnails
-- ▶️ Player de vídeo integrado (Plyr)
-- 🗑️ Exclusão de vídeos com limpeza automática de arquivos relacionados
+- 📚 Biblioteca de vídeos locais com thumbnails e duração
+- ▶️ Player de vídeo integrado (Vidstack)
+- 🗑️ Exclusão individual ou em lote de vídeos
+- ℹ️ Modal de informações detalhadas do vídeo
 - ⚙️ Opções avançadas: headers, cookies, rate limiting, nomenclatura customizada
 
 **Página Google Drive (`/drive`):**
 - ☁️ Autenticação OAuth2 com Google Drive
-- 📂 Visualização de vídeos sincronizados no Drive
+- 📂 Visualização de vídeos sincronizados no Drive com thumbnails
 - ⬆️ Upload individual ou em lote de vídeos locais
+- ⬇️ Download de vídeos do Drive para armazenamento local
 - 🔄 Painel de sincronização mostrando diferenças entre local e Drive
 - ▶️ Streaming direto do Google Drive com suporte a seek/skip
-- 🗑️ Exclusão de vídeos do Drive
+- 🗑️ Exclusão individual ou em lote de vídeos do Drive
+- ℹ️ Modal de informações detalhadas do vídeo
 
 **Recursos da Interface:**
 - ✨ Design moderno e responsivo (Next.js 15 + Tailwind CSS)
@@ -201,13 +204,15 @@ A API FastAPI oferece endpoints completos para integração:
 
 ### Endpoints de Biblioteca Local
 
-**GET** `/api/videos` - Lista vídeos baixados localmente
+**GET** `/api/videos` - Lista vídeos baixados localmente (com duração)
 
 **GET** `/api/videos/stream/{video_path}` - Stream de vídeo local (com range requests)
 
 **GET** `/api/videos/thumbnail/{thumbnail_path}` - Serve thumbnail de vídeo local
 
 **DELETE** `/api/videos/{video_path}` - Exclui vídeo e arquivos relacionados
+
+**POST** `/api/videos/delete-batch` - Exclui múltiplos vídeos em lote
 
 ### Endpoints Google Drive
 
@@ -230,6 +235,10 @@ A API FastAPI oferece endpoints completos para integração:
 **GET** `/api/drive/thumbnail/{file_id}` - Thumbnail de vídeo do Drive
 
 **DELETE** `/api/drive/videos/{file_id}` - Remove vídeo do Drive
+
+**POST** `/api/drive/videos/delete-batch` - Exclui múltiplos vídeos do Drive em lote
+
+**POST** `/api/drive/download/{file_id}` - Download de vídeo do Drive para armazenamento local
 
 **Documentação Interativa:** http://localhost:8000/docs
 
@@ -341,7 +350,7 @@ O backend segue uma arquitetura modular com separação clara de responsabilidad
 - **TypeScript** - Type safety
 - **Tailwind CSS** - Utility-first CSS
 - **shadcn/ui** - Componentes acessíveis (Radix UI)
-- **Plyr** - Player de vídeo HTML5
+- **Vidstack** - Player de vídeo moderno e acessível
 - **Lucide React** - Ícones
 
 ### Infraestrutura
