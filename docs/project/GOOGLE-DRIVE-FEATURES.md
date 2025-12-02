@@ -23,6 +23,8 @@
    - `DELETE /api/drive/videos/{id}` - Remover vídeo do Drive
    - `POST /api/drive/videos/delete-batch` - Excluir múltiplos vídeos em lote
    - `POST /api/drive/download/{id}` - Download de vídeo para local
+   - `PATCH /api/drive/videos/{id}/rename` - Renomear vídeo no Drive
+   - `POST /api/drive/videos/{id}/thumbnail` - Atualizar thumbnail no Drive
 
 ### Frontend (Web UI)
 
@@ -53,6 +55,7 @@
    - Modal de informações detalhadas do vídeo
    - Seleção múltipla com checkboxes
    - Exclusão individual ou em lote
+   - Edição de vídeos (renomear e atualizar thumbnail)
    - Componente VideoCard unificado (mesmo usado na biblioteca local)
 
 5. **Componente `Navigation`**

@@ -34,8 +34,19 @@
 #### Componente VideoCard Unificado
 - **Componente único** usado tanto na biblioteca local quanto no Drive
 - **Props flexíveis** - aceita thumbnail por path ou URL direta
-- **Menu de ações** com opções de Info e Excluir
+- **Menu de ações** com opções de Editar, Info e Excluir
 - **Transições suaves** em todos os estados interativos
+
+#### Edição de Vídeos
+- **Renomear vídeos** na biblioteca local e no Google Drive
+- **Atualizar thumbnail** com upload de nova imagem
+- **Modal de edição** com preview da thumbnail
+- **Renomeação automática** de arquivos relacionados (legendas, metadados)
+- **Endpoints novos:**
+  - `PATCH /api/videos/{path}/rename` - Renomear vídeo local
+  - `POST /api/videos/{path}/thumbnail` - Atualizar thumbnail local
+  - `PATCH /api/drive/videos/{id}/rename` - Renomear vídeo no Drive
+  - `POST /api/drive/videos/{id}/thumbnail` - Atualizar thumbnail no Drive
 
 ### 🔧 Modificado
 
@@ -48,9 +59,9 @@
 - `drive/manager.py` - Adicionado `delete_files_batch()` para exclusão em lote
 
 #### Frontend
-- `video-card.tsx` - Redesenhado completamente com novo layout
-- `paginated-video-grid.tsx` - Adicionada seleção múltipla e exclusão em lote
-- `drive-video-grid.tsx` - Refatorado para usar VideoCard unificado
+- `video-card.tsx` - Redesenhado completamente com novo layout e modal de edição
+- `paginated-video-grid.tsx` - Adicionada seleção múltipla, exclusão em lote e edição
+- `drive-video-grid.tsx` - Refatorado para usar VideoCard unificado com edição
 - `api-urls.ts` - Adicionadas constantes `VIDEOS_DELETE_BATCH` e `DRIVE_DELETE_BATCH`
 
 ### 📦 Dependências
