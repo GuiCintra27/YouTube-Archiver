@@ -375,6 +375,38 @@ def delete_video(file_id: str) -> Dict:
     }
 
 
+def delete_videos_batch(file_ids: List[str]) -> Dict:
+    """
+    Delete multiple videos from Drive.
+
+    Args:
+        file_ids: List of file IDs to delete
+
+    Returns:
+        Dict with deletion results
+    """
+    if not file_ids:
+        return {
+            "status": "success",
+            "message": "No files to delete",
+            "total_deleted": 0,
+            "total_failed": 0,
+        }
+
+    result = drive_manager.delete_videos_batch(file_ids)
+
+    status = "success" if result["total_failed"] == 0 else "partial"
+    message = f"{result['total_deleted']} vídeo(s) excluído(s)"
+    if result["total_failed"] > 0:
+        message += f", {result['total_failed']} falha(s)"
+
+    return {
+        "status": status,
+        "message": message,
+        **result,
+    }
+
+
 def stream_video(
     file_id: str,
     range_header: Optional[str] = None

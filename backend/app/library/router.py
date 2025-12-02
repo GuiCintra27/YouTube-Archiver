@@ -17,7 +17,8 @@ from fastapi.responses import StreamingResponse, FileResponse
 
 from app.core.logging import get_module_logger
 from app.core.rate_limit import limiter, RateLimits
-from .service import get_paginated_videos, delete_video_with_related
+from typing import List
+from .service import get_paginated_videos, delete_video_with_related, delete_videos_batch
 from app.config import settings
 from app.core.security import sanitize_path, validate_path_within_base, validate_file_exists, encode_filename_for_header
 from app.core.exceptions import (
@@ -237,6 +238,56 @@ async def get_thumbnail(request: Request, thumbnail_path: str, base_dir: str = "
         return FileResponse(full_path, media_type=media_type)
 
     except ThumbnailNotFoundException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/delete-batch",
+    summary="Excluir múltiplos vídeos",
+    description="""
+Exclui múltiplos vídeos e todos os arquivos associados de uma só vez.
+
+**Limite:** Máximo de 100 vídeos por requisição.
+
+**Arquivos removidos para cada vídeo:**
+- Arquivo de vídeo principal
+- Thumbnail (se existir)
+- Legendas (.srt, .vtt)
+- Metadados (.info.json, .description)
+
+**Atenção:** Esta ação não pode ser desfeita.
+    """,
+    responses={
+        200: {
+            "description": "Resultado da exclusão em lote",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "5 vídeo(s) excluído(s)",
+                        "total_deleted": 5,
+                        "total_failed": 0
+                    }
+                }
+            }
+        },
+        400: {"description": "Requisição inválida"},
+    }
+)
+@limiter.limit(RateLimits.DELETE)
+async def delete_videos_batch_endpoint(request: Request, video_paths: List[str], base_dir: str = "./downloads"):
+    """Exclui múltiplos vídeos e seus arquivos associados."""
+    try:
+        if not video_paths:
+            raise InvalidRequestException("video_paths list cannot be empty")
+
+        if len(video_paths) > 100:
+            raise InvalidRequestException("Cannot delete more than 100 videos at once")
+
+        return delete_videos_batch(video_paths, base_dir)
+    except InvalidRequestException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
