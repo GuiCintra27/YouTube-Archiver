@@ -781,6 +781,219 @@ class DriveManager:
             logger.error(f"Error deleting file {file_id}: {e}")
             return False
 
+    def rename_file(self, file_id: str, new_name: str) -> Dict:
+        """
+        Rename a file in Google Drive.
+
+        Args:
+            file_id: Google Drive file ID
+            new_name: New name for the file (without extension)
+
+        Returns:
+            Dict with status and new file info
+        """
+        try:
+            service = self.get_service()
+
+            # Get current file metadata
+            file_metadata = service.files().get(
+                fileId=file_id,
+                fields='name, parents'
+            ).execute()
+
+            old_name = file_metadata.get('name', '')
+            old_extension = Path(old_name).suffix
+            old_base_name = Path(old_name).stem
+
+            # Create new filename with same extension
+            new_full_name = new_name + old_extension
+
+            # Update file name
+            updated_metadata = {'name': new_full_name}
+            updated_file = service.files().update(
+                fileId=file_id,
+                body=updated_metadata,
+                fields='id, name'
+            ).execute()
+
+            logger.info(f"Renamed file: {old_name} -> {new_full_name}")
+
+            # Try to rename related files (thumbnails, metadata, etc.)
+            renamed_related = []
+            parents = file_metadata.get('parents', [])
+            if parents:
+                parent_id = parents[0]
+                renamed_related = self._rename_related_files(
+                    parent_id, old_base_name, new_name
+                )
+
+            return {
+                "status": "success",
+                "message": "Arquivo renomeado com sucesso",
+                "file_id": updated_file['id'],
+                "new_name": updated_file['name'],
+                "renamed_related": renamed_related,
+            }
+
+        except Exception as e:
+            logger.error(f"Error renaming file {file_id}: {e}", exc_info=True)
+            raise
+
+    def _rename_related_files(
+        self,
+        parent_id: str,
+        old_base_name: str,
+        new_base_name: str
+    ) -> List[str]:
+        """
+        Rename related files (thumbnails, metadata, subtitles) for a video.
+
+        Args:
+            parent_id: Parent folder ID
+            old_base_name: Old base name (without extension)
+            new_base_name: New base name (without extension)
+
+        Returns:
+            List of renamed file names
+        """
+        try:
+            service = self.get_service()
+
+            # Related file extensions
+            related_extensions = [
+                '.jpg', '.jpeg', '.png', '.webp',  # Thumbnails
+                '.info.json',  # Metadata
+                '.vtt', '.srt', '.ass',  # Subtitles
+                '.description',  # Description
+            ]
+
+            # Search for related files in same folder
+            escaped_old_name = old_base_name.replace("'", "\\'")
+            query = f"'{parent_id}' in parents and name contains '{escaped_old_name}' and trashed=false"
+            results = service.files().list(
+                q=query,
+                fields='files(id, name)'
+            ).execute()
+
+            renamed = []
+            for item in results.get('files', []):
+                item_name = item['name']
+
+                # Check if it's a related file (starts with old name and has related extension)
+                if item_name.startswith(old_base_name + "."):
+                    remaining = item_name[len(old_base_name):]  # Gets ".jpg", ".info.json", etc.
+
+                    if any(remaining.endswith(ext) or remaining == ext for ext in related_extensions):
+                        new_name = new_base_name + remaining
+
+                        try:
+                            service.files().update(
+                                fileId=item['id'],
+                                body={'name': new_name},
+                                fields='id, name'
+                            ).execute()
+                            renamed.append(new_name)
+                            logger.debug(f"Renamed related file: {item_name} -> {new_name}")
+                        except Exception as e:
+                            logger.warning(f"Failed to rename related file {item_name}: {e}")
+
+            return renamed
+
+        except Exception as e:
+            logger.warning(f"Error renaming related files: {e}")
+            return []
+
+    def update_thumbnail(
+        self,
+        file_id: str,
+        thumbnail_data: bytes,
+        thumbnail_extension: str
+    ) -> Dict:
+        """
+        Update/upload a new thumbnail for a video in Google Drive.
+
+        Args:
+            file_id: Video file ID in Drive
+            thumbnail_data: Binary data of the new thumbnail
+            thumbnail_extension: Extension of the thumbnail (e.g., '.jpg', '.png')
+
+        Returns:
+            Dict with status and thumbnail info
+        """
+        try:
+            service = self.get_service()
+
+            # Get video metadata to find folder and base name
+            file_metadata = service.files().get(
+                fileId=file_id,
+                fields='name, parents'
+            ).execute()
+
+            video_name = file_metadata.get('name', '')
+            video_base_name = Path(video_name).stem
+            parents = file_metadata.get('parents', [])
+
+            if not parents:
+                raise Exception("Cannot find parent folder for video")
+
+            parent_id = parents[0]
+
+            # Delete old thumbnails
+            for ext in settings.THUMBNAIL_EXTENSIONS:
+                old_thumb_name = video_base_name + ext
+                escaped_name = old_thumb_name.replace("'", "\\'")
+                query = f"name='{escaped_name}' and '{parent_id}' in parents and trashed=false"
+                results = service.files().list(q=query, fields='files(id)').execute()
+
+                for old_file in results.get('files', []):
+                    try:
+                        service.files().delete(fileId=old_file['id']).execute()
+                        logger.debug(f"Deleted old thumbnail: {old_thumb_name}")
+                    except Exception as e:
+                        logger.warning(f"Failed to delete old thumbnail: {e}")
+
+            # Normalize extension
+            if not thumbnail_extension.startswith('.'):
+                thumbnail_extension = '.' + thumbnail_extension
+
+            # Create new thumbnail file
+            new_thumb_name = video_base_name + thumbnail_extension.lower()
+            thumb_metadata = {
+                'name': new_thumb_name,
+                'parents': [parent_id]
+            }
+
+            # Create temporary file for upload
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix=thumbnail_extension) as tmp:
+                tmp.write(thumbnail_data)
+                tmp_path = tmp.name
+
+            try:
+                media = MediaFileUpload(tmp_path)
+                new_file = service.files().create(
+                    body=thumb_metadata,
+                    media_body=media,
+                    fields='id, name'
+                ).execute()
+
+                logger.info(f"Uploaded new thumbnail: {new_thumb_name}")
+
+                return {
+                    "status": "success",
+                    "message": "Thumbnail atualizada com sucesso",
+                    "thumbnail_id": new_file['id'],
+                    "thumbnail_name": new_file['name'],
+                }
+            finally:
+                # Clean up temp file
+                import os
+                os.unlink(tmp_path)
+
+        except Exception as e:
+            logger.error(f"Error updating thumbnail for {file_id}: {e}", exc_info=True)
+            raise
+
     def delete_videos_batch(self, file_ids: List[str]) -> Dict:
         """
         Delete multiple videos from Drive.

@@ -165,6 +165,60 @@ export default function PaginatedVideoGrid() {
     }
   }, [selectedPaths, apiUrl, page, fetchVideos]);
 
+  const handleEdit = useCallback(
+    async (video: Video, newTitle: string, newThumbnail?: File) => {
+      if (!apiUrl) return;
+
+      try {
+        // Rename if title changed
+        if (newTitle !== video.title) {
+          const renameResponse = await fetch(
+            `${apiUrl}/api/${APIURLS.VIDEOS}/${encodeURIComponent(video.path)}/rename`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ new_name: newTitle }),
+            }
+          );
+
+          if (!renameResponse.ok) {
+            throw new Error("Falha ao renomear vídeo");
+          }
+
+          // Get the new path from the response
+          const renameResult = await renameResponse.json();
+          video.path = renameResult.new_path || video.path;
+        }
+
+        // Update thumbnail if provided
+        if (newThumbnail) {
+          const formData = new FormData();
+          formData.append("thumbnail", newThumbnail);
+
+          const thumbnailResponse = await fetch(
+            `${apiUrl}/api/${APIURLS.VIDEOS}/${encodeURIComponent(video.path)}/thumbnail`,
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
+
+          if (!thumbnailResponse.ok) {
+            throw new Error("Falha ao atualizar thumbnail");
+          }
+        }
+
+        // Refresh the video list
+        await fetchVideos(page);
+      } catch (err) {
+        console.error("Erro ao editar vídeo:", err);
+        setError(err instanceof Error ? err.message : "Erro ao editar vídeo");
+        throw err;
+      }
+    },
+    [apiUrl, page, fetchVideos]
+  );
+
   const hasSelection = selectedPaths.size > 0;
 
   return (
@@ -225,6 +279,8 @@ export default function PaginatedVideoGrid() {
                 selectable={true}
                 selected={selectedPaths.has(video.path)}
                 onSelectionChange={() => toggleSelection(video.path)}
+                editable={true}
+                onEdit={(newTitle, newThumbnail) => handleEdit(video, newTitle, newThumbnail)}
               />
             ))}
           </div>

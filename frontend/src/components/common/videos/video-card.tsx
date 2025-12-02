@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Trash2, Play, MoreVertical, Info, Clock, HardDrive, Calendar, FileVideo } from "lucide-react";
+import { useState, useCallback, useRef } from "react";
+import { Trash2, Play, MoreVertical, Info, Clock, HardDrive, Calendar, FileVideo, Pencil, Loader2, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +28,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { useApiUrl } from "@/hooks/use-api-url";
 import { formatBytes } from "@/lib/utils";
@@ -46,6 +49,9 @@ interface VideoCardProps {
   selectable?: boolean;
   selected?: boolean;
   onSelectionChange?: (selected: boolean) => void;
+  // Optional edit props
+  editable?: boolean;
+  onEdit?: (newTitle: string, newThumbnail?: File) => Promise<void>;
 }
 
 export default function VideoCard({
@@ -62,11 +68,21 @@ export default function VideoCard({
   selectable = false,
   selected = false,
   onSelectionChange,
+  editable = false,
+  onEdit,
 }: VideoCardProps) {
   const apiUrl = useApiUrl();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [imageError, setImageError] = useState(false);
+
+  // Edit form state
+  const [editTitle, setEditTitle] = useState(title);
+  const [editThumbnail, setEditThumbnail] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Use external URL if provided, otherwise construct from thumbnail path
   const thumbnailUrl = externalThumbnailUrl
@@ -79,6 +95,37 @@ export default function VideoCard({
     setShowDeleteDialog(false);
     onDelete();
   }, [onDelete]);
+
+  const handleOpenEditDialog = useCallback(() => {
+    setEditTitle(title);
+    setEditThumbnail(null);
+    setThumbnailPreview(null);
+    setShowEditDialog(true);
+  }, [title]);
+
+  const handleThumbnailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setEditThumbnail(file);
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setThumbnailPreview(previewUrl);
+    }
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!onEdit) return;
+
+    try {
+      setIsSaving(true);
+      await onEdit(editTitle, editThumbnail || undefined);
+      setShowEditDialog(false);
+    } catch (error) {
+      console.error("Error saving edit:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [onEdit, editTitle, editThumbnail]);
 
   const handleCardClick = useCallback(
     (e: React.MouseEvent) => {
@@ -186,6 +233,15 @@ export default function VideoCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {editable && (
+                    <DropdownMenuItem
+                      onClick={handleOpenEditDialog}
+                      className="cursor-pointer"
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Editar
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
                     onClick={() => setShowInfoDialog(true)}
                     className="cursor-pointer"
@@ -297,6 +353,106 @@ export default function VideoCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog de edição */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary" />
+              Editar Vídeo
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6 pt-2">
+            {/* Nome do vídeo */}
+            <div className="space-y-2">
+              <Label htmlFor="video-title">Nome do vídeo</Label>
+              <Input
+                id="video-title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Digite o novo nome"
+              />
+            </div>
+
+            {/* Upload de thumbnail */}
+            <div className="space-y-2">
+              <Label>Thumbnail</Label>
+              <div
+                className="relative border-2 border-dashed rounded-lg p-4 hover:border-primary/50 transition-colors cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handleThumbnailChange}
+                />
+
+                {thumbnailPreview ? (
+                  <div className="relative aspect-video rounded-lg overflow-hidden">
+                    <img
+                      src={thumbnailPreview}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                      <p className="text-white text-sm font-medium">Clique para alterar</p>
+                    </div>
+                  </div>
+                ) : thumbnailUrl ? (
+                  <div className="relative aspect-video rounded-lg overflow-hidden">
+                    <img
+                      src={thumbnailUrl}
+                      alt="Thumbnail atual"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                      <p className="text-white text-sm font-medium">Clique para alterar</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                    <ImageIcon className="h-10 w-10 mb-2" />
+                    <p className="text-sm font-medium">Clique para selecionar uma imagem</p>
+                    <p className="text-xs">JPG, PNG ou WebP</p>
+                  </div>
+                )}
+              </div>
+              {editThumbnail && (
+                <p className="text-xs text-muted-foreground">
+                  Arquivo selecionado: {editThumbnail.name}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowEditDialog(false)}
+              disabled={isSaving}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              disabled={isSaving || !editTitle.trim()}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                "Salvar"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

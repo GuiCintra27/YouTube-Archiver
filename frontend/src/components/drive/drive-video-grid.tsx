@@ -175,6 +175,59 @@ export default function DriveVideoGrid() {
     }
   }, [selectedIds, apiUrl, page, fetchVideos]);
 
+  const handleEdit = useCallback(
+    async (video: DriveVideo, newTitle: string, newThumbnail?: File) => {
+      if (!apiUrl) return;
+
+      try {
+        // Get current name without extension for comparison
+        const currentBaseName = video.name.replace(/\.[^/.]+$/, "");
+
+        // Rename if title changed
+        if (newTitle !== currentBaseName) {
+          const renameResponse = await fetch(
+            `${apiUrl}/api/${APIURLS.DRIVE_VIDEOS}/${video.id}/rename`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ new_name: newTitle }),
+            }
+          );
+
+          if (!renameResponse.ok) {
+            throw new Error("Falha ao renomear vídeo");
+          }
+        }
+
+        // Update thumbnail if provided
+        if (newThumbnail) {
+          const formData = new FormData();
+          formData.append("thumbnail", newThumbnail);
+
+          const thumbnailResponse = await fetch(
+            `${apiUrl}/api/${APIURLS.DRIVE_VIDEOS}/${video.id}/thumbnail`,
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
+
+          if (!thumbnailResponse.ok) {
+            throw new Error("Falha ao atualizar thumbnail");
+          }
+        }
+
+        // Refresh the video list
+        await fetchVideos(page);
+      } catch (err) {
+        console.error("Erro ao editar vídeo:", err);
+        setError(err instanceof Error ? err.message : "Erro ao editar vídeo");
+        throw err;
+      }
+    },
+    [apiUrl, page, fetchVideos]
+  );
+
   // Helper to get thumbnail URL for Drive videos
   const getThumbnailUrl = (video: DriveVideo): string | undefined => {
     if (video.thumbnail) {
@@ -238,7 +291,7 @@ export default function DriveVideoGrid() {
               <VideoCard
                 key={video.id}
                 id={video.id}
-                title={video.name}
+                title={video.name.replace(/\.[^/.]+$/, "")}
                 channel={video.path}
                 path={video.path}
                 thumbnailUrl={getThumbnailUrl(video)}
@@ -249,6 +302,8 @@ export default function DriveVideoGrid() {
                 selectable={true}
                 selected={selectedIds.has(video.id)}
                 onSelectionChange={() => toggleSelection(video.id)}
+                editable={true}
+                onEdit={(newTitle, newThumbnail) => handleEdit(video, newTitle, newThumbnail)}
               />
             ))}
           </div>

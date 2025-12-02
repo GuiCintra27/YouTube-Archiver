@@ -147,7 +147,7 @@ export default function SyncPanel() {
 
           // Atualizar progresso
           if (job.progress) {
-            setUploadProgress(job.progress);
+            setUploadProgress(job.progress as UploadProgress);
           }
 
           // Verificar se terminou
