@@ -4,6 +4,7 @@ export enum APIURLS {
 
   DRIVE_AUTH_STATUS = "drive/auth-status",
   DRIVE_AUTH_URL = "drive/auth-url",
+  DRIVE_DELETE_BATCH = "drive/videos/delete-batch",
   DRIVE_DOWNLOAD = "drive/download",
   DRIVE_DOWNLOAD_ALL = "drive/download-all",
   DRIVE_STREAM = "drive/stream",
@@ -19,4 +20,5 @@ export enum APIURLS {
   RECORDINGS_UPLOAD = "recordings/upload",
 
   VIDEOS = "videos",
+  VIDEOS_DELETE_BATCH = "videos/delete-batch",
 }

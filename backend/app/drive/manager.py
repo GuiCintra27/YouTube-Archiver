@@ -781,6 +781,38 @@ class DriveManager:
             logger.error(f"Error deleting file {file_id}: {e}")
             return False
 
+    def delete_videos_batch(self, file_ids: List[str]) -> Dict:
+        """
+        Delete multiple videos from Drive.
+
+        Args:
+            file_ids: List of file IDs to delete
+
+        Returns:
+            Dict with deleted count, failed list, and status
+        """
+        service = self.get_service()
+        deleted = []
+        failed = []
+
+        for file_id in file_ids:
+            try:
+                service.files().delete(fileId=file_id).execute()
+                deleted.append(file_id)
+                logger.debug(f"Deleted file: {file_id}")
+            except Exception as e:
+                logger.error(f"Failed to delete file {file_id}: {e}")
+                failed.append({"file_id": file_id, "error": str(e)})
+
+        logger.info(f"Batch delete completed: {len(deleted)} deleted, {len(failed)} failed")
+
+        return {
+            "deleted": deleted,
+            "failed": failed,
+            "total_deleted": len(deleted),
+            "total_failed": len(failed),
+        }
+
     def get_file_metadata(self, file_id: str) -> Dict:
         """Get file metadata including size and mime type"""
         service = self.get_service()

@@ -2,6 +2,7 @@
 Library service - business logic for local video library
 """
 import re
+import subprocess
 from pathlib import Path
 from datetime import datetime
 from typing import List, Optional, Dict, Any
@@ -12,6 +13,59 @@ from app.core.security import validate_path_within_base, validate_file_exists, s
 from .cache import video_cache
 
 logger = get_module_logger("library")
+
+
+def get_video_duration(video_path: Path) -> Optional[float]:
+    """
+    Get video duration in seconds using ffprobe.
+
+    Args:
+        video_path: Path to video file
+
+    Returns:
+        Duration in seconds or None if unable to determine
+    """
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                str(video_path)
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return float(result.stdout.strip())
+    except Exception as e:
+        logger.debug(f"Could not get duration for {video_path}: {e}")
+    return None
+
+
+def format_duration(seconds: Optional[float]) -> Optional[str]:
+    """
+    Format duration in seconds to human readable string (HH:MM:SS or MM:SS).
+
+    Args:
+        seconds: Duration in seconds
+
+    Returns:
+        Formatted string or None
+    """
+    if seconds is None:
+        return None
+
+    total_seconds = int(seconds)
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    secs = total_seconds % 60
+
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
 
 
 def scan_videos_directory(base_dir: str = "./downloads", use_cache: bool = True) -> List[Dict[str, Any]]:
@@ -67,6 +121,10 @@ def scan_videos_directory(base_dir: str = "./downloads", use_cache: bool = True)
             # File info
             stat = video_file.stat()
 
+            # Get video duration
+            duration_seconds = get_video_duration(video_file)
+            duration_formatted = format_duration(duration_seconds)
+
             videos.append({
                 "id": str(rel_path),
                 "title": title,
@@ -74,6 +132,8 @@ def scan_videos_directory(base_dir: str = "./downloads", use_cache: bool = True)
                 "path": str(rel_path),
                 "thumbnail": thumbnail,
                 "size": stat.st_size,
+                "duration": duration_formatted,
+                "duration_seconds": duration_seconds,
                 "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
                 "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
             })
@@ -221,3 +281,50 @@ def _cleanup_empty_dirs(directory: Path, base_dir: Path) -> None:
                 grandparent.rmdir()
     except Exception:
         pass
+
+
+def delete_videos_batch(
+    video_paths: List[str],
+    base_dir: str = "./downloads",
+    archive_file: str = "./archive.txt"
+) -> dict:
+    """
+    Delete multiple videos and their related files.
+
+    Args:
+        video_paths: List of relative paths to videos
+        base_dir: Base directory
+        archive_file: Archive file path
+
+    Returns:
+        Dict with deletion results including success/failure counts
+    """
+    deleted = []
+    failed = []
+
+    for video_path in video_paths:
+        try:
+            result = delete_video_with_related(video_path, base_dir, archive_file)
+            deleted.append({
+                "path": video_path,
+                "deleted_files": result.get("deleted_files", [])
+            })
+        except Exception as e:
+            logger.error(f"Failed to delete {video_path}: {e}")
+            failed.append({
+                "path": video_path,
+                "error": str(e)
+            })
+
+    total_deleted = len(deleted)
+    total_failed = len(failed)
+    status = "success" if total_failed == 0 else "partial"
+
+    return {
+        "status": status,
+        "message": f"{total_deleted} vídeo(s) excluído(s)" + (f", {total_failed} falha(s)" if total_failed > 0 else ""),
+        "deleted": deleted,
+        "failed": failed,
+        "total_deleted": total_deleted,
+        "total_failed": total_failed,
+    }

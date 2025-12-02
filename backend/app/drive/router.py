@@ -20,6 +20,7 @@ from .service import (
     get_sync_status,
     sync_all_videos,
     delete_video,
+    delete_videos_batch,
     stream_video,
     get_thumbnail,
     get_custom_thumbnail,
@@ -161,6 +162,34 @@ async def delete_drive_video(request: Request, file_id: str):
         _require_auth()
         return delete_video(file_id)
     except DriveNotAuthenticatedException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/videos/delete-batch")
+@limiter.limit(RateLimits.DELETE)
+async def delete_drive_videos_batch(request: Request, file_ids: List[str]):
+    """
+    Delete multiple videos from Google Drive.
+
+    Args:
+        file_ids: List of file IDs to delete
+
+    Returns:
+        Results with deleted count and any failures
+    """
+    try:
+        _require_auth()
+
+        if not file_ids:
+            raise InvalidRequestException("file_ids list cannot be empty")
+
+        if len(file_ids) > 100:
+            raise InvalidRequestException("Cannot delete more than 100 files at once")
+
+        return delete_videos_batch(file_ids)
+    except (DriveNotAuthenticatedException, InvalidRequestException):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
