@@ -77,7 +77,21 @@ async def auth_url(request: Request):
 async def oauth2callback(request: Request, code: str):
     """OAuth callback - exchange code for tokens"""
     try:
-        return exchange_auth_code(code)
+        result = exchange_auth_code(code)
+
+        # Trigger initial cache sync after successful authentication
+        if settings.DRIVE_CACHE_ENABLED:
+            try:
+                from .cache import trigger_initial_sync_if_authenticated
+                # Run in background to not block the callback response
+                import asyncio
+                asyncio.create_task(trigger_initial_sync_if_authenticated())
+            except Exception as e:
+                # Log but don't fail the auth callback
+                import logging
+                logging.warning(f"Failed to trigger initial cache sync: {e}")
+
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -92,7 +106,7 @@ async def list_videos(request: Request, page: int = 1, limit: int = 24):
         if page < 1 or limit < 1:
             raise InvalidRequestException("page and limit must be positive integers")
 
-        return list_videos_paginated(page, limit)
+        return await list_videos_paginated(page, limit)
     except (DriveNotAuthenticatedException, InvalidRequestException):
         raise
     except Exception as e:
@@ -167,7 +181,7 @@ async def delete_drive_video(request: Request, file_id: str):
     """Remove a video from Google Drive"""
     try:
         _require_auth()
-        return delete_video(file_id)
+        return await delete_video(file_id)
     except DriveNotAuthenticatedException:
         raise
     except Exception as e:
@@ -195,7 +209,7 @@ async def delete_drive_videos_batch(request: Request, file_ids: List[str]):
         if len(file_ids) > 100:
             raise InvalidRequestException("Cannot delete more than 100 files at once")
 
-        return delete_videos_batch(file_ids)
+        return await delete_videos_batch(file_ids)
     except (DriveNotAuthenticatedException, InvalidRequestException):
         raise
     except Exception as e:
@@ -471,6 +485,144 @@ async def download_all_from_drive_endpoint(
             "message": "Download de todos os vídeos iniciado em background"
         }
     except DriveNotAuthenticatedException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Cache Management Endpoints
+# ============================================================================
+
+@router.post("/cache/sync")
+@limiter.limit(RateLimits.DEFAULT)
+async def sync_cache(request: Request, full: bool = False):
+    """
+    Trigger manual cache synchronization.
+
+    Args:
+        full: If True, performs a complete rebuild. Otherwise, incremental sync.
+
+    Returns:
+        Sync result with statistics
+    """
+    try:
+        _require_auth()
+
+        if not settings.DRIVE_CACHE_ENABLED:
+            raise InvalidRequestException("Drive cache is disabled")
+
+        from .cache import full_sync, incremental_sync
+
+        if full:
+            result = await full_sync()
+        else:
+            result = await incremental_sync()
+
+        return {
+            "success": result.success,
+            "sync_type": "full" if full else "incremental",
+            "message": result.message,
+            "added": result.added,
+            "updated": result.updated,
+            "deleted": result.deleted,
+            "changes_detected": result.changes_detected,
+        }
+    except (DriveNotAuthenticatedException, InvalidRequestException):
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/cache/stats")
+@limiter.limit(RateLimits.GET_STATUS)
+async def get_cache_stats(request: Request):
+    """
+    Get cache statistics and sync metadata.
+
+    Returns:
+        Cache stats including video count, last sync times, etc.
+    """
+    try:
+        if not settings.DRIVE_CACHE_ENABLED:
+            return {
+                "enabled": False,
+                "message": "Drive cache is disabled"
+            }
+
+        from .cache import get_repository
+
+        repo = get_repository()
+        stats = await repo.get_stats()
+
+        return {
+            "enabled": True,
+            **stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/cache/rebuild")
+@limiter.limit(RateLimits.DEFAULT)
+async def rebuild_cache(request: Request):
+    """
+    Force a complete cache rebuild.
+
+    Clears all cached data and re-fetches everything from Google Drive.
+    Use this when cache seems out of sync or corrupted.
+
+    Returns:
+        Rebuild result with statistics
+    """
+    try:
+        _require_auth()
+
+        if not settings.DRIVE_CACHE_ENABLED:
+            raise InvalidRequestException("Drive cache is disabled")
+
+        from .cache import full_sync
+
+        result = await full_sync()
+
+        return {
+            "success": result.success,
+            "message": result.message,
+            "total_videos": result.added,
+            "sync_duration": "completed"
+        }
+    except (DriveNotAuthenticatedException, InvalidRequestException):
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/cache")
+@limiter.limit(RateLimits.DELETE)
+async def clear_cache(request: Request):
+    """
+    Clear all cached data.
+
+    Removes all videos and folders from cache. Next list operation
+    will trigger a fresh sync from Google Drive.
+
+    Returns:
+        Confirmation of cache clear
+    """
+    try:
+        if not settings.DRIVE_CACHE_ENABLED:
+            raise InvalidRequestException("Drive cache is disabled")
+
+        from .cache import get_repository
+
+        repo = get_repository()
+        await repo.clear_all()
+
+        return {
+            "success": True,
+            "message": "Cache cleared successfully"
+        }
+    except InvalidRequestException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

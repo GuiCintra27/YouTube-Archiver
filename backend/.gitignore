@@ -32,3 +32,4 @@ cookies.txt
 # OS
 .DS_Store
 Thumbs.db
+drive_cache.db

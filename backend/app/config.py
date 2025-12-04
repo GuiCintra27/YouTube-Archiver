@@ -106,6 +106,26 @@ class Settings(BaseSettings):
         description="Hours after which completed jobs are cleaned up"
     )
 
+    # Drive Cache settings
+    DRIVE_CACHE_DB_PATH: str = Field(
+        default="./drive_cache.db",
+        description="Path to SQLite cache database file"
+    )
+    DRIVE_CACHE_SYNC_INTERVAL: int = Field(
+        default=30,
+        ge=5,
+        le=1440,
+        description="Minutes between automatic cache sync (5-1440)"
+    )
+    DRIVE_CACHE_ENABLED: bool = Field(
+        default=True,
+        description="Enable/disable Drive cache"
+    )
+    DRIVE_CACHE_FALLBACK_TO_API: bool = Field(
+        default=True,
+        description="Fall back to direct API if cache unavailable"
+    )
+
     # Pydantic settings configuration
     model_config = SettingsConfigDict(
         env_file=".env",

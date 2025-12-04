@@ -18,6 +18,7 @@ O YT-Archiver combina uma API REST robusta com uma interface web moderna para fa
 - ✅ Cookies personalizados via arquivo Netscape
 - ✅ **Biblioteca de vídeos local** - Visualize, reproduza e gerencie vídeos baixados
 - ✅ **Sincronização com Google Drive** - Upload, visualização e streaming de vídeos no Drive
+- ✅ **Cache SQLite para Drive** - Listagem ultrarrápida com cache local de metadados
 - ✅ **Sistema de jobs assíncronos** - Downloads em background com progresso em tempo real
 - ✅ Sistema de arquivamento para evitar downloads duplicados
 - ✅ Controle de qualidade e formato de saída
@@ -240,6 +241,16 @@ A API FastAPI oferece endpoints completos para integração:
 
 **POST** `/api/drive/download/{file_id}` - Download de vídeo do Drive para armazenamento local
 
+### Endpoints de Cache do Drive
+
+**POST** `/api/drive/cache/sync` - Sincronização manual do cache (`?full=true` para rebuild)
+
+**GET** `/api/drive/cache/stats` - Estatísticas do cache (contagem, tamanho, última sync)
+
+**POST** `/api/drive/cache/rebuild` - Força rebuild completo do cache
+
+**DELETE** `/api/drive/cache` - Limpa todo o cache
+
 **Documentação Interativa:** http://localhost:8000/docs
 
 ---
@@ -276,14 +287,20 @@ yt-archiver/
 │   │       ├── router.py         # Endpoints /api/drive/*
 │   │       ├── service.py        # Lógica de negócio
 │   │       ├── schemas.py        # Modelos do Drive
-│   │       └── manager.py        # DriveManager (OAuth, upload, sync)
+│   │       ├── manager.py        # DriveManager (OAuth, upload, sync)
+│   │       └── cache/            # Cache SQLite para metadados
+│   │           ├── database.py   # Schema e conexão SQLite
+│   │           ├── repository.py # CRUD operations
+│   │           ├── sync.py       # Full/incremental sync
+│   │           └── background.py # Task de sync periódico
 │   ├── requirements.txt          # Dependências Python
 │   ├── run.sh                    # Script para iniciar backend
 │   ├── .venv/                    # Ambiente virtual Python
 │   ├── downloads/                # Vídeos baixados (padrão)
 │   ├── archive.txt               # Controle de downloads
 │   ├── credentials.json          # Credenciais OAuth Google (gitignored)
-│   └── token.json                # Token OAuth (gitignored)
+│   ├── token.json                # Token OAuth (gitignored)
+│   └── drive_cache.db            # Cache SQLite de metadados do Drive
 │
 ├── frontend/                     # Interface Next.js
 │   ├── src/
@@ -338,6 +355,7 @@ O backend segue uma arquitetura modular com separação clara de responsabilidad
 | `library` | Biblioteca de vídeos locais | `/api/videos/*` |
 | `recordings` | Upload de gravações de tela | `/api/recordings/upload` |
 | `drive` | Integração Google Drive | `/api/drive/*` |
+| `drive/cache` | Cache SQLite para metadados | `/api/drive/cache/*` |
 | `core` | Exceções, segurança, utilitários | - |
 
 **Padrão de cada módulo:**

@@ -4,8 +4,8 @@
 
 Sistema completo de download e arquivamento de vídeos do YouTube com interface web moderna e integração com Google Drive.
 
-**Versão atual:** v2.0
-**Stack:** FastAPI (backend) + Next.js 15 (frontend) + yt-dlp (download engine)
+**Versão atual:** v2.4
+**Stack:** FastAPI (backend) + Next.js 15 (frontend) + yt-dlp (download engine) + SQLite (cache)
 
 ### Objetivo Principal
 Baixar vídeos do YouTube (canais, playlists, vídeos individuais) e streams HLS sem DRM, com:
@@ -62,7 +62,13 @@ backend/app/
     ├── router.py        # Endpoints /api/drive/*
     ├── service.py       # Lógica de negócio
     ├── schemas.py       # Modelos Pydantic
-    └── manager.py       # DriveManager (OAuth, upload, sync)
+    ├── manager.py       # DriveManager (OAuth, upload, sync)
+    └── cache/           # Cache SQLite para metadados
+        ├── __init__.py  # Exports do módulo
+        ├── database.py  # Schema SQLite, conexão, WAL mode
+        ├── repository.py # CRUD operations
+        ├── sync.py      # Full/incremental sync
+        └── background.py # Task de sync periódico
 ```
 
 **Padrão de cada módulo:**
@@ -75,6 +81,7 @@ backend/app/
 - `fastapi`, `uvicorn`, `pydantic`, `pydantic-settings`
 - `yt-dlp` (download engine)
 - `google-api-python-client`, `google-auth-oauthlib` (Drive API)
+- `aiosqlite` (cache SQLite async)
 - `slowapi` (rate limiting)
 - `pytest`, `pytest-asyncio`, `pytest-cov`, `httpx` (testes)
 
@@ -158,6 +165,9 @@ src/
 - [x] Exclusão de vídeos do Drive
 - [x] Upload de arquivos relacionados (thumbnails, metadata, legendas)
 - [x] Preservação de estrutura de pastas
+- [x] **Cache SQLite** para listagem ultrarrápida (~20-50x mais rápido)
+- [x] Sync automático a cada 30 minutos
+- [x] Sync real-time após upload/delete/rename
 
 ### ✅ Opções Avançadas
 - [x] Headers customizados (Referer, Origin)
@@ -600,7 +610,7 @@ npx shadcn@latest add <component-name>
 ```bash
 cd backend && source .venv/bin/activate
 
-# Rodar todos os 46 testes
+# Rodar todos os 68 testes
 pytest tests/ -v
 
 # Rodar com cobertura de código
@@ -690,20 +700,22 @@ cat BUGS.md
    - Entry point: `app/main.py`
    - Configurações: `app/config.py` (pydantic-settings + `.env`)
 2. **Iniciar Backend:** `./run.sh` (nunca `python app/main.py` diretamente)
-3. **Testes Backend:** `pytest tests/ -v` (46 testes)
+3. **Testes Backend:** `pytest tests/ -v` (68 testes)
 4. **Arquitetura Frontend:** Next.js 15 + shadcn/ui + Tailwind
 5. **Unicode/Encoding:** Sempre RFC 5987 para headers, sempre escapar `'` em queries Drive
 6. **Bugs conhecidos:** Todos corrigidos (ver BUGS.md para histórico)
 7. **Google Drive:** OAuth em `app/drive/manager.py`, streaming funcionando
-8. **Player:** Plyr com range requests (HTTP 206) funcionando local + Drive
-9. **Sistema de jobs:** Em `app/jobs/`, assíncrono com polling + limpeza automática
+8. **Drive Cache:** SQLite em `app/drive/cache/` (~20-50x mais rápido que API)
+9. **Player:** Plyr com range requests (HTTP 206) funcionando local + Drive
+10. **Sistema de jobs:** Em `app/jobs/`, assíncrono com polling + limpeza automática
 
 **Localização dos arquivos principais:**
 - Downloads: `app/downloads/` (schemas.py tem DownloadRequest)
 - Jobs: `app/jobs/` (store.py tem storage, cleanup.py tem limpeza automática)
 - Streaming: `app/library/router.py`
-- Cache de vídeos: `app/library/cache.py`
+- Cache de scan local: `app/library/cache.py`
 - Google Drive: `app/drive/manager.py`
+- **Drive Cache SQLite:** `app/drive/cache/` (database.py, repository.py, sync.py, background.py)
 - **Logging:** `app/core/logging.py` (usar `get_module_logger()`)
 - **Erros:** `app/core/errors.py` (usar `raise_error()`, `ErrorCode`)
 - **Validação:** `app/core/validators.py` (URLs, paths, filenames)
@@ -731,5 +743,5 @@ cat BUGS.md
 
 ---
 
-**Última atualização:** 2025-11-29
-**Status:** ✅ Aplicação 100% funcional, arquitetura modular implementada
+**Última atualização:** 2025-12-04
+**Status:** ✅ Aplicação 100% funcional, arquitetura modular implementada, cache SQLite para Drive

@@ -12,10 +12,14 @@ import requests
 from google.oauth2.credentials import Credentials
 
 from .manager import drive_manager, SCOPES
+from app.config import settings
 from app.core.security import validate_path_within_base, validate_file_exists, sanitize_path
+from app.core.logging import get_module_logger
 # Import store directly to avoid circular imports via app.jobs package
 from app.jobs.store import JobType
 import app.jobs.store as store
+
+logger = get_module_logger("drive.service")
 
 # Semaphore para limitar uploads concorrentes (3 simultâneos)
 UPLOAD_SEMAPHORE: Optional[asyncio.Semaphore] = None
@@ -81,8 +85,36 @@ def exchange_auth_code(code: str) -> Dict:
     }
 
 
-def list_videos_paginated(page: int = 1, limit: int = 24) -> Dict:
-    """List Drive videos with pagination"""
+async def list_videos_paginated(page: int = 1, limit: int = 24) -> Dict:
+    """
+    List Drive videos with pagination.
+
+    Uses SQLite cache if enabled for faster response.
+    Falls back to direct API if cache is unavailable.
+    """
+    # Check if cache is enabled
+    if settings.DRIVE_CACHE_ENABLED:
+        try:
+            from .cache import get_repository, ensure_cache_initialized
+
+            # Ensure cache has data (triggers initial sync if empty)
+            await ensure_cache_initialized()
+
+            repo = get_repository()
+            result = await repo.get_videos_paginated(page, limit)
+
+            if result and result.get("videos") is not None:
+                logger.debug(f"Serving {len(result['videos'])} videos from cache")
+                return result
+
+        except Exception as e:
+            logger.warning(f"Cache error, falling back to API: {e}")
+
+            if not settings.DRIVE_CACHE_FALLBACK_TO_API:
+                raise
+
+    # Fallback to direct Drive API
+    logger.debug("Fetching videos from Drive API")
     videos = drive_manager.list_videos()
     total = len(videos)
 
@@ -362,12 +394,20 @@ async def _run_batch_upload_job(job_id: str, base_dir: str) -> None:
         _fail_job(job_id, str(e))
 
 
-def delete_video(file_id: str) -> Dict:
+async def delete_video(file_id: str) -> Dict:
     """Delete a video from Drive"""
     success = drive_manager.delete_video(file_id)
 
     if not success:
         raise Exception("Failed to delete video")
+
+    # Sync with cache
+    if settings.DRIVE_CACHE_ENABLED:
+        try:
+            from .cache import sync_video_deleted
+            await sync_video_deleted(file_id)
+        except Exception as e:
+            logger.warning(f"Failed to sync deletion to cache: {e}")
 
     return {
         "status": "success",
@@ -375,7 +415,7 @@ def delete_video(file_id: str) -> Dict:
     }
 
 
-def delete_videos_batch(file_ids: List[str]) -> Dict:
+async def delete_videos_batch(file_ids: List[str]) -> Dict:
     """
     Delete multiple videos from Drive.
 
@@ -394,6 +434,15 @@ def delete_videos_batch(file_ids: List[str]) -> Dict:
         }
 
     result = drive_manager.delete_videos_batch(file_ids)
+
+    # Sync with cache - mark deleted IDs
+    if settings.DRIVE_CACHE_ENABLED and result.get("deleted_ids"):
+        try:
+            from .cache import get_repository
+            repo = get_repository()
+            await repo.mark_videos_deleted_batch(result["deleted_ids"])
+        except Exception as e:
+            logger.warning(f"Failed to sync batch deletion to cache: {e}")
 
     status = "success" if result["total_failed"] == 0 else "partial"
     message = f"{result['total_deleted']} vídeo(s) excluído(s)"

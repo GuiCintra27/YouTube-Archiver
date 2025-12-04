@@ -21,6 +21,11 @@ from app.drive.router import router as drive_router
 
 # Import background tasks
 from app.jobs.cleanup import run_cleanup_loop
+from app.drive.cache import (
+    run_cache_sync_loop,
+    initialize_cache_on_startup,
+    shutdown_cache,
+)
 
 # Configure logging with settings
 setup_logging(level=settings.LOG_LEVEL)
@@ -35,17 +40,38 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("Starting background tasks...")
+
+    # Initialize Drive cache database
+    await initialize_cache_on_startup()
+
+    # Start job cleanup task (runs every 30 minutes)
     cleanup_task = asyncio.create_task(run_cleanup_loop(interval_minutes=30))
+
+    # Start Drive cache sync task (runs at configured interval)
+    cache_sync_task = asyncio.create_task(
+        run_cache_sync_loop(interval_minutes=settings.DRIVE_CACHE_SYNC_INTERVAL)
+    )
 
     yield
 
     # Shutdown
     logger.info("Shutting down background tasks...")
+
     cleanup_task.cancel()
+    cache_sync_task.cancel()
+
     try:
         await cleanup_task
     except asyncio.CancelledError:
         pass
+
+    try:
+        await cache_sync_task
+    except asyncio.CancelledError:
+        pass
+
+    # Close cache database
+    await shutdown_cache()
 
 # Create FastAPI application
 app = FastAPI(
