@@ -7,12 +7,12 @@
     },
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/guilherme-cintra"],
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/usuario"],
       "description": "File system operations and management"
     },
     "git": {
       "command": "uvx",
-      "args": ["mcp-server-git", "--repository", "."],
+      "args": ["mcp-server-git", "--repository", "/home/usuario/Área de trabalho/Projects/Mine/yt-archiver"],
       "description": "Git repository management and operations"
     },
     "sqlite": {
