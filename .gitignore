@@ -6,3 +6,5 @@ uploaded.jsonl
 # Node.js (Commitizen na raiz)
 node_modules/
 package-lock.json
+
+.claude/settings.local.json
