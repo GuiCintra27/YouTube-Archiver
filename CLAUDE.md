@@ -178,6 +178,14 @@ src/
 - [x] Extração de áudio (MP3)
 - [x] Download de legendas e miniaturas
 
+### ✅ Global Player (Background Playback)
+- [x] Mini barra de controle fixa no rodapé
+- [x] Picture-in-Picture nativo do navegador (Vidstack)
+- [x] Controle de volume (mute + slider)
+- [x] Persistência entre páginas (player no layout.tsx)
+- [x] Transferência de tempo de reprodução ao minimizar
+- [x] **Documentação:** `docs/local/GLOBAL-PLAYER-FEATURE.md`
+
 ---
 
 ## 🐛 Bugs Corrigidos (Histórico)

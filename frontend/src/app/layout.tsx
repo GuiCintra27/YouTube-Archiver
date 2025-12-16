@@ -8,7 +8,7 @@ import "@vidstack/react/player/styles/default/layouts/video.css";
 
 import Navigation from "@/components/common/navigation";
 import ThemeToggle from "@/components/common/theme-toggle";
-import { ThemeProvider } from "@/components/common/theme-provider";
+import Providers from "@/components/common/providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -26,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
-        <ThemeProvider>
+        <Providers>
           <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
             <header className="border-b">
               <div className="container mx-auto px-4 py-4">
@@ -49,7 +49,7 @@ export default function RootLayout({
               </div>
             </footer>
           </div>
-        </ThemeProvider>
+        </Providers>
       </body>
     </html>
   );

@@ -26,6 +26,7 @@ O YT-Archiver combina uma API REST robusta com uma interface web moderna para fa
 - ✅ Extração de áudio (MP3)
 - ✅ Download de legendas, miniaturas e metadados
 - ✅ Nomes de arquivo e caminhos customizados
+- ✅ **Global Player com PiP** - Reproduza vídeos em background enquanto navega
 - ✅ API REST completa para integração
 
 ---
@@ -102,6 +103,13 @@ npm run dev
 - ▶️ Streaming direto do Google Drive com suporte a seek/skip
 - 🗑️ Exclusão individual ou em lote de vídeos do Drive
 - ℹ️ Modal de informações detalhadas do vídeo
+
+**Global Player (Background Playback):**
+- 🎵 Minimize vídeos para reproduzir em background
+- 🖼️ Picture-in-Picture nativo do navegador
+- 🔊 Controle de volume na mini barra
+- 🔄 Continua tocando ao navegar entre páginas
+- 📖 Documentação completa: **[GLOBAL-PLAYER-FEATURE.md](./docs/local/GLOBAL-PLAYER-FEATURE.md)**
 
 **Recursos da Interface:**
 - ✨ Design moderno e responsivo (Next.js 15 + Tailwind CSS)

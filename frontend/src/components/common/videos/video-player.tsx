@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Trash2, Loader2, AlertCircle } from "lucide-react";
+import { useState, useRef, useCallback } from "react";
+import { Trash2, Loader2, AlertCircle, Minimize2 } from "lucide-react";
+import type { MediaPlayerInstance } from "@vidstack/react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,6 +24,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
 import { formatBytes } from "@/lib/utils";
+import { useGlobalPlayer } from "@/contexts/global-player-context";
 
 // Vidstack imports
 import { MediaPlayer, MediaProvider } from "@vidstack/react";
@@ -80,9 +82,31 @@ export default function VideoPlayer({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Global player context
+  const { playVideo } = useGlobalPlayer();
+  const playerRef = useRef<MediaPlayerInstance>(null);
+
   // Determinar título e subtítulo baseado no tipo de vídeo
   const videoTitle = isLocalVideo(video) ? video.title : video.name;
   const videoSubtitle = isLocalVideo(video) ? video.channel : video.path;
+
+  // Handle minimize - transfer to global player
+  const handleMinimize = useCallback(() => {
+    const currentTime = playerRef.current?.currentTime || 0;
+    playVideo(
+      {
+        id: video.id,
+        title: videoTitle,
+        subtitle: videoSubtitle,
+        path: video.path,
+        thumbnail: isLocalVideo(video) ? video.thumbnail : undefined,
+        size: video.size,
+      },
+      source,
+      currentTime
+    );
+    onClose();
+  }, [video, videoTitle, videoSubtitle, source, playVideo, onClose]);
 
   // Construir URL do stream baseado na fonte
   const videoUrl = apiUrl
@@ -126,15 +150,28 @@ export default function VideoPlayer({
                       {videoSubtitle}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setDeleteDialogOpen(true)}
-                    className="text-destructive hover:text-destructive -mt-1"
-                    title="Excluir"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {/* Minimize button */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleMinimize}
+                      className="text-muted-foreground hover:text-foreground -mt-1"
+                      title="Minimizar (PiP)"
+                    >
+                      <Minimize2 className="h-4 w-4" />
+                    </Button>
+                    {/* Delete button */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setDeleteDialogOpen(true)}
+                      className="text-destructive hover:text-destructive -mt-1"
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </DialogHeader>
 
@@ -149,6 +186,7 @@ export default function VideoPlayer({
             <div className="mx-6 rounded-lg overflow-hidden">
               {videoUrl && (
                 <MediaPlayer
+                  ref={playerRef}
                   title={videoTitle}
                   src={{ src: videoUrl, type: "video/mp4" }}
                   aspectRatio="16/9"
@@ -165,6 +203,8 @@ export default function VideoPlayer({
                     seekStep={10}
                     // Tema escuro automático
                     colorScheme="dark"
+                    // Remover botão PiP (usamos o minimizar)
+                    slots={{ pipButton: null }}
                   />
                 </MediaPlayer>
               )}
