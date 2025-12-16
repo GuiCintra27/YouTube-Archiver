@@ -82,8 +82,8 @@ export default function VideoPlayer({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Global player context
-  const { playVideo } = useGlobalPlayer();
+  // Global player context (volume é sincronizado via props do MediaPlayer)
+  const { playVideo, volume, isMuted, setVolume, setMuted } = useGlobalPlayer();
   const playerRef = useRef<MediaPlayerInstance>(null);
 
   // Determinar título e subtítulo baseado no tipo de vídeo
@@ -193,6 +193,12 @@ export default function VideoPlayer({
                   crossOrigin
                   playsInline
                   className="w-full"
+                  volume={volume}
+                  muted={isMuted}
+                  onVolumeChange={(detail) => {
+                    setVolume(detail.volume);
+                    setMuted(detail.muted);
+                  }}
                 >
                   <MediaProvider />
                   <DefaultVideoLayout

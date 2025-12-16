@@ -11,13 +11,11 @@ import { APIURLS } from "@/lib/api-urls";
 
 export default function GlobalPlayer() {
   const apiUrl = useApiUrl();
-  const { video, source, isActive, startTime, stopVideo } = useGlobalPlayer();
+  const { video, source, isActive, startTime, stopVideo, volume, isMuted, setVolume, setMuted } = useGlobalPlayer();
   const playerRef = useRef<MediaPlayerInstance>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [canPip, setCanPip] = useState(false);
-  const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
 
   // Construir URL do stream
   const videoUrl =
@@ -55,6 +53,9 @@ export default function GlobalPlayer() {
       if (startTime > 0) {
         player.currentTime = startTime;
       }
+      // Aplicar volume salvo
+      player.volume = volume;
+      player.muted = isMuted;
       // Forçar play (autoPlay pode falhar em alguns navegadores)
       player.play().catch((err) => {
         console.warn("AutoPlay blocked:", err);
@@ -66,7 +67,15 @@ export default function GlobalPlayer() {
     return () => {
       player.removeEventListener("can-play", handleCanPlay);
     };
-  }, [startTime, videoUrl]);
+  }, [startTime, videoUrl, volume, isMuted]);
+
+  // Sincronizar volume quando mudar pelo contexto (ex: mudou no VideoPlayer)
+  useEffect(() => {
+    if (playerRef.current && isReady) {
+      playerRef.current.volume = volume;
+      playerRef.current.muted = isMuted;
+    }
+  }, [volume, isMuted, isReady]);
 
   const handlePlayPause = () => {
     if (!playerRef.current || !isReady) return;
@@ -96,7 +105,7 @@ export default function GlobalPlayer() {
     if (playerRef.current) {
       playerRef.current.volume = newVolume;
       if (newVolume > 0 && isMuted) {
-        setIsMuted(false);
+        setMuted(false);
         playerRef.current.muted = false;
       }
     }
@@ -105,7 +114,7 @@ export default function GlobalPlayer() {
   const handleMuteToggle = () => {
     if (!playerRef.current) return;
     const newMuted = !isMuted;
-    setIsMuted(newMuted);
+    setMuted(newMuted);
     playerRef.current.muted = newMuted;
   };
 
