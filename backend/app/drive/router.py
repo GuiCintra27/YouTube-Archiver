@@ -362,15 +362,20 @@ async def upload_external_to_drive(
     request: Request,
     folder_name: str = Form(...),
     video: UploadFile = File(...),
-    extra_files: List[UploadFile] = File(default=[]),
+    thumbnail: UploadFile = File(default=None),
+    subtitles: List[UploadFile] = File(default=[]),
+    transcription: UploadFile = File(default=None),
 ):
     """
     Upload de arquivos externos para o Google Drive.
 
     Permite fazer upload de qualquer vídeo do PC para o Drive,
-    com possibilidade de adicionar arquivos extras (thumbnail, legendas, etc.).
-    A pasta é criada automaticamente se não existir.
+    com possibilidade de adicionar:
+    - thumbnail: imagem de capa (jpg, png, webp)
+    - subtitles: arquivos de legenda (.srt, .vtt) - múltiplos permitidos
+    - transcription: arquivo de transcrição (.txt)
 
+    A pasta é criada automaticamente se não existir.
     Retorna job_id para tracking de progresso via GET /api/jobs/{job_id}.
     """
     try:
@@ -389,13 +394,27 @@ async def upload_external_to_drive(
                 shutil.copyfileobj(video.file, f)
             temp_files.append(str(video_path))
 
-            # Salvar arquivos extras
-            for extra in extra_files:
-                if extra.filename:  # Ignorar arquivos vazios
-                    extra_path = temp_dir / extra.filename
-                    with open(extra_path, "wb") as f:
-                        shutil.copyfileobj(extra.file, f)
-                    temp_files.append(str(extra_path))
+            # Salvar thumbnail (se fornecida)
+            if thumbnail and thumbnail.filename:
+                thumb_path = temp_dir / thumbnail.filename
+                with open(thumb_path, "wb") as f:
+                    shutil.copyfileobj(thumbnail.file, f)
+                temp_files.append(str(thumb_path))
+
+            # Salvar legendas (múltiplas)
+            for subtitle in subtitles:
+                if subtitle.filename:
+                    sub_path = temp_dir / subtitle.filename
+                    with open(sub_path, "wb") as f:
+                        shutil.copyfileobj(subtitle.file, f)
+                    temp_files.append(str(sub_path))
+
+            # Salvar transcrição (se fornecida)
+            if transcription and transcription.filename:
+                trans_path = temp_dir / transcription.filename
+                with open(trans_path, "wb") as f:
+                    shutil.copyfileobj(transcription.file, f)
+                temp_files.append(str(trans_path))
 
             # Iniciar upload em background
             job_id = await upload_external_files(folder_name, temp_files)

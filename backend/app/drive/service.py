@@ -633,6 +633,28 @@ async def _run_external_upload_job(
         # Get generated thumbnails for cleanup
         generated_thumbnails = result.get("generated_thumbnails", [])
 
+        # Sync uploaded videos to cache
+        uploaded_files = result.get("uploaded", [])
+        for uploaded_file in uploaded_files:
+            if uploaded_file.get("status") == "success":
+                file_name = uploaded_file.get("name", "")
+                # Only sync video files (not thumbnails, subtitles, etc.)
+                if any(file_name.lower().endswith(ext) for ext in settings.VIDEO_EXTENSIONS):
+                    try:
+                        from .cache import sync_video_added
+                        video_path = f"{folder_name}/{file_name}"
+                        await sync_video_added(
+                            drive_id=uploaded_file.get("file_id"),
+                            name=file_name,
+                            path=video_path,
+                            size=uploaded_file.get("size", 0),
+                            created_at=datetime.now().isoformat(),
+                            modified_at=datetime.now().isoformat(),
+                        )
+                        logger.info(f"Synced video to cache: {video_path}")
+                    except Exception as cache_err:
+                        logger.warning(f"Failed to sync video to cache: {cache_err}")
+
         # Completar job
         _complete_job(job_id, {
             "status": result.get("status", "success"),

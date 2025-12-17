@@ -17,12 +17,13 @@ import {
   Upload,
   X,
   FileVideo,
-  File,
   Loader2,
   CheckCircle2,
   XCircle,
   Cloud,
-  Trash2,
+  Image,
+  Subtitles,
+  FileText,
 } from "lucide-react";
 import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
@@ -63,14 +64,18 @@ export default function ExternalUploadModal({
   const apiUrl = useApiUrl();
   const [folderName, setFolderName] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [extraFiles, setExtraFiles] = useState<File[]>([]);
+  const [thumbnail, setThumbnail] = useState<File | null>(null);
+  const [subtitles, setSubtitles] = useState<File[]>([]);
+  const [transcription, setTranscription] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const videoInputRef = useRef<HTMLInputElement>(null);
-  const extraInputRef = useRef<HTMLInputElement>(null);
+  const thumbnailInputRef = useRef<HTMLInputElement>(null);
+  const subtitlesInputRef = useRef<HTMLInputElement>(null);
+  const transcriptionInputRef = useRef<HTMLInputElement>(null);
   const pollingCleanupRef = useRef<(() => void) | null>(null);
 
   // Cleanup on unmount
@@ -90,7 +95,9 @@ export default function ExternalUploadModal({
         if (!uploading) {
           setFolderName("");
           setVideoFile(null);
-          setExtraFiles([]);
+          setThumbnail(null);
+          setSubtitles([]);
+          setTranscription(null);
           setError(null);
           setSuccess(false);
           setUploadProgress(null);
@@ -111,19 +118,33 @@ export default function ExternalUploadModal({
     }
   };
 
-  const handleExtraFilesSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length > 0) {
-      setExtraFiles((prev) => [...prev, ...files]);
-    }
-    // Reset input to allow selecting same file again
-    if (extraInputRef.current) {
-      extraInputRef.current.value = "";
+  const handleThumbnailSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setThumbnail(file);
     }
   };
 
-  const removeExtraFile = (index: number) => {
-    setExtraFiles((prev) => prev.filter((_, i) => i !== index));
+  const handleSubtitlesSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setSubtitles((prev) => [...prev, ...files]);
+    }
+    // Reset input to allow selecting same file again
+    if (subtitlesInputRef.current) {
+      subtitlesInputRef.current.value = "";
+    }
+  };
+
+  const removeSubtitle = (index: number) => {
+    setSubtitles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleTranscriptionSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setTranscription(file);
+    }
   };
 
   const pollJobProgress = useCallback(
@@ -180,13 +201,16 @@ export default function ExternalUploadModal({
   const handleUpload = async () => {
     if (!videoFile || !folderName.trim() || !apiUrl) return;
 
+    // Calculate total files
+    const totalFiles = 1 + (thumbnail ? 1 : 0) + subtitles.length + (transcription ? 1 : 0);
+
     try {
       setUploading(true);
       setError(null);
       setSuccess(false);
       setUploadProgress({
         status: "uploading",
-        total: 1 + extraFiles.length,
+        total: totalFiles,
         uploaded: 0,
         failed: 0,
         percent: 0,
@@ -198,9 +222,17 @@ export default function ExternalUploadModal({
       formData.append("folder_name", folderName.trim());
       formData.append("video", videoFile);
 
-      extraFiles.forEach((file) => {
-        formData.append("extra_files", file);
+      if (thumbnail) {
+        formData.append("thumbnail", thumbnail);
+      }
+
+      subtitles.forEach((file) => {
+        formData.append("subtitles", file);
       });
+
+      if (transcription) {
+        formData.append("transcription", transcription);
+      }
 
       // Send upload request
       const response = await fetch(
@@ -231,7 +263,9 @@ export default function ExternalUploadModal({
         if (job.status === "completed") {
           setSuccess(true);
           setVideoFile(null);
-          setExtraFiles([]);
+          setThumbnail(null);
+          setSubtitles([]);
+          setTranscription(null);
           setFolderName("");
           onUploadComplete?.();
         } else if (job.status === "error") {
@@ -339,55 +373,155 @@ export default function ExternalUploadModal({
             )}
           </div>
 
-          {/* Extra Files Input */}
-          <div className="space-y-2">
-            <Label>Arquivos extras (opcional)</Label>
-            <input
-              ref={extraInputRef}
-              type="file"
-              multiple
-              onChange={handleExtraFilesSelect}
-              className="hidden"
-              disabled={uploading}
-            />
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => extraInputRef.current?.click()}
-              disabled={uploading}
-            >
-              <File className="h-4 w-4 mr-2" />
-              Adicionar arquivos...
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              Thumbnail, legendas, transcrição, etc.
-            </p>
-            {extraFiles.length > 0 && (
-              <div className="space-y-1 max-h-32 overflow-y-auto">
-                {extraFiles.map((file, index) => (
-                  <div
-                    key={`${file.name}-${index}`}
-                    className="flex items-center gap-2 p-2 rounded bg-muted"
-                  >
-                    <File className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm truncate flex-1">{file.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatBytes(file.size)}
-                    </span>
-                    {!uploading && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                        onClick={() => removeExtraFile(index)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
+          {/* Arquivos Opcionais */}
+          <div className="space-y-4">
+            <Label className="text-muted-foreground">Arquivos opcionais</Label>
+
+            {/* Thumbnail */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Image className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Thumbnail</span>
               </div>
-            )}
+              <input
+                ref={thumbnailInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                onChange={handleThumbnailSelect}
+                className="hidden"
+                disabled={uploading}
+              />
+              {thumbnail ? (
+                <div className="flex items-center gap-2 p-2 rounded bg-muted">
+                  <Image className="h-4 w-4 text-green-600" />
+                  <span className="text-sm truncate flex-1">{thumbnail.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatBytes(thumbnail.size)}
+                  </span>
+                  {!uploading && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => setThumbnail(null)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start text-muted-foreground"
+                  onClick={() => thumbnailInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  <Image className="h-4 w-4 mr-2" />
+                  Selecionar imagem...
+                </Button>
+              )}
+            </div>
+
+            {/* Legendas */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Subtitles className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Legendas</span>
+                <span className="text-xs text-muted-foreground">(múltiplas)</span>
+              </div>
+              <input
+                ref={subtitlesInputRef}
+                type="file"
+                accept=".srt,.vtt"
+                multiple
+                onChange={handleSubtitlesSelect}
+                className="hidden"
+                disabled={uploading}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start text-muted-foreground"
+                onClick={() => subtitlesInputRef.current?.click()}
+                disabled={uploading}
+              >
+                <Subtitles className="h-4 w-4 mr-2" />
+                Adicionar legendas...
+              </Button>
+              {subtitles.length > 0 && (
+                <div className="space-y-1 max-h-24 overflow-y-auto">
+                  {subtitles.map((file, index) => (
+                    <div
+                      key={`${file.name}-${index}`}
+                      className="flex items-center gap-2 p-2 rounded bg-muted"
+                    >
+                      <Subtitles className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm truncate flex-1">{file.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatBytes(file.size)}
+                      </span>
+                      {!uploading && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => removeSubtitle(index)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Transcrição */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Transcrição</span>
+              </div>
+              <input
+                ref={transcriptionInputRef}
+                type="file"
+                accept=".txt"
+                onChange={handleTranscriptionSelect}
+                className="hidden"
+                disabled={uploading}
+              />
+              {transcription ? (
+                <div className="flex items-center gap-2 p-2 rounded bg-muted">
+                  <FileText className="h-4 w-4 text-purple-600" />
+                  <span className="text-sm truncate flex-1">{transcription.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatBytes(transcription.size)}
+                  </span>
+                  {!uploading && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => setTranscription(null)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start text-muted-foreground"
+                  onClick={() => transcriptionInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Selecionar arquivo...
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Upload Progress */}
