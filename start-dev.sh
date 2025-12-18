@@ -41,6 +41,12 @@ if ! command -v ffmpeg &> /dev/null; then
     exit 1
 fi
 
+# Matar processos existentes nas portas
+echo -e "${YELLOW}🧹 Limpando processos existentes...${NC}"
+lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+sleep 1
+
 # Iniciar backend
 echo -e "${BLUE}📡 Iniciando Backend (FastAPI)...${NC}"
 cd backend || exit
@@ -58,8 +64,10 @@ source .venv/bin/activate
 echo "📥 Instalando dependências do backend..."
 pip install -q -r requirements.txt
 
-# Iniciar API em background
-python api.py &
+# Iniciar API em background com hot-reload
+# --reload: reinicia quando arquivos mudam
+# --reload-dir: monitora apenas o diretório app (mais eficiente)
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app &
 BACKEND_PID=$!
 
 sleep 2
@@ -102,6 +110,8 @@ echo ""
 echo -e "📡 Backend (API):  ${BLUE}http://localhost:8000${NC}"
 echo -e "📚 API Docs:       ${BLUE}http://localhost:8000/docs${NC}"
 echo -e "🎨 Frontend (Web): ${BLUE}http://localhost:3000${NC}"
+echo ""
+echo -e "${YELLOW}🔄 Hot-reload ativado: alterações no código reiniciam automaticamente${NC}"
 echo ""
 echo -e "Para parar os servidores, pressione ${GREEN}Ctrl+C${NC}"
 echo ""

@@ -173,7 +173,7 @@ export default function PaginatedVideoGrid() {
         // Rename if title changed
         if (newTitle !== video.title) {
           const renameResponse = await fetch(
-            `${apiUrl}/api/${APIURLS.VIDEOS}/${encodeURIComponent(video.path)}/rename`,
+            `${apiUrl}/api/${APIURLS.VIDEOS_RENAME}/${encodeURIComponent(video.path)}`,
             {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
@@ -196,7 +196,7 @@ export default function PaginatedVideoGrid() {
           formData.append("thumbnail", newThumbnail);
 
           const thumbnailResponse = await fetch(
-            `${apiUrl}/api/${APIURLS.VIDEOS}/${encodeURIComponent(video.path)}/thumbnail`,
+            `${apiUrl}/api/${APIURLS.VIDEOS_UPDATE_THUMBNAIL}/${encodeURIComponent(video.path)}`,
             {
               method: "POST",
               body: formData,

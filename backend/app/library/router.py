@@ -300,7 +300,7 @@ async def delete_videos_batch_endpoint(request: Request, video_paths: List[str],
 
 
 @router.patch(
-    "/{video_path:path}/rename",
+    "/rename/{video_path:path}",
     summary="Renomear vídeo",
     description="""
 Renomeia um vídeo e todos os arquivos associados.
@@ -350,7 +350,7 @@ async def rename_video_endpoint(request: Request, video_path: str, body: RenameR
 
 
 @router.post(
-    "/{video_path:path}/thumbnail",
+    "/update-thumbnail/{video_path:path}",
     summary="Atualizar thumbnail",
     description="""
 Atualiza a thumbnail (miniatura) de um vídeo.
