@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Trash2, Loader2, AlertCircle, Minimize2 } from "lucide-react";
 import type { MediaPlayerInstance } from "@vidstack/react";
 import { Button } from "@/components/ui/button";
@@ -83,8 +83,16 @@ export default function VideoPlayer({
   const [error, setError] = useState<string | null>(null);
 
   // Global player context (volume é sincronizado via props do MediaPlayer)
-  const { playVideo, volume, isMuted, setVolume, setMuted } = useGlobalPlayer();
+  const { playVideo, stopVideo, isActive, volume, isMuted, setVolume, setMuted } = useGlobalPlayer();
   const playerRef = useRef<MediaPlayerInstance>(null);
+
+  // Parar o player global quando o modal é aberto (evita dois vídeos tocando)
+  useEffect(() => {
+    if (isActive) {
+      stopVideo();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Executa apenas na montagem
 
   // Determinar título e subtítulo baseado no tipo de vídeo
   const videoTitle = isLocalVideo(video) ? video.title : video.name;
