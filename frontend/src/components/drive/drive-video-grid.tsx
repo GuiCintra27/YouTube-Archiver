@@ -243,16 +243,19 @@ export default function DriveVideoGrid() {
 
   return (
     <>
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <Cloud className="h-6 w-6" />
-              Vídeos no Drive
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {total} {total === 1 ? "vídeo" : "vídeos"}
-            </p>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="icon-glow p-2">
+              <Cloud className="h-5 w-5 text-cyan" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Vídeos no Drive</h2>
+              <p className="text-sm text-muted-foreground">
+                {total} {total === 1 ? "vídeo" : "vídeos"} encontrados
+              </p>
+            </div>
           </div>
 
           <PaginationControls
@@ -264,20 +267,28 @@ export default function DriveVideoGrid() {
           />
         </div>
 
+        {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <div className="flex items-center justify-center py-16">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-cyan/10 flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-cyan" />
+              </div>
+              <p className="text-sm text-muted-foreground">Carregando vídeos do Drive...</p>
+            </div>
           </div>
         ) : error ? (
-          <Alert variant="destructive">
-            <AlertDescription>
+          <Alert className="bg-red-500/10 border-red-500/20">
+            <AlertDescription className="text-red-400">
               Erro ao carregar vídeos: {error}
             </AlertDescription>
           </Alert>
         ) : videos.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <VideoOff className="h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">
+          <div className="flex flex-col items-center justify-center py-16 text-center glass-card rounded-2xl">
+            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+              <VideoOff className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium text-white mb-2">
               Nenhum vídeo no Drive
             </h3>
             <p className="text-sm text-muted-foreground max-w-md">
@@ -286,7 +297,7 @@ export default function DriveVideoGrid() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {videos.map((video) => (
               <VideoCard
                 key={video.id}
@@ -313,16 +324,18 @@ export default function DriveVideoGrid() {
       {/* Selection Action Bar */}
       {hasSelection && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-          <div className="bg-background border shadow-lg rounded-lg px-4 py-3 flex items-center gap-4">
+          <div className="glass-card rounded-xl px-4 py-3 flex items-center gap-4 shadow-lg shadow-black/20">
             <div className="flex items-center gap-2">
-              <CheckSquare className="h-5 w-5 text-primary" />
-              <span className="font-medium">
+              <div className="w-8 h-8 rounded-lg bg-cyan/10 flex items-center justify-center">
+                <CheckSquare className="h-4 w-4 text-cyan" />
+              </div>
+              <span className="font-medium text-white">
                 {selectedIds.size}{" "}
                 {selectedIds.size === 1 ? "selecionado" : "selecionados"}
               </span>
             </div>
 
-            <div className="h-6 w-px bg-border" />
+            <div className="h-6 w-px bg-white/10" />
 
             <div className="flex items-center gap-2">
               <Button
@@ -330,19 +343,25 @@ export default function DriveVideoGrid() {
                 size="sm"
                 onClick={selectAll}
                 disabled={selectedIds.size === videos.length}
+                className="text-muted-foreground hover:text-white hover:bg-white/10"
               >
                 Selecionar todos
               </Button>
 
-              <Button variant="ghost" size="sm" onClick={clearSelection}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearSelection}
+                className="text-muted-foreground hover:text-white hover:bg-white/10"
+              >
                 <X className="h-4 w-4 mr-1" />
                 Limpar
               </Button>
 
               <Button
-                variant="destructive"
                 size="sm"
                 onClick={() => setBatchDeleteDialogOpen(true)}
+                className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
                 Excluir ({selectedIds.size})
@@ -357,23 +376,29 @@ export default function DriveVideoGrid() {
         open={batchDeleteDialogOpen}
         onOpenChange={setBatchDeleteDialogOpen}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="glass border-white/10">
           <AlertDialogHeader>
-            <AlertDialogTitle>
+            <AlertDialogTitle className="text-white flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-400" />
               Excluir {selectedIds.size} vídeos?
             </AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="text-muted-foreground">
               Tem certeza que deseja excluir {selectedIds.size}{" "}
               {selectedIds.size === 1 ? "vídeo" : "vídeos"} do Google Drive?
               Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel
+              disabled={deleting}
+              className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white"
+            >
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleBatchDeleteConfirm}
               disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
             >
               {deleting ? (
                 <>

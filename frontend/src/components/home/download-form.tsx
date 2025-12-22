@@ -2,13 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -29,11 +22,16 @@ import {
   X,
   Video,
   List,
+  Shield,
+  Settings2,
+  LibraryBig,
 } from "lucide-react";
 import { formatBytes, formatSpeed, formatTime } from "@/lib/utils";
 import { validateUrl, type UrlType } from "@/lib/url-validator";
 import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
+import Link from "next/link";
+import { PATHS } from "@/lib/paths";
 
 interface DownloadProgress {
   status: string;
@@ -290,40 +288,98 @@ export default function DownloadForm() {
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-3xl">YT-Archiver</CardTitle>
-          <CardDescription>
-            Baixe vídeos do YouTube, playlists e streams HLS de forma simples
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* Glass Card Container */}
+      <div className="glass-card rounded-2xl overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-white/5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal to-cyan flex items-center justify-center">
+              <Download className="h-6 w-6 text-navy-dark" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Download</h2>
+              <p className="text-sm text-muted-foreground">
+                Cole a URL e clique em baixar
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 rounded-full text-xs font-medium bg-teal/10 text-teal border border-teal/20">
+              <Shield className="inline h-3 w-3 mr-1" />
+              Anti-ban
+            </span>
+            <Link
+              href={PATHS.LIBRARY}
+              className="px-3 py-1.5 rounded-full text-xs font-medium border border-white/10 text-muted-foreground hover:text-white hover:border-white/20 transition-all flex items-center gap-1"
+            >
+              <LibraryBig className="h-3 w-3" />
+              Biblioteca
+            </Link>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-6">
           {/* Seletor de Tipo */}
           <div className="space-y-3">
-            <Label>Tipo de Download</Label>
+            <Label className="text-white">Tipo de Download</Label>
             <RadioGroup
               value={urlType}
               onValueChange={(value) => setUrlType(value as UrlType)}
               className="flex gap-4"
               disabled={isDownloading}
             >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="video" id="video" />
+              <div
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all ${
+                  urlType === "video"
+                    ? "bg-teal/10 border border-teal/30"
+                    : "bg-white/5 border border-white/10 hover:border-white/20"
+                }`}
+                onClick={() => !isDownloading && setUrlType("video")}
+              >
+                <RadioGroupItem value="video" id="video" className="sr-only" />
+                <Video
+                  className={`h-5 w-5 ${
+                    urlType === "video" ? "text-teal" : "text-muted-foreground"
+                  }`}
+                />
                 <Label
                   htmlFor="video"
-                  className="flex items-center gap-2 cursor-pointer"
+                  className={`cursor-pointer ${
+                    urlType === "video" ? "text-white" : "text-muted-foreground"
+                  }`}
                 >
-                  <Video className="h-4 w-4" />
-                  Vídeo Único
+                  Video Unico
                 </Label>
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="playlist" id="playlist" />
+              <div
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all ${
+                  urlType === "playlist"
+                    ? "bg-teal/10 border border-teal/30"
+                    : "bg-white/5 border border-white/10 hover:border-white/20"
+                }`}
+                onClick={() => !isDownloading && setUrlType("playlist")}
+              >
+                <RadioGroupItem
+                  value="playlist"
+                  id="playlist"
+                  className="sr-only"
+                />
+                <List
+                  className={`h-5 w-5 ${
+                    urlType === "playlist"
+                      ? "text-teal"
+                      : "text-muted-foreground"
+                  }`}
+                />
                 <Label
                   htmlFor="playlist"
-                  className="flex items-center gap-2 cursor-pointer"
+                  className={`cursor-pointer ${
+                    urlType === "playlist"
+                      ? "text-white"
+                      : "text-muted-foreground"
+                  }`}
                 >
-                  <List className="h-4 w-4" />
                   Playlist
                 </Label>
               </div>
@@ -331,11 +387,11 @@ export default function DownloadForm() {
           </div>
 
           {/* URL Input */}
-          <div className="space-y-2">
-            <Label htmlFor="url">
-              {urlType === "video" ? "URL do Vídeo" : "URL da Playlist"}
+          <div className="space-y-3">
+            <Label htmlFor="url" className="text-white">
+              {urlType === "video" ? "URL do Video" : "URL da Playlist"}
             </Label>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <Input
                 id="url"
                 placeholder={
@@ -349,14 +405,17 @@ export default function DownloadForm() {
                 onKeyDown={(e) =>
                   e.key === "Enter" && !validationError && startDownload()
                 }
-                className={validationError ? "border-destructive" : ""}
+                className={`glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground h-12 ${
+                  validationError
+                    ? "border-red-500/50 focus:border-red-500"
+                    : "focus:border-teal/50"
+                }`}
               />
               {!isDownloading ? (
                 <Button
                   onClick={startDownload}
                   disabled={isDownloading || !url.trim() || !!validationError}
-                  size="lg"
-                  className="min-w-[140px]"
+                  className="h-12 px-6 btn-gradient-teal rounded-xl"
                 >
                   <Download className="mr-2 h-4 w-4" />
                   Baixar
@@ -365,8 +424,7 @@ export default function DownloadForm() {
                 <Button
                   onClick={cancelDownload}
                   variant="destructive"
-                  size="lg"
-                  className="min-w-[140px]"
+                  className="h-12 px-6 rounded-xl"
                 >
                   <X className="mr-2 h-4 w-4" />
                   Cancelar
@@ -376,7 +434,10 @@ export default function DownloadForm() {
 
             {/* Validação Error */}
             {validationError && (
-              <Alert variant="destructive">
+              <Alert
+                variant="destructive"
+                className="bg-red-500/10 border-red-500/20"
+              >
                 <AlertDescription>{validationError}</AlertDescription>
               </Alert>
             )}
@@ -384,71 +445,89 @@ export default function DownloadForm() {
 
           {/* Progress Bar */}
           {jobStatus && (
-            <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+            <div className="space-y-4 p-5 rounded-xl bg-white/5 border border-white/10">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   {jobStatus.status === "completed" && (
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    </div>
                   )}
                   {jobStatus.status === "error" && (
-                    <XCircle className="h-5 w-5 text-red-500" />
+                    <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                      <XCircle className="h-5 w-5 text-red-500" />
+                    </div>
                   )}
                   {jobStatus.status === "cancelled" && (
-                    <XCircle className="h-5 w-5 text-orange-500" />
+                    <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center">
+                      <XCircle className="h-5 w-5 text-orange-500" />
+                    </div>
                   )}
-                  {jobStatus.status === "downloading" && (
-                    <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                  {(jobStatus.status === "downloading" ||
+                    jobStatus.status === "pending") && (
+                    <div className="w-10 h-10 rounded-full bg-teal/10 flex items-center justify-center">
+                      <Loader2 className="h-5 w-5 animate-spin text-teal" />
+                    </div>
                   )}
-                  <span className="font-medium">
-                    {jobStatus.status === "completed" && "Download Concluído!"}
-                    {jobStatus.status === "error" && "Erro no Download"}
-                    {jobStatus.status === "cancelled" && "Download Cancelado"}
-                    {jobStatus.status === "downloading" && "Baixando..."}
-                    {jobStatus.status === "pending" && "Aguardando..."}
-                  </span>
+                  <div>
+                    <span className="font-medium text-white">
+                      {jobStatus.status === "completed" && "Download Concluido!"}
+                      {jobStatus.status === "error" && "Erro no Download"}
+                      {jobStatus.status === "cancelled" && "Download Cancelado"}
+                      {jobStatus.status === "downloading" && "Baixando..."}
+                      {jobStatus.status === "pending" && "Aguardando..."}
+                    </span>
+                    {progress.filename && (
+                      <p className="text-sm text-muted-foreground truncate max-w-xs">
+                        {progress.filename}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <span className="text-sm text-muted-foreground">
+                <span className="text-2xl font-bold gradient-teal-text">
                   {Math.round(percentage)}%
                 </span>
               </div>
 
-              <Progress value={percentage} className="h-2" />
+              {/* Custom Progress Bar */}
+              <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-teal to-cyan transition-all duration-300"
+                  style={{ width: `${percentage}%` }}
+                />
+              </div>
 
               {/* Download Stats */}
               {progress.status === "downloading" && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  {progress.filename && (
-                    <div>
-                      <div className="text-muted-foreground">Arquivo</div>
-                      <div className="font-medium truncate">
-                        {progress.filename}
-                      </div>
-                    </div>
-                  )}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {progress.downloaded_bytes !== undefined &&
                     progress.total_bytes && (
-                      <div>
-                        <div className="text-muted-foreground">Tamanho</div>
-                        <div className="font-medium">
+                      <div className="p-3 rounded-lg bg-white/5">
+                        <div className="text-xs text-muted-foreground mb-1">
+                          Tamanho
+                        </div>
+                        <div className="font-medium text-white">
                           {formatBytes(progress.downloaded_bytes)} /{" "}
                           {formatBytes(progress.total_bytes)}
                         </div>
                       </div>
                     )}
                   {progress.speed && (
-                    <div>
-                      <div className="text-muted-foreground">Velocidade</div>
-                      <div className="font-medium">
+                    <div className="p-3 rounded-lg bg-white/5">
+                      <div className="text-xs text-muted-foreground mb-1">
+                        Velocidade
+                      </div>
+                      <div className="font-medium text-white">
                         {formatSpeed(progress.speed)}
                       </div>
                     </div>
                   )}
                   {progress.eta && (
-                    <div>
-                      <div className="text-muted-foreground">
+                    <div className="p-3 rounded-lg bg-white/5">
+                      <div className="text-xs text-muted-foreground mb-1">
                         Tempo Restante
                       </div>
-                      <div className="font-medium">
+                      <div className="font-medium text-white">
                         {formatTime(progress.eta)}
                       </div>
                     </div>
@@ -459,23 +538,23 @@ export default function DownloadForm() {
               {/* Waiting Status */}
               {(progress.status === "waiting" ||
                 progress.status === "batch_waiting") && (
-                <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-                  <AlertDescription className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <div>
-                      <div className="font-medium">{progress.message}</div>
-                      {progress.batch_completed && (
-                        <div className="text-sm text-muted-foreground">
-                          Batch {progress.batch_completed} concluído
-                        </div>
-                      )}
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-teal/5 border border-teal/20">
+                  <Loader2 className="h-4 w-4 animate-spin text-teal" />
+                  <div>
+                    <div className="font-medium text-white">
+                      {progress.message}
                     </div>
-                  </AlertDescription>
-                </Alert>
+                    {progress.batch_completed && (
+                      <div className="text-sm text-muted-foreground">
+                        Batch {progress.batch_completed} concluido
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
 
               {jobStatus.error && (
-                <div className="text-sm text-red-600 dark:text-red-400">
+                <div className="text-sm text-red-400 bg-red-500/10 p-3 rounded-lg">
                   Erro: {jobStatus.error}
                 </div>
               )}
@@ -484,26 +563,39 @@ export default function DownloadForm() {
 
           {/* Advanced Options */}
           <Accordion type="single" collapsible>
-            <AccordionItem value="advanced">
-              <AccordionTrigger>Opções Avançadas</AccordionTrigger>
-              <AccordionContent>
-                <div className="space-y-4 pt-4">
+            <AccordionItem
+              value="advanced"
+              className="border-white/10 rounded-xl overflow-hidden"
+            >
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-white/5 text-white">
+                <div className="flex items-center gap-2">
+                  <Settings2 className="h-4 w-4 text-purple" />
+                  Opcoes Avancadas
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="space-y-6 pt-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Diretório */}
                     <div className="space-y-2">
-                      <Label htmlFor="outDir">Diretório de Saída</Label>
+                      <Label htmlFor="outDir" className="text-white text-sm">
+                        Diretorio de Saida
+                      </Label>
                       <Input
                         id="outDir"
                         value={outDir}
                         onChange={(e) => setOutDir(e.target.value)}
                         placeholder="./downloads"
                         disabled={isDownloading}
+                        className="glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
                       />
                     </div>
 
                     {/* Resolução Máxima */}
                     <div className="space-y-2">
-                      <Label htmlFor="maxRes">Resolução Máxima (altura)</Label>
+                      <Label htmlFor="maxRes" className="text-white text-sm">
+                        Resolucao Maxima (altura)
+                      </Label>
                       <Input
                         id="maxRes"
                         type="number"
@@ -511,74 +603,95 @@ export default function DownloadForm() {
                         onChange={(e) => setMaxRes(e.target.value)}
                         placeholder="1080"
                         disabled={isDownloading}
+                        className="glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
                       />
                     </div>
 
                     {/* Caminho Customizado */}
                     <div className="space-y-2">
-                      <Label htmlFor="customPath">Subpasta Personalizada</Label>
+                      <Label
+                        htmlFor="customPath"
+                        className="text-white text-sm"
+                      >
+                        Subpasta Personalizada
+                      </Label>
                       <Input
                         id="customPath"
                         value={customPath}
                         onChange={(e) => setCustomPath(e.target.value)}
-                        placeholder="Curso/Módulo 01"
+                        placeholder="Curso/Modulo 01"
                         disabled={isDownloading}
+                        className="glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
                       />
                     </div>
 
                     {/* Nome do Arquivo */}
                     <div className="space-y-2">
-                      <Label htmlFor="fileName">Nome do Arquivo</Label>
+                      <Label htmlFor="fileName" className="text-white text-sm">
+                        Nome do Arquivo
+                      </Label>
                       <Input
                         id="fileName"
                         value={fileName}
                         onChange={(e) => setFileName(e.target.value)}
-                        placeholder="Aula 01 - Introdução"
+                        placeholder="Aula 01 - Introducao"
                         disabled={isDownloading}
+                        className="glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
                       />
                     </div>
 
                     {/* Referer */}
                     <div className="space-y-2">
-                      <Label htmlFor="referer">Header Referer</Label>
+                      <Label htmlFor="referer" className="text-white text-sm">
+                        Header Referer
+                      </Label>
                       <Input
                         id="referer"
                         value={referer}
                         onChange={(e) => setReferer(e.target.value)}
                         placeholder="https://example.com"
                         disabled={isDownloading}
+                        className="glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
                       />
                     </div>
 
                     {/* Origin */}
                     <div className="space-y-2">
-                      <Label htmlFor="origin">Header Origin</Label>
+                      <Label htmlFor="origin" className="text-white text-sm">
+                        Header Origin
+                      </Label>
                       <Input
                         id="origin"
                         value={origin}
                         onChange={(e) => setOrigin(e.target.value)}
                         placeholder="https://example.com"
                         disabled={isDownloading}
+                        className="glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
                       />
                     </div>
 
                     {/* Cookies File */}
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="cookies">Arquivo de Cookies</Label>
+                      <Label htmlFor="cookies" className="text-white text-sm">
+                        Arquivo de Cookies
+                      </Label>
                       <Input
                         id="cookies"
                         value={cookiesFile}
                         onChange={(e) => setCookiesFile(e.target.value)}
                         placeholder="./cookies.txt"
                         disabled={isDownloading}
+                        className="glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
                       />
                     </div>
                   </div>
 
                   {/* Switches */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="subs">Baixar Legendas</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-white/10">
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                      <Label htmlFor="subs" className="text-white">
+                        Baixar Legendas
+                      </Label>
                       <Switch
                         id="subs"
                         checked={subs}
@@ -587,8 +700,10 @@ export default function DownloadForm() {
                       />
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="autoSubs">Legendas Automáticas</Label>
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                      <Label htmlFor="autoSubs" className="text-white">
+                        Legendas Automaticas
+                      </Label>
                       <Switch
                         id="autoSubs"
                         checked={autoSubs}
@@ -597,8 +712,10 @@ export default function DownloadForm() {
                       />
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="thumbnails">Baixar Miniaturas</Label>
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                      <Label htmlFor="thumbnails" className="text-white">
+                        Baixar Miniaturas
+                      </Label>
                       <Switch
                         id="thumbnails"
                         checked={thumbnails}
@@ -607,8 +724,10 @@ export default function DownloadForm() {
                       />
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="audioOnly">Apenas Áudio (MP3)</Label>
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                      <Label htmlFor="audioOnly" className="text-white">
+                        Apenas Audio (MP3)
+                      </Label>
                       <Switch
                         id="audioOnly"
                         checked={audioOnly}
@@ -619,11 +738,14 @@ export default function DownloadForm() {
                   </div>
 
                   {/* Anti-Ban Settings */}
-                  <div className="space-y-4 pt-4 border-t">
-                    <div className="flex items-center justify-between mb-2">
+                  <div className="space-y-4 pt-4 border-t border-white/10">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="icon-glow-yellow p-2">
+                        <Shield className="h-4 w-4 text-yellow" />
+                      </div>
                       <div>
-                        <Label className="text-base font-semibold">
-                          Proteção Anti-Ban
+                        <Label className="text-base font-semibold text-white">
+                          Protecao Anti-Ban
                         </Label>
                         <p className="text-sm text-muted-foreground">
                           Evite bloqueios ao baixar playlists grandes
@@ -634,8 +756,11 @@ export default function DownloadForm() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Delay Between Downloads */}
                       <div className="space-y-2">
-                        <Label htmlFor="delayBetweenDownloads">
-                          Delay Entre Vídeos (segundos)
+                        <Label
+                          htmlFor="delayBetweenDownloads"
+                          className="text-white text-sm"
+                        >
+                          Delay Entre Videos (segundos)
                         </Label>
                         <Input
                           id="delayBetweenDownloads"
@@ -647,15 +772,21 @@ export default function DownloadForm() {
                           }
                           placeholder="0"
                           disabled={isDownloading}
+                          className="glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
                         />
                         <p className="text-xs text-muted-foreground">
-                          Pausa entre cada vídeo (recomendado: 2-5s)
+                          Pausa entre cada video (recomendado: 2-5s)
                         </p>
                       </div>
 
                       {/* Batch Size */}
                       <div className="space-y-2">
-                        <Label htmlFor="batchSize">Vídeos por Batch</Label>
+                        <Label
+                          htmlFor="batchSize"
+                          className="text-white text-sm"
+                        >
+                          Videos por Batch
+                        </Label>
                         <Input
                           id="batchSize"
                           type="number"
@@ -664,6 +795,7 @@ export default function DownloadForm() {
                           onChange={(e) => setBatchSize(e.target.value)}
                           placeholder="Desabilitado"
                           disabled={isDownloading}
+                          className="glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
                         />
                         <p className="text-xs text-muted-foreground">
                           Agrupar downloads em batches (ex: 5)
@@ -672,7 +804,10 @@ export default function DownloadForm() {
 
                       {/* Batch Delay */}
                       <div className="space-y-2">
-                        <Label htmlFor="batchDelay">
+                        <Label
+                          htmlFor="batchDelay"
+                          className="text-white text-sm"
+                        >
                           Delay Entre Batches (segundos)
                         </Label>
                         <Input
@@ -683,6 +818,7 @@ export default function DownloadForm() {
                           onChange={(e) => setBatchDelay(e.target.value)}
                           placeholder="0"
                           disabled={isDownloading}
+                          className="glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
                         />
                         <p className="text-xs text-muted-foreground">
                           Pausa maior entre grupos (recomendado: 10-30s)
@@ -691,8 +827,11 @@ export default function DownloadForm() {
 
                       {/* Randomize Delay */}
                       <div className="space-y-2">
-                        <div className="flex items-center justify-between h-10">
-                          <Label htmlFor="randomizeDelay">
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 h-10">
+                          <Label
+                            htmlFor="randomizeDelay"
+                            className="text-white"
+                          >
                             Randomizar Delays
                           </Label>
                           <Switch
@@ -709,7 +848,7 @@ export default function DownloadForm() {
                     </div>
 
                     {/* Presets */}
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="flex gap-2 flex-wrap pt-2">
                       <Button
                         type="button"
                         variant="outline"
@@ -721,8 +860,10 @@ export default function DownloadForm() {
                           setBatchDelay("30");
                           setRandomizeDelay(true);
                         }}
+                        className="bg-white/5 border-white/10 hover:bg-white/10 hover:border-teal/30 text-white"
                       >
-                        🛡️ Seguro
+                        <Shield className="h-3 w-3 mr-1 text-teal" />
+                        Seguro
                       </Button>
                       <Button
                         type="button"
@@ -735,8 +876,10 @@ export default function DownloadForm() {
                           setBatchDelay("15");
                           setRandomizeDelay(true);
                         }}
+                        className="bg-white/5 border-white/10 hover:bg-white/10 hover:border-yellow/30 text-white"
                       >
-                        ⚖️ Moderado
+                        <Settings2 className="h-3 w-3 mr-1 text-yellow" />
+                        Moderado
                       </Button>
                       <Button
                         type="button"
@@ -749,8 +892,10 @@ export default function DownloadForm() {
                           setBatchDelay("0");
                           setRandomizeDelay(false);
                         }}
+                        className="bg-white/5 border-white/10 hover:bg-white/10 hover:border-purple/30 text-white"
                       >
-                        ⚡ Rápido (sem proteção)
+                        <Download className="h-3 w-3 mr-1 text-purple" />
+                        Rapido
                       </Button>
                     </div>
                   </div>
@@ -758,8 +903,8 @@ export default function DownloadForm() {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

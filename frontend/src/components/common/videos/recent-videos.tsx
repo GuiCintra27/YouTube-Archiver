@@ -2,11 +2,10 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Loader2, VideoOff, LibraryBig } from "lucide-react";
+import { Loader2, VideoOff, LibraryBig, Play } from "lucide-react";
 import VideoCard from "@/components/common/videos/video-card";
 import VideoPlayer from "@/components/common/videos/video-player";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { PATHS } from "@/lib/paths";
 import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
@@ -31,7 +30,7 @@ interface RecentVideosProps {
 }
 
 export default function RecentVideos({
-  title = "Últimos vídeos",
+  title = "Ultimos videos",
   limit = 4,
   refreshToken,
   ctaLabel = "Ver biblioteca completa",
@@ -85,30 +84,56 @@ export default function RecentVideos({
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <LibraryBig className="h-5 w-5 text-primary" />
-          <h2 className="text-2xl font-bold">{title}</h2>
+        <div className="flex items-center gap-3">
+          <div className="icon-glow">
+            <LibraryBig className="h-5 w-5 text-teal" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-white">{title}</h2>
+            <p className="text-sm text-muted-foreground">
+              Videos baixados recentemente
+            </p>
+          </div>
         </div>
-        <Button variant="outline" size="sm">
-          <Link href={ctaHref}>{ctaLabel}</Link>
-        </Button>
+        <Link
+          href={ctaHref}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 text-muted-foreground hover:text-white hover:border-teal/30 hover:bg-white/5 transition-all duration-300"
+        >
+          <Play className="h-4 w-4" />
+          <span className="hidden sm:inline">{ctaLabel}</span>
+        </Link>
       </div>
 
+      {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center py-10">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <div className="flex items-center justify-center py-16">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-teal/10 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-teal" />
+            </div>
+            <p className="text-sm text-muted-foreground">Carregando videos...</p>
+          </div>
         </div>
       ) : error ? (
-        <Alert variant="destructive">
-          <AlertDescription>Erro ao carregar vídeos: {error}</AlertDescription>
+        <Alert
+          variant="destructive"
+          className="bg-red-500/10 border-red-500/20"
+        >
+          <AlertDescription>Erro ao carregar videos: {error}</AlertDescription>
         </Alert>
       ) : videos.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 text-center">
-          <VideoOff className="h-12 w-12 text-muted-foreground mb-3" />
-          <p className="text-sm text-muted-foreground">
-            Nenhum vídeo encontrado.
+        <div className="flex flex-col items-center justify-center py-16 text-center glass-card rounded-2xl">
+          <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+            <VideoOff className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-medium text-white mb-2">
+            Nenhum video encontrado
+          </h3>
+          <p className="text-sm text-muted-foreground max-w-md">
+            Baixe seu primeiro video usando o formulario acima. Seus videos aparecera aqui.
           </p>
         </div>
       ) : (

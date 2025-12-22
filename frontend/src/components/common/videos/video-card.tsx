@@ -156,9 +156,9 @@ export default function VideoCard({
   return (
     <>
       <div
-        className={`group relative flex flex-col cursor-pointer hover:bg-gray-200/35 dark:hover:bg-white/10 rounded-xl ${
+        className={`group relative flex flex-col cursor-pointer glass-card rounded-xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:border-white/20 ${
           selected
-            ? "ring-2 transition-all duration-300 ring-gray-200/70 dark:ring-white/70 rounded-xl"
+            ? "ring-2 ring-teal/50 border-teal/30"
             : ""
         }`}
         onClick={handleCardClick}
@@ -166,7 +166,7 @@ export default function VideoCard({
         {/* Checkbox for selection mode */}
         {selectable && (
           <div
-            className={`flex absolute top-9 left-7 z-10 transition-opacity duration-200 ${
+            className={`flex absolute top-3 left-3 z-10 transition-opacity duration-200 ${
               selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             }`}
             data-no-play
@@ -175,102 +175,110 @@ export default function VideoCard({
             <Checkbox
               checked={selected}
               onCheckedChange={(checked) => onSelectionChange?.(!!checked)}
-              className="h-5 w-5 bg-background/30 backdrop-blur-[2px] border-2 border-gray-300 dark:border-gray-200 data-[state=checked]:bg-gray-500/50 data-[state=checked]:text-white"
+              className="h-5 w-5 bg-black/50 backdrop-blur-sm border-2 border-white/50 data-[state=checked]:bg-teal data-[state=checked]:text-navy-dark data-[state=checked]:border-teal"
             />
           </div>
         )}
 
-        <div className="p-4 py-6">
-          {/* Thumbnail Container */}
-          <div className="relative aspect-video bg-muted overflow-hidden rounded-xl">
-            {thumbnailUrl && !imageError ? (
-              <img
-                src={thumbnailUrl}
-                alt={title}
-                className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
-                onError={() => setImageError(true)}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-muted">
-                <Play className="h-16 w-16 text-muted-foreground/50" />
+        {/* Thumbnail Container */}
+        <div className="relative aspect-video bg-navy overflow-hidden">
+          {thumbnailUrl && !imageError ? (
+            <img
+              src={thumbnailUrl}
+              alt={title}
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-navy-light">
+              <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
+                <Play className="h-8 w-8 text-muted-foreground" />
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Duration badge */}
-            {duration && (
-              <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs font-medium px-1.5 py-0.5 rounded">
-                {duration}
-              </div>
-            )}
+          {/* Duration badge */}
+          {duration && (
+            <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm text-white text-xs font-medium px-2 py-1 rounded-md">
+              {duration}
+            </div>
+          )}
 
-            {/* Hover overlay */}
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+          {/* Hover overlay with play button */}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-teal to-cyan flex items-center justify-center transform scale-75 group-hover:scale-100 transition-transform duration-300">
+              <Play className="h-6 w-6 text-navy-dark ml-1" />
+            </div>
+          </div>
+        </div>
+
+        {/* Info */}
+        <div className="flex gap-3 p-4">
+          <div className="flex-1 min-w-0">
+            <h3
+              className="font-medium line-clamp-2 text-sm leading-snug mb-1 text-white"
+              title={title}
+            >
+              {title}
+            </h3>
+            <p
+              className="text-xs text-muted-foreground truncate"
+              title={channel}
+            >
+              {channel}
+            </p>
           </div>
 
-          {/* Info */}
-          <div className="flex gap-3 pt-3 px-1">
-            <div className="flex-1 min-w-0">
-              <h3
-                className="font-medium line-clamp-2 text-sm leading-snug mb-1"
-                title={title}
-              >
-                {title}
-              </h3>
-              <p
-                className="text-xs text-muted-foreground truncate"
-                title={channel}
-              >
-                {channel}
-              </p>
-            </div>
-
-            {/* Menu de ações */}
-            <div data-no-play onClick={(e) => e.stopPropagation()}>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 -mt-1">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {editable && (
-                    <DropdownMenuItem
-                      onClick={handleOpenEditDialog}
-                      className="cursor-pointer"
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Editar
-                    </DropdownMenuItem>
-                  )}
+          {/* Menu de ações */}
+          <div data-no-play onClick={(e) => e.stopPropagation()}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 -mt-1 text-muted-foreground hover:text-white hover:bg-white/10"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="glass border-white/10">
+                {editable && (
                   <DropdownMenuItem
-                    onClick={() => setShowInfoDialog(true)}
-                    className="cursor-pointer"
+                    onClick={handleOpenEditDialog}
+                    className="cursor-pointer text-white focus:bg-white/10 focus:text-white"
                   >
-                    <Info className="mr-2 h-4 w-4" />
-                    Informações
+                    <Pencil className="mr-2 h-4 w-4 text-purple" />
+                    Editar
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="cursor-pointer text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Excluir
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                )}
+                <DropdownMenuItem
+                  onClick={() => setShowInfoDialog(true)}
+                  className="cursor-pointer text-white focus:bg-white/10 focus:text-white"
+                >
+                  <Info className="mr-2 h-4 w-4 text-teal" />
+                  Informacoes
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="cursor-pointer text-red-400 focus:bg-red-500/10 focus:text-red-400"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Excluir
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
 
       {/* Dialog de informações */}
       <Dialog open={showInfoDialog} onOpenChange={setShowInfoDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md glass border-white/10">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileVideo className="h-5 w-5 text-primary" />
-              Informações do Vídeo
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <FileVideo className="h-5 w-5 text-teal" />
+              Informacoes do Video
             </DialogTitle>
           </DialogHeader>
 
@@ -278,9 +286,9 @@ export default function VideoCard({
             {/* Título completo */}
             <div className="space-y-1.5">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Título
+                Titulo
               </p>
-              <p className="text-sm font-medium leading-relaxed break-words">
+              <p className="text-sm font-medium leading-relaxed break-words text-white">
                 {title}
               </p>
             </div>
@@ -289,22 +297,22 @@ export default function VideoCard({
             <div className="grid grid-cols-2 gap-4">
               {/* Duração */}
               {duration && (
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                  <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-white/5">
+                  <Clock className="h-4 w-4 text-teal mt-0.5" />
                   <div>
-                    <p className="text-xs text-muted-foreground">Duração</p>
-                    <p className="text-sm font-medium">{duration}</p>
+                    <p className="text-xs text-muted-foreground">Duracao</p>
+                    <p className="text-sm font-medium text-white">{duration}</p>
                   </div>
                 </div>
               )}
 
               {/* Tamanho */}
               {size !== undefined && (
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                  <HardDrive className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-white/5">
+                  <HardDrive className="h-4 w-4 text-purple mt-0.5" />
                   <div>
                     <p className="text-xs text-muted-foreground">Tamanho</p>
-                    <p className="text-sm font-medium">{formatBytes(size)}</p>
+                    <p className="text-sm font-medium text-white">{formatBytes(size)}</p>
                   </div>
                 </div>
               )}
@@ -312,21 +320,21 @@ export default function VideoCard({
 
             {/* Data de download */}
             {createdAt && formatDate(createdAt) && (
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                <Calendar className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-white/5">
+                <Calendar className="h-4 w-4 text-yellow mt-0.5" />
                 <div>
                   <p className="text-xs text-muted-foreground">Data de download</p>
-                  <p className="text-sm font-medium">{formatDate(createdAt)}</p>
+                  <p className="text-sm font-medium text-white">{formatDate(createdAt)}</p>
                 </div>
               </div>
             )}
 
             {/* Canal */}
-            <div className="space-y-1.5 pt-2 border-t">
+            <div className="space-y-1.5 pt-2 border-t border-white/10">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Canal
               </p>
-              <p className="text-sm">{channel}</p>
+              <p className="text-sm text-white">{channel}</p>
             </div>
           </div>
         </DialogContent>
@@ -334,19 +342,21 @@ export default function VideoCard({
 
       {/* Dialog de confirmação de exclusão */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="glass border-white/10">
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir vídeo?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação não pode ser desfeita. O vídeo &quot;{title}&quot; será
-              permanentemente excluído do seu dispositivo.
+            <AlertDialogTitle className="text-white">Excluir video?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              Esta acao nao pode ser desfeita. O video &quot;{title}&quot; sera
+              permanentemente excluido do seu dispositivo.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white">
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
             >
               Excluir
             </AlertDialogAction>
@@ -356,31 +366,32 @@ export default function VideoCard({
 
       {/* Dialog de edição */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md glass border-white/10">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Pencil className="h-5 w-5 text-primary" />
-              Editar Vídeo
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <Pencil className="h-5 w-5 text-purple" />
+              Editar Video
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-6 pt-2">
             {/* Nome do vídeo */}
             <div className="space-y-2">
-              <Label htmlFor="video-title">Nome do vídeo</Label>
+              <Label htmlFor="video-title" className="text-white">Nome do video</Label>
               <Input
                 id="video-title"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
                 placeholder="Digite o novo nome"
+                className="glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
               />
             </div>
 
             {/* Upload de thumbnail */}
             <div className="space-y-2">
-              <Label>Thumbnail</Label>
+              <Label className="text-white">Thumbnail</Label>
               <div
-                className="relative border-2 border-dashed rounded-lg p-4 hover:border-primary/50 transition-colors cursor-pointer"
+                className="relative border-2 border-dashed border-white/10 rounded-lg p-4 hover:border-teal/50 transition-colors cursor-pointer"
                 onClick={() => fileInputRef.current?.click()}
               >
                 <input
@@ -434,12 +445,14 @@ export default function VideoCard({
               variant="outline"
               onClick={() => setShowEditDialog(false)}
               disabled={isSaving}
+              className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white"
             >
               Cancelar
             </Button>
             <Button
               onClick={handleSaveEdit}
               disabled={isSaving || !editTitle.trim()}
+              className="btn-gradient-teal"
             >
               {isSaving ? (
                 <>

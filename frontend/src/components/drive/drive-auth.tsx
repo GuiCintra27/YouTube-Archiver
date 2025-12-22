@@ -2,15 +2,8 @@
 
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Cloud, Loader2, ShieldAlert } from "lucide-react";
+import { Cloud, Loader2, ShieldAlert, Shield, Link } from "lucide-react";
 import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
 
@@ -98,30 +91,37 @@ export default function DriveAuth({ onAuthenticated }: DriveAuthProps) {
   }, [apiUrl, onAuthenticated]);
 
   return (
-    <div className="flex items-center justify-center min-h-[500px]">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-            <Cloud className="h-8 w-8 text-primary" />
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="glass-card rounded-2xl w-full max-w-md overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-white/10 text-center">
+          <div className="flex justify-center mb-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-cyan/20 blur-xl rounded-full" />
+              <div className="relative w-16 h-16 rounded-xl bg-gradient-to-br from-cyan to-teal flex items-center justify-center">
+                <Cloud className="h-8 w-8 text-navy-dark" />
+              </div>
+            </div>
           </div>
-          <CardTitle>Conectar ao Google Drive</CardTitle>
-          <CardDescription>
-            Autentique-se para visualizar e gerenciar seus vídeos no Google
-            Drive
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          <h2 className="text-xl font-bold text-white">Conectar ao Google Drive</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Autentique-se para visualizar e gerenciar seus vídeos no Google Drive
+          </p>
+        </div>
+
+        {/* Content */}
+        <div className="px-6 py-5 space-y-4">
           {error && (
-            <Alert variant="destructive">
-              <ShieldAlert className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+            <Alert className="bg-red-500/10 border-red-500/20">
+              <ShieldAlert className="h-4 w-4 text-red-400" />
+              <AlertDescription className="text-red-400">{error}</AlertDescription>
             </Alert>
           )}
 
           <Button
             onClick={handleAuth}
             disabled={loading}
-            className="w-full"
+            className="w-full btn-gradient-cyan"
             size="lg"
           >
             {loading ? (
@@ -131,24 +131,32 @@ export default function DriveAuth({ onAuthenticated }: DriveAuthProps) {
               </>
             ) : (
               <>
-                <Cloud className="mr-2 h-4 w-4" />
+                <Link className="mr-2 h-4 w-4" />
                 Conectar com Google Drive
               </>
             )}
           </Button>
 
-          <div className="text-xs text-muted-foreground text-center space-y-2">
-            <p>
-              Ao conectar, você será redirecionado para o Google para autorizar
-              o acesso ao Drive.
-            </p>
-            <p className="font-medium">
-              ⚠️ Certifique-se de que o arquivo credentials.json está
-              configurado no backend.
-            </p>
+          {/* Info */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-white/5">
+              <Shield className="h-4 w-4 text-cyan mt-0.5" />
+              <p className="text-xs text-muted-foreground">
+                Ao conectar, você será redirecionado para o Google para autorizar
+                o acesso ao Drive.
+              </p>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-yellow/5 border border-yellow/20">
+              <ShieldAlert className="h-4 w-4 text-yellow mt-0.5" />
+              <p className="text-xs text-yellow/80">
+                Certifique-se de que o arquivo <code className="text-yellow">credentials.json</code> está
+                configurado no backend.
+              </p>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

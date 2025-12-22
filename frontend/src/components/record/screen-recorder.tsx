@@ -2,23 +2,24 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Download,
-  MonitorDown,
+  MonitorPlay,
   RefreshCw,
   Save,
   StopCircle,
+  Play,
+  Volume2,
+  Mic,
+  FileVideo,
+  AlertCircle,
+  CheckCircle2,
+  Info,
+  Eye,
 } from "lucide-react";
 import {
   Dialog,
@@ -53,7 +54,7 @@ const defaultFileName = () => {
 
 const sanitizeFileName = (name: string) => {
   const trimmed = name.trim() || defaultFileName();
-  const safe = trimmed.replace(/[<>:\"/\\|?*\x00-\x1F]/g, "").slice(0, 120);
+  const safe = trimmed.replace(/[<>:"/\\|?*\x00-\x1F]/g, "").slice(0, 120);
   if (safe.toLowerCase().endsWith(".webm")) {
     return safe;
   }
@@ -331,74 +332,129 @@ export default function ScreenRecorder({
   const actionsDisabled = state === "recording" && uploading;
 
   return (
-    <Card className="border-primary/10">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MonitorDown className="h-5 w-5 text-primary" />
-          Gravar tela
-        </CardTitle>
-        <CardDescription>
-          Capture a tela pelo navegador com áudio do sistema e/ou microfone.
-          Baixe o arquivo e, opcionalmente, salve uma cópia na pasta de vídeos.
-        </CardDescription>
-      </CardHeader>
+    <div className="glass-card rounded-2xl overflow-hidden">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="icon-glow-purple p-2">
+            <MonitorPlay className="h-5 w-5 text-purple" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white">Gravador de Tela</h3>
+            <p className="text-sm text-muted-foreground">
+              Capture a tela pelo navegador com áudio do sistema e/ou microfone
+            </p>
+          </div>
+        </div>
+      </div>
 
-      <CardContent className="space-y-6">
+      {/* Content */}
+      <div className="p-5 space-y-5">
+        {/* Status Messages */}
         {(error || uploadMessage || statusMessage) && (
-          <Alert variant={error ? "destructive" : "default"}>
-            <AlertDescription>
-              {error || uploadMessage || statusMessage}
-              {blobSize
-                ? ` • Tamanho: ${(blobSize / (1024 * 1024)).toFixed(1)} MB`
-                : ""}
-            </AlertDescription>
+          <Alert
+            className={`${
+              error
+                ? "bg-red-500/10 border-red-500/20 text-red-400"
+                : uploadMessage
+                ? "bg-teal/10 border-teal/20 text-teal"
+                : "bg-purple/10 border-purple/20 text-purple-light"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {error ? (
+                <AlertCircle className="h-4 w-4" />
+              ) : uploadMessage ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : (
+                <Info className="h-4 w-4" />
+              )}
+              <AlertDescription className="text-sm">
+                {error || uploadMessage || statusMessage}
+                {blobSize
+                  ? ` • Tamanho: ${(blobSize / (1024 * 1024)).toFixed(1)} MB`
+                  : ""}
+              </AlertDescription>
+            </div>
           </Alert>
         )}
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Recording Indicator */}
+        {state === "recording" && (
+          <div className="flex items-center justify-center gap-2 py-3">
+            <div className="relative">
+              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+              <div className="absolute inset-0 w-3 h-3 bg-red-500 rounded-full animate-ping" />
+            </div>
+            <span className="text-base font-medium text-red-400">Gravando...</span>
+          </div>
+        )}
+
+        {/* Settings */}
+        <div className="space-y-4">
+          {/* File Name */}
           <div className="space-y-2">
-            <Label htmlFor="fileName">Nome do arquivo</Label>
+            <Label htmlFor="fileName" className="text-white flex items-center gap-2">
+              <FileVideo className="h-4 w-4 text-muted-foreground" />
+              Nome do arquivo
+            </Label>
             <Input
               id="fileName"
               value={fileName}
               onChange={(e) => setFileName(e.target.value)}
               placeholder="gravacao.webm"
               disabled={state === "recording"}
+              className="glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
             />
           </div>
 
-          <div className="flex items-center justify-between rounded-md border px-4 py-3">
-            <div>
-              <p className="text-sm font-medium">Áudio do sistema</p>
-              <p className="text-xs text-muted-foreground">
-                Som da aba/desktop
-              </p>
+          {/* Audio Toggles */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {/* System Audio Toggle */}
+            <div className="glass rounded-xl p-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-teal/10 flex items-center justify-center">
+                  <Volume2 className="h-4 w-4 text-teal" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">Áudio do sistema</p>
+                  <p className="text-xs text-muted-foreground">Som da aba/desktop</p>
+                </div>
+              </div>
+              <Switch
+                checked={captureSystemAudio}
+                onCheckedChange={setCaptureSystemAudio}
+                disabled={state === "recording"}
+                className="data-[state=checked]:bg-teal"
+              />
             </div>
-            <Switch
-              checked={captureSystemAudio}
-              onCheckedChange={setCaptureSystemAudio}
-              disabled={state === "recording"}
-            />
-          </div>
 
-          <div className="flex items-center justify-between rounded-md border px-4 py-3">
-            <div>
-              <p className="text-sm font-medium">Microfone</p>
-              <p className="text-xs text-muted-foreground">
-                Gravar sua voz
-              </p>
+            {/* Microphone Toggle */}
+            <div className="glass rounded-xl p-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-purple/10 flex items-center justify-center">
+                  <Mic className="h-4 w-4 text-purple" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">Microfone</p>
+                  <p className="text-xs text-muted-foreground">Gravar sua voz</p>
+                </div>
+              </div>
+              <Switch
+                checked={captureMicrophone}
+                onCheckedChange={setCaptureMicrophone}
+                disabled={state === "recording"}
+                className="data-[state=checked]:bg-purple"
+              />
             </div>
-            <Switch
-              checked={captureMicrophone}
-              onCheckedChange={setCaptureMicrophone}
-              disabled={state === "recording"}
-            />
           </div>
         </div>
 
+        {/* Linux Warning */}
         {isLinux && captureSystemAudio && state !== "recording" && (
-          <Alert>
-            <AlertDescription>
+          <Alert className="bg-yellow/10 border-yellow/20">
+            <AlertCircle className="h-4 w-4 text-yellow" />
+            <AlertDescription className="text-yellow-light text-sm">
               <strong>Linux:</strong> A captura de áudio do sistema pode não
               funcionar. Ao compartilhar, selecione uma{" "}
               <strong>&quot;Aba do Chrome&quot;</strong> (não janela/tela) e
@@ -407,20 +463,24 @@ export default function ScreenRecorder({
           </Alert>
         )}
 
-        <div className="flex flex-wrap gap-3">
-          {state !== "recording" && (
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {state !== "recording" && state !== "ready" && (
             <Button
               onClick={startRecording}
-              disabled={state.toString() === RecorderState.RECORDING}
+              className="btn-gradient-purple gap-2"
             >
-              <MonitorDown className="mr-2 h-4 w-4" />
+              <Play className="h-4 w-4" />
               Iniciar gravação
             </Button>
           )}
 
           {state === "recording" && (
-            <Button variant="destructive" onClick={stopRecording}>
-              <StopCircle className="mr-2 h-4 w-4" />
+            <Button
+              onClick={stopRecording}
+              className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 gap-2"
+            >
+              <StopCircle className="h-4 w-4" />
               Parar gravação
             </Button>
           )}
@@ -428,76 +488,100 @@ export default function ScreenRecorder({
           {state === "ready" && (
             <>
               <Button
-                variant="secondary"
                 onClick={downloadRecording}
                 disabled={actionsDisabled}
+                className="btn-gradient-teal gap-1.5"
+                size="sm"
               >
-                <Download className="mr-2 h-4 w-4" />
+                <Download className="h-3.5 w-3.5" />
                 Baixar
               </Button>
+
               <Button
-                variant="outline"
                 onClick={() => setPreviewOpen(true)}
                 disabled={!blobUrl}
+                variant="outline"
+                className="bg-white/5 border-white/10 text-white hover:bg-white/10 gap-1.5"
+                size="sm"
               >
-                Visualizar vídeo
+                <Eye className="h-3.5 w-3.5" />
+                Visualizar
               </Button>
-              <div className="flex items-center gap-2">
+
+              <div className="flex items-center gap-2 px-3 py-1.5 glass rounded-lg">
                 <Switch
                   checked={saveToLibrary}
                   onCheckedChange={setSaveToLibrary}
                   id="saveToLibrary"
+                  className="data-[state=checked]:bg-yellow scale-90"
                 />
-                <Label htmlFor="saveToLibrary" className="text-sm">
-                  Salvar cópia na pasta de downloads
+                <Label htmlFor="saveToLibrary" className="text-xs text-white cursor-pointer">
+                  Salvar na biblioteca
                 </Label>
               </div>
+
               <Button
                 onClick={saveRecordingToLibrary}
                 disabled={!saveToLibrary || uploading}
-                variant="default"
+                className="btn-gradient-yellow gap-1.5"
+                size="sm"
               >
                 {uploading ? (
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Save className="mr-2 h-4 w-4" />
+                  <Save className="h-3.5 w-3.5" />
                 )}
-                Enviar para a biblioteca
+                Enviar
               </Button>
-              <Button variant="ghost" onClick={resetRecorder}>
+
+              <Button
+                onClick={resetRecorder}
+                variant="ghost"
+                className="text-muted-foreground hover:text-white hover:bg-white/10"
+                size="sm"
+              >
                 Resetar
               </Button>
             </>
           )}
         </div>
 
-        <p className="text-sm text-muted-foreground">
-          <strong>Dica:</strong> Para capturar áudio do sistema, marque
-          &quot;Compartilhar áudio&quot; no diálogo do navegador ao selecionar a
-          aba/janela. Se habilitar ambas as fontes (sistema + microfone), os
-          áudios serão mixados automaticamente.
-        </p>
-      </CardContent>
+        {/* Tips */}
+        <div className="glass rounded-lg p-3">
+          <p className="text-xs text-muted-foreground">
+            <span className="text-teal font-medium">Dica:</span> Para capturar áudio do sistema, marque
+            &quot;Compartilhar áudio&quot; no diálogo do navegador ao selecionar a
+            aba/janela. Se habilitar ambas as fontes (sistema + microfone), os
+            áudios serão mixados automaticamente.
+          </p>
+        </div>
+      </div>
 
+      {/* Preview Dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl glass border-white/10">
           <DialogHeader>
-            <DialogTitle>Pré-visualização</DialogTitle>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Eye className="h-5 w-5 text-purple" />
+              Pré-visualização
+            </DialogTitle>
           </DialogHeader>
           {blobUrl ? (
-            <video
-              key={blobUrl}
-              src={blobUrl}
-              controls
-              className="w-full h-auto rounded-lg"
-            />
+            <div className="rounded-xl overflow-hidden bg-black">
+              <video
+                key={blobUrl}
+                src={blobUrl}
+                controls
+                className="w-full h-auto"
+              />
+            </div>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              Nenhuma gravação disponível.
-            </p>
+            <div className="flex items-center justify-center py-12 text-muted-foreground">
+              <p className="text-sm">Nenhuma gravação disponível.</p>
+            </div>
           )}
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
   );
 }

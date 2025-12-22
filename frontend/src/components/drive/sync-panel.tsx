@@ -1,18 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  ArrowUpCircle,
+  FolderSync,
   Loader2,
   RefreshCw,
   CheckCircle2,
@@ -466,11 +459,16 @@ export default function SyncPanel() {
 
   if (loading && !syncStatus) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
+      <div className="glass-card rounded-2xl">
+        <div className="flex items-center justify-center py-12">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-purple/10 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-purple" />
+            </div>
+            <p className="text-sm text-muted-foreground">Carregando status...</p>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -481,28 +479,35 @@ export default function SyncPanel() {
     : 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ArrowUpCircle className="h-5 w-5" />
-          Sincronização Local → Drive
-        </CardTitle>
-        <CardDescription>
-          Gerencie seus vídeos entre armazenamento local e Google Drive
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <div className="glass-card rounded-2xl overflow-hidden">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="icon-glow-purple p-2">
+            <FolderSync className="h-5 w-5 text-purple" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-white">Sincronização Local ↔ Drive</h3>
+            <p className="text-xs text-muted-foreground">
+              Gerencie seus vídeos entre armazenamento local e Google Drive
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-5 space-y-5">
         {error && (
-          <Alert variant="destructive">
-            <XCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+          <Alert className="bg-red-500/10 border-red-500/20">
+            <XCircle className="h-4 w-4 text-red-400" />
+            <AlertDescription className="text-red-400">{error}</AlertDescription>
           </Alert>
         )}
 
         {successMessage && (
-          <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-700 dark:text-green-300">
+          <Alert className="bg-teal/10 border-teal/20">
+            <CheckCircle2 className="h-4 w-4 text-teal" />
+            <AlertDescription className="text-teal">
               {successMessage}
             </AlertDescription>
           </Alert>
@@ -510,23 +515,23 @@ export default function SyncPanel() {
 
         {/* Upload Progress */}
         {uploadProgress && syncing && (
-          <div className="space-y-3 p-4 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
+          <div className="space-y-3 p-4 rounded-xl bg-cyan/10 border border-cyan/20">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-blue-700 dark:text-blue-300">
+              <span className="font-medium text-cyan">
                 Enviando para o Drive...
               </span>
-              <span className="text-blue-600 dark:text-blue-400">
+              <span className="text-cyan/80">
                 {uploadProgress.uploaded}/{uploadProgress.total} ({Math.round(uploadProgress.percent)}%)
               </span>
             </div>
             <Progress value={uploadProgress.percent} className="h-2" />
             {uploadProgress.current_file && (
-              <p className="text-xs text-blue-600 dark:text-blue-400 truncate">
+              <p className="text-xs text-cyan/70 truncate">
                 Arquivo atual: {uploadProgress.current_file}
               </p>
             )}
             {uploadProgress.failed > 0 && (
-              <p className="text-xs text-red-600 dark:text-red-400">
+              <p className="text-xs text-red-400">
                 {uploadProgress.failed} arquivo(s) com falha
               </p>
             )}
@@ -535,23 +540,23 @@ export default function SyncPanel() {
 
         {/* Download Progress */}
         {downloadProgress && (downloading || downloadingVideo !== null) && (
-          <div className="space-y-3 p-4 rounded-lg bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800">
+          <div className="space-y-3 p-4 rounded-xl bg-purple/10 border border-purple/20">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-purple-700 dark:text-purple-300">
+              <span className="font-medium text-purple">
                 {downloading ? "Baixando do Drive..." : "Baixando vídeo..."}
               </span>
-              <span className="text-purple-600 dark:text-purple-400">
+              <span className="text-purple/80">
                 {downloadProgress.downloaded}/{downloadProgress.total} ({Math.round(downloadProgress.percent)}%)
               </span>
             </div>
             <Progress value={downloadProgress.percent} className="h-2" />
             {downloadProgress.current_file && (
-              <p className="text-xs text-purple-600 dark:text-purple-400 truncate">
+              <p className="text-xs text-purple/70 truncate">
                 Arquivo atual: {downloadProgress.current_file}
               </p>
             )}
             {downloadProgress.failed > 0 && (
-              <p className="text-xs text-red-600 dark:text-red-400">
+              <p className="text-xs text-red-400">
                 {downloadProgress.failed} arquivo(s) com falha
               </p>
             )}
@@ -561,31 +566,31 @@ export default function SyncPanel() {
         {syncStatus && (
           <>
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-muted">
-                <HardDrive className="h-5 w-5 text-muted-foreground" />
+            <div className="grid grid-cols-3 gap-3">
+              <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white/5 border border-white/10">
+                <HardDrive className="h-5 w-5 text-teal" />
                 <div className="text-center">
-                  <div className="text-2xl font-bold">
+                  <div className="text-2xl font-bold text-white">
                     {syncStatus.total_local}
                   </div>
                   <div className="text-xs text-muted-foreground">Local</div>
                 </div>
               </div>
 
-              <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-muted">
-                <Cloud className="h-5 w-5 text-muted-foreground" />
+              <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white/5 border border-white/10">
+                <Cloud className="h-5 w-5 text-cyan" />
                 <div className="text-center">
-                  <div className="text-2xl font-bold">
+                  <div className="text-2xl font-bold text-white">
                     {syncStatus.total_drive}
                   </div>
                   <div className="text-xs text-muted-foreground">Drive</div>
                 </div>
               </div>
 
-              <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-primary/10">
-                <CheckCircle2 className="h-5 w-5 text-primary" />
+              <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-teal/10 border border-teal/20">
+                <CheckCircle2 className="h-5 w-5 text-teal" />
                 <div className="text-center">
-                  <div className="text-2xl font-bold">
+                  <div className="text-2xl font-bold text-white">
                     {syncStatus.synced.length}
                   </div>
                   <div className="text-xs text-muted-foreground">
@@ -601,28 +606,32 @@ export default function SyncPanel() {
                 <span className="text-muted-foreground">
                   Progresso de sincronização
                 </span>
-                <span className="font-medium">
+                <span className="font-medium text-white">
                   {Math.round(syncPercentage)}%
                 </span>
               </div>
-              <Progress value={syncPercentage} />
+              <Progress value={syncPercentage} className="h-2" />
             </div>
 
             {/* Actions */}
             <div className="flex gap-2 flex-wrap">
               <Button
-                variant="outline"
+                variant="ghost"
+                size="sm"
                 onClick={fetchSyncStatus}
                 disabled={loading || syncing}
+                className="text-muted-foreground hover:text-teal hover:bg-teal/10"
               >
-                <RefreshCw className="h-4 w-4 mr-2" />
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
                 Atualizar
               </Button>
 
               <Button
-                variant="outline"
+                variant="ghost"
+                size="sm"
                 onClick={() => setShowExternalUpload(true)}
                 disabled={syncing || uploadingVideo !== null}
+                className="text-muted-foreground hover:text-yellow hover:bg-yellow/10"
               >
                 <FolderUp className="h-4 w-4 mr-2" />
                 Upload Externo
@@ -630,8 +639,10 @@ export default function SyncPanel() {
 
               {syncStatus.local_only.length > 0 && (
                 <Button
+                  size="sm"
                   onClick={handleSyncAll}
                   disabled={syncing || uploadingVideo !== null || downloading || downloadingVideo !== null}
+                  className="btn-gradient-cyan"
                 >
                   {syncing ? (
                     <>
@@ -649,9 +660,10 @@ export default function SyncPanel() {
 
               {syncStatus.drive_only.length > 0 && (
                 <Button
-                  variant="secondary"
+                  size="sm"
                   onClick={handleDownloadAll}
                   disabled={downloading || downloadingVideo !== null || syncing || uploadingVideo !== null}
+                  className="btn-gradient-purple"
                 >
                   {downloading ? (
                     <>
@@ -669,24 +681,24 @@ export default function SyncPanel() {
             </div>
 
             {/* Details Accordion */}
-            <Accordion type="single" collapsible className="w-full">
+            <Accordion type="single" collapsible className="w-full space-y-2">
               {/* Local Only */}
               {syncStatus.local_only.length > 0 && (
-                <AccordionItem value="local-only">
-                  <AccordionTrigger>
+                <AccordionItem value="local-only" className="border-white/10 rounded-xl overflow-hidden">
+                  <AccordionTrigger className="px-4 py-3 hover:bg-white/5 hover:no-underline">
                     <div className="flex items-center gap-2">
-                      <HardDrive className="h-4 w-4" />
-                      Apenas Local ({syncStatus.local_only.length})
+                      <HardDrive className="h-4 w-4 text-teal" />
+                      <span className="text-white">Apenas Local ({syncStatus.local_only.length})</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent>
+                  <AccordionContent className="px-4 pb-3">
                     <div className="space-y-2 max-h-64 overflow-y-auto">
                       {syncStatus.local_only.map((video) => (
                         <div
                           key={video}
-                          className="flex items-center justify-between p-2 rounded bg-muted"
+                          className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10"
                         >
-                          <span className="text-sm truncate flex-1">
+                          <span className="text-sm truncate flex-1 text-white">
                             {video}
                           </span>
                           <Button
@@ -694,6 +706,7 @@ export default function SyncPanel() {
                             variant="ghost"
                             onClick={() => handleUploadSingle(video)}
                             disabled={uploadingVideo !== null || syncing}
+                            className="text-muted-foreground hover:text-cyan hover:bg-cyan/10"
                           >
                             {uploadingVideo === video ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -710,21 +723,21 @@ export default function SyncPanel() {
 
               {/* Drive Only */}
               {syncStatus.drive_only.length > 0 && (
-                <AccordionItem value="drive-only">
-                  <AccordionTrigger>
+                <AccordionItem value="drive-only" className="border-white/10 rounded-xl overflow-hidden">
+                  <AccordionTrigger className="px-4 py-3 hover:bg-white/5 hover:no-underline">
                     <div className="flex items-center gap-2">
-                      <Cloud className="h-4 w-4" />
-                      Apenas Drive ({syncStatus.drive_only.length})
+                      <Cloud className="h-4 w-4 text-cyan" />
+                      <span className="text-white">Apenas Drive ({syncStatus.drive_only.length})</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent>
+                  <AccordionContent className="px-4 pb-3">
                     <div className="space-y-2 max-h-64 overflow-y-auto">
                       {syncStatus.drive_only.map((video) => (
                         <div
                           key={video}
-                          className="flex items-center justify-between p-2 rounded bg-muted"
+                          className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10"
                         >
-                          <span className="text-sm truncate flex-1">
+                          <span className="text-sm truncate flex-1 text-white">
                             {video}
                           </span>
                           <Button
@@ -732,6 +745,7 @@ export default function SyncPanel() {
                             variant="ghost"
                             onClick={() => handleDownloadSingle(video)}
                             disabled={downloadingVideo !== null || downloading || syncing || uploadingVideo !== null}
+                            className="text-muted-foreground hover:text-purple hover:bg-purple/10"
                           >
                             {downloadingVideo === video ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -748,22 +762,22 @@ export default function SyncPanel() {
 
               {/* Synced */}
               {syncStatus.synced.length > 0 && (
-                <AccordionItem value="synced">
-                  <AccordionTrigger>
+                <AccordionItem value="synced" className="border-white/10 rounded-xl overflow-hidden">
+                  <AccordionTrigger className="px-4 py-3 hover:bg-white/5 hover:no-underline">
                     <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-primary" />
-                      Sincronizados ({syncStatus.synced.length})
+                      <CheckCircle2 className="h-4 w-4 text-teal" />
+                      <span className="text-white">Sincronizados ({syncStatus.synced.length})</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent>
+                  <AccordionContent className="px-4 pb-3">
                     <div className="space-y-2 max-h-64 overflow-y-auto">
                       {syncStatus.synced.map((video) => (
                         <div
                           key={video}
-                          className="flex items-center p-2 rounded bg-muted"
+                          className="flex items-center p-2 rounded-lg bg-teal/5 border border-teal/20"
                         >
-                          <CheckCircle2 className="h-4 w-4 text-primary mr-2" />
-                          <span className="text-sm truncate">{video}</span>
+                          <CheckCircle2 className="h-4 w-4 text-teal mr-2" />
+                          <span className="text-sm truncate text-white">{video}</span>
                         </div>
                       ))}
                     </div>
@@ -780,7 +794,7 @@ export default function SyncPanel() {
           onOpenChange={setShowExternalUpload}
           onUploadComplete={fetchSyncStatus}
         />
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

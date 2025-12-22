@@ -287,31 +287,33 @@ export default function ExternalUploadModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] glass border-white/10">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Cloud className="h-5 w-5" />
+          <DialogTitle className="flex items-center gap-2 text-white">
+            <div className="w-8 h-8 rounded-lg bg-cyan/10 flex items-center justify-center">
+              <Cloud className="h-4 w-4 text-cyan" />
+            </div>
             Upload para o Google Drive
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-muted-foreground">
             Envie qualquer vídeo do seu computador para o Google Drive
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-5 py-4">
           {/* Error Alert */}
           {error && (
-            <Alert variant="destructive">
-              <XCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+            <Alert className="bg-red-500/10 border-red-500/20">
+              <XCircle className="h-4 w-4 text-red-400" />
+              <AlertDescription className="text-red-400">{error}</AlertDescription>
             </Alert>
           )}
 
           {/* Success Alert */}
           {success && (
-            <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-700 dark:text-green-300">
+            <Alert className="bg-teal/10 border-teal/20">
+              <CheckCircle2 className="h-4 w-4 text-teal" />
+              <AlertDescription className="text-teal">
                 Upload concluído com sucesso!
               </AlertDescription>
             </Alert>
@@ -319,13 +321,14 @@ export default function ExternalUploadModal({
 
           {/* Folder Name Input */}
           <div className="space-y-2">
-            <Label htmlFor="folder-name">Nome da pasta no Drive *</Label>
+            <Label htmlFor="folder-name" className="text-white">Nome da pasta no Drive *</Label>
             <Input
               id="folder-name"
               placeholder="Ex: Meus Vídeos"
               value={folderName}
               onChange={(e) => setFolderName(e.target.value)}
               disabled={uploading}
+              className="glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
             />
             <p className="text-xs text-muted-foreground">
               A pasta será criada automaticamente dentro de &quot;YouTube Archiver&quot;
@@ -334,7 +337,7 @@ export default function ExternalUploadModal({
 
           {/* Video File Input */}
           <div className="space-y-2">
-            <Label>Vídeo principal *</Label>
+            <Label className="text-white">Vídeo principal *</Label>
             <input
               ref={videoInputRef}
               type="file"
@@ -345,7 +348,7 @@ export default function ExternalUploadModal({
             />
             <Button
               variant="outline"
-              className="w-full justify-start"
+              className="w-full justify-start bg-white/5 border-white/10 text-muted-foreground hover:text-white hover:bg-white/10"
               onClick={() => videoInputRef.current?.click()}
               disabled={uploading}
             >
@@ -353,9 +356,9 @@ export default function ExternalUploadModal({
               {videoFile ? "Alterar vídeo..." : "Selecionar vídeo..."}
             </Button>
             {videoFile && (
-              <div className="flex items-center gap-2 p-2 rounded bg-muted">
-                <FileVideo className="h-4 w-4 text-primary" />
-                <span className="text-sm truncate flex-1">{videoFile.name}</span>
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-cyan/10 border border-cyan/20">
+                <FileVideo className="h-4 w-4 text-cyan" />
+                <span className="text-sm truncate flex-1 text-white">{videoFile.name}</span>
                 <span className="text-xs text-muted-foreground">
                   {formatBytes(videoFile.size)}
                 </span>
@@ -363,7 +366,7 @@ export default function ExternalUploadModal({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 w-6 p-0"
+                    className="h-6 w-6 p-0 text-muted-foreground hover:text-white"
                     onClick={() => setVideoFile(null)}
                   >
                     <X className="h-3 w-3" />
@@ -375,13 +378,13 @@ export default function ExternalUploadModal({
 
           {/* Arquivos Opcionais */}
           <div className="space-y-4">
-            <Label className="text-muted-foreground">Arquivos opcionais</Label>
+            <Label className="text-muted-foreground text-xs uppercase tracking-wider">Arquivos opcionais</Label>
 
             {/* Thumbnail */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Image className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Thumbnail</span>
+                <Image className="h-4 w-4 text-teal" />
+                <span className="text-sm text-white">Thumbnail</span>
               </div>
               <input
                 ref={thumbnailInputRef}
@@ -392,9 +395,9 @@ export default function ExternalUploadModal({
                 disabled={uploading}
               />
               {thumbnail ? (
-                <div className="flex items-center gap-2 p-2 rounded bg-muted">
-                  <Image className="h-4 w-4 text-green-600" />
-                  <span className="text-sm truncate flex-1">{thumbnail.name}</span>
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-teal/10 border border-teal/20">
+                  <Image className="h-4 w-4 text-teal" />
+                  <span className="text-sm truncate flex-1 text-white">{thumbnail.name}</span>
                   <span className="text-xs text-muted-foreground">
                     {formatBytes(thumbnail.size)}
                   </span>
@@ -402,7 +405,7 @@ export default function ExternalUploadModal({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-white"
                       onClick={() => setThumbnail(null)}
                     >
                       <X className="h-3 w-3" />
@@ -413,7 +416,7 @@ export default function ExternalUploadModal({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full justify-start text-muted-foreground"
+                  className="w-full justify-start bg-white/5 border-white/10 text-muted-foreground hover:text-white hover:bg-white/10"
                   onClick={() => thumbnailInputRef.current?.click()}
                   disabled={uploading}
                 >
@@ -426,8 +429,8 @@ export default function ExternalUploadModal({
             {/* Legendas */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Subtitles className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Legendas</span>
+                <Subtitles className="h-4 w-4 text-yellow" />
+                <span className="text-sm text-white">Legendas</span>
                 <span className="text-xs text-muted-foreground">(múltiplas)</span>
               </div>
               <input
@@ -442,7 +445,7 @@ export default function ExternalUploadModal({
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full justify-start text-muted-foreground"
+                className="w-full justify-start bg-white/5 border-white/10 text-muted-foreground hover:text-white hover:bg-white/10"
                 onClick={() => subtitlesInputRef.current?.click()}
                 disabled={uploading}
               >
@@ -454,10 +457,10 @@ export default function ExternalUploadModal({
                   {subtitles.map((file, index) => (
                     <div
                       key={`${file.name}-${index}`}
-                      className="flex items-center gap-2 p-2 rounded bg-muted"
+                      className="flex items-center gap-2 p-2 rounded-lg bg-yellow/10 border border-yellow/20"
                     >
-                      <Subtitles className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm truncate flex-1">{file.name}</span>
+                      <Subtitles className="h-4 w-4 text-yellow" />
+                      <span className="text-sm truncate flex-1 text-white">{file.name}</span>
                       <span className="text-xs text-muted-foreground">
                         {formatBytes(file.size)}
                       </span>
@@ -465,7 +468,7 @@ export default function ExternalUploadModal({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-6 w-6 p-0"
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-white"
                           onClick={() => removeSubtitle(index)}
                         >
                           <X className="h-3 w-3" />
@@ -480,8 +483,8 @@ export default function ExternalUploadModal({
             {/* Transcrição */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Transcrição</span>
+                <FileText className="h-4 w-4 text-purple" />
+                <span className="text-sm text-white">Transcrição</span>
               </div>
               <input
                 ref={transcriptionInputRef}
@@ -492,9 +495,9 @@ export default function ExternalUploadModal({
                 disabled={uploading}
               />
               {transcription ? (
-                <div className="flex items-center gap-2 p-2 rounded bg-muted">
-                  <FileText className="h-4 w-4 text-purple-600" />
-                  <span className="text-sm truncate flex-1">{transcription.name}</span>
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-purple/10 border border-purple/20">
+                  <FileText className="h-4 w-4 text-purple" />
+                  <span className="text-sm truncate flex-1 text-white">{transcription.name}</span>
                   <span className="text-xs text-muted-foreground">
                     {formatBytes(transcription.size)}
                   </span>
@@ -502,7 +505,7 @@ export default function ExternalUploadModal({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-white"
                       onClick={() => setTranscription(null)}
                     >
                       <X className="h-3 w-3" />
@@ -513,7 +516,7 @@ export default function ExternalUploadModal({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full justify-start text-muted-foreground"
+                  className="w-full justify-start bg-white/5 border-white/10 text-muted-foreground hover:text-white hover:bg-white/10"
                   onClick={() => transcriptionInputRef.current?.click()}
                   disabled={uploading}
                 >
@@ -526,19 +529,19 @@ export default function ExternalUploadModal({
 
           {/* Upload Progress */}
           {uploadProgress && uploading && (
-            <div className="space-y-3 p-4 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
+            <div className="space-y-3 p-4 rounded-xl bg-cyan/10 border border-cyan/20">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-blue-700 dark:text-blue-300">
+                <span className="font-medium text-cyan">
                   Enviando para o Drive...
                 </span>
-                <span className="text-blue-600 dark:text-blue-400">
+                <span className="text-cyan/80">
                   {uploadProgress.uploaded}/{uploadProgress.total} (
                   {Math.round(uploadProgress.percent)}%)
                 </span>
               </div>
               <Progress value={uploadProgress.percent} className="h-2" />
               {uploadProgress.current_file && (
-                <p className="text-xs text-blue-600 dark:text-blue-400 truncate">
+                <p className="text-xs text-cyan/70 truncate">
                   {uploadProgress.current_file}
                 </p>
               )}
@@ -546,15 +549,20 @@ export default function ExternalUploadModal({
           )}
 
           {/* Actions */}
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-2">
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => onOpenChange(false)}
               disabled={uploading}
+              className="text-muted-foreground hover:text-white hover:bg-white/10"
             >
               Cancelar
             </Button>
-            <Button onClick={handleUpload} disabled={!canUpload}>
+            <Button
+              onClick={handleUpload}
+              disabled={!canUpload}
+              className="btn-gradient-cyan"
+            >
               {uploading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

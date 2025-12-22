@@ -3,7 +3,12 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RefreshCw, Search } from "lucide-react";
+import {
+  RefreshCw,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 interface PaginationControlsProps {
   page: number;
@@ -56,28 +61,28 @@ export default function PaginationControls({
   };
 
   return (
-    <div className="flex w-full flex-wrap items-center gap-3 rounded-lg border bg-card/60 px-3 py-2 shadow-sm sm:w-auto">
+    <div className="flex w-full flex-wrap items-center gap-2 glass rounded-xl px-3 py-2 sm:w-auto">
       {/* Botão Atualizar */}
       {showRefreshButton && onRefresh && (
         <>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="flex items-center gap-2"
+            className="flex items-center gap-1.5 text-muted-foreground hover:text-teal hover:bg-teal/10"
             onClick={onRefresh}
             disabled={loading}
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Atualizar</span>
           </Button>
 
-          <span className="hidden sm:block h-6 w-px bg-border" aria-hidden />
+          <span className="hidden sm:block h-5 w-px bg-white/10" aria-hidden />
         </>
       )}
 
       {/* Input de navegação direta */}
       <div className="flex items-center gap-2">
-        <span>Navegar Para:</span>
+        <span className="text-xs text-muted-foreground hidden sm:inline">Ir para:</span>
 
         <div className="relative flex items-center">
           <Input
@@ -93,46 +98,52 @@ export default function PaginationControls({
                 handlePageJump();
               }
             }}
-            className="h-10 w-24 pr-10 text-center no-spinner"
+            className="h-8 w-16 pr-7 text-center no-spinner glass-input bg-white/5 border-white/10 text-white text-sm"
             aria-label="Ir para página"
-            placeholder="Página"
+            placeholder="Pág"
             disabled={loading || totalPages === 0}
           />
           <Button
             variant="ghost"
             size="icon"
-            className="absolute right-1 top-1/2 -translate-y-1/2"
+            className="absolute right-0.5 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground hover:text-teal"
             onClick={handlePageJump}
             disabled={loading || totalPages === 0}
             aria-label="Confirmar página"
           >
-            <Search className="h-4 w-4" />
+            <Search className="h-3 w-3" />
           </Button>
         </div>
       </div>
 
-      <span className="hidden sm:block h-6 w-px bg-border" aria-hidden />
+      <span className="hidden sm:block h-5 w-px bg-white/10" aria-hidden />
 
       {/* Botões de navegação */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         <Button
           variant="ghost"
-          size="sm"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-white hover:bg-white/10"
           onClick={handlePrevious}
           disabled={!canPrev || loading}
         >
-          Anterior
+          <ChevronLeft className="h-4 w-4" />
         </Button>
-        <span className="text-sm text-muted-foreground">
-          Página {page} de {totalPages}
+
+        <span className="text-xs text-muted-foreground px-2 min-w-[4rem] text-center">
+          <span className="text-white font-medium">{page}</span>
+          <span className="mx-1">/</span>
+          <span>{totalPages}</span>
         </span>
+
         <Button
           variant="ghost"
-          size="sm"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-white hover:bg-white/10"
           onClick={handleNext}
           disabled={!canNext || loading}
         >
-          Próxima
+          <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
     </div>
