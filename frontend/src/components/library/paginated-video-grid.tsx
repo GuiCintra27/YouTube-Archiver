@@ -137,7 +137,7 @@ export default function PaginatedVideoGrid() {
   }, []);
 
   const handleBatchDeleteConfirm = useCallback(async () => {
-    if (selectedPaths.size === 0 || !apiUrl) return;
+    if (deleting || selectedPaths.size === 0 || !apiUrl) return;
 
     try {
       setDeleting(true);
@@ -171,7 +171,15 @@ export default function PaginatedVideoGrid() {
     } finally {
       setDeleting(false);
     }
-  }, [selectedPaths, apiUrl, page, fetchVideos]);
+  }, [selectedPaths, apiUrl, page, fetchVideos, deleting]);
+
+  const handleBatchDialogChange = useCallback(
+    (open: boolean) => {
+      if (deleting) return;
+      setBatchDeleteDialogOpen(open);
+    },
+    [deleting]
+  );
 
   const handleEdit = useCallback(
     async (video: Video, newTitle: string, newThumbnail?: File) => {
@@ -313,7 +321,7 @@ export default function PaginatedVideoGrid() {
 
       {/* Selection Action Bar */}
       {hasSelection && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70]">
           <div className="glass-card rounded-xl px-4 py-3 flex items-center gap-4 shadow-lg shadow-black/20">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-teal/10 flex items-center justify-center">
@@ -332,7 +340,7 @@ export default function PaginatedVideoGrid() {
                 variant="ghost"
                 size="sm"
                 onClick={selectAll}
-                disabled={selectedPaths.size === videos.length}
+                disabled={deleting || selectedPaths.size === videos.length}
                 className="text-muted-foreground hover:text-white hover:bg-white/10"
               >
                 Selecionar todos
@@ -342,6 +350,7 @@ export default function PaginatedVideoGrid() {
                 variant="ghost"
                 size="sm"
                 onClick={clearSelection}
+                disabled={deleting}
                 className="text-muted-foreground hover:text-white hover:bg-white/10"
               >
                 <X className="h-4 w-4 mr-1" />
@@ -351,10 +360,20 @@ export default function PaginatedVideoGrid() {
               <Button
                 size="sm"
                 onClick={() => setBatchDeleteDialogOpen(true)}
+                disabled={deleting}
                 className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
               >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Excluir ({selectedPaths.size})
+                {deleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Excluindo...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Excluir ({selectedPaths.size})
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -364,7 +383,7 @@ export default function PaginatedVideoGrid() {
       {/* Batch Delete Confirmation Dialog */}
       <AlertDialog
         open={batchDeleteDialogOpen}
-        onOpenChange={setBatchDeleteDialogOpen}
+        onOpenChange={handleBatchDialogChange}
       >
         <AlertDialogContent className="glass border-white/10">
           <AlertDialogHeader>
