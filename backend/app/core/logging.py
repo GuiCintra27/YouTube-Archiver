@@ -13,6 +13,14 @@ import logging
 import sys
 from typing import Optional
 
+from app.core.request_context import get_request_id
+
+
+class _RequestIdFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.request_id = get_request_id() or "-"
+        return True
+
 
 def setup_logging(
     level: str = "INFO",
@@ -34,7 +42,7 @@ def setup_logging(
     # Default format with timestamp, level, module, and message
     if format_string is None:
         format_string = (
-            "%(asctime)s | %(levelname)-8s | %(name)s:%(funcName)s:%(lineno)d | %(message)s"
+            "%(asctime)s | %(levelname)-8s | %(request_id)s | %(name)s:%(funcName)s:%(lineno)d | %(message)s"
         )
 
     # Create formatter
@@ -47,6 +55,7 @@ def setup_logging(
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
     handler.setLevel(log_level)
+    handler.addFilter(_RequestIdFilter())
 
     # Get root logger for the app
     app_logger = logging.getLogger("yt-archiver")

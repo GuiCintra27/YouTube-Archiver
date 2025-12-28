@@ -13,8 +13,19 @@ from google.oauth2.credentials import Credentials
 
 from .manager import drive_manager, SCOPES
 from app.config import settings
+from app.core.blocking import run_blocking, get_drive_semaphore, get_catalog_semaphore
 from app.core.security import validate_path_within_base, validate_file_exists, sanitize_path
 from app.core.logging import get_module_logger
+from app.catalog.repository import CatalogRepository
+from app.catalog.service import (
+    list_drive_videos_paginated,
+    delete_drive_video_from_catalog,
+    maybe_publish_drive_snapshot,
+    rename_drive_video_in_catalog,
+    set_drive_thumbnail_in_catalog,
+    upsert_drive_video_from_upload,
+)
+from app.catalog.service import upsert_local_video_from_fs
 # Import store directly to avoid circular imports via app.jobs package
 from app.jobs.store import JobType
 import app.jobs.store as store
@@ -92,6 +103,20 @@ async def list_videos_paginated(page: int = 1, limit: int = 24) -> Dict:
     Uses SQLite cache if enabled for faster response.
     Falls back to direct API if cache is unavailable.
     """
+    if settings.CATALOG_ENABLED:
+        result = await list_drive_videos_paginated(page=page, limit=limit)
+        if result.get("total", 0) > 0:
+            return result
+        # Drive catalog is empty: avoid slow legacy listing unless explicitly allowed.
+        if not settings.CATALOG_DRIVE_ALLOW_LEGACY_LISTING_FALLBACK:
+            return {
+                "total": 0,
+                "page": page,
+                "limit": limit,
+                "videos": [],
+                "warning": "Drive catalog vazio. Rode /api/catalog/drive/rebuild (primeira vez) ou /api/catalog/drive/import (em uma máquina nova).",
+            }
+
     # Check if cache is enabled
     if settings.DRIVE_CACHE_ENABLED:
         try:
@@ -115,7 +140,11 @@ async def list_videos_paginated(page: int = 1, limit: int = 24) -> Dict:
 
     # Fallback to direct Drive API
     logger.debug("Fetching videos from Drive API")
-    videos = drive_manager.list_videos()
+    videos = await run_blocking(
+        drive_manager.list_videos,
+        semaphore=get_drive_semaphore(),
+        label="drive.list_videos",
+    )
     total = len(videos)
 
     start = (page - 1) * limit
@@ -214,6 +243,20 @@ async def _run_single_upload_job(job_id: str, full_path: str, video_path: str) -
         )
 
         if result.get("status") != "error":
+            if settings.CATALOG_ENABLED:
+                try:
+                    video_file_id = result.get("file_id")
+                    if video_file_id:
+                        await upsert_drive_video_from_upload(
+                            video_file_id=str(video_file_id),
+                            drive_path=video_path,
+                            size_bytes=int(result.get("size") or 0),
+                            related_files=result.get("related_files_detailed") or [],
+                        )
+                        await maybe_publish_drive_snapshot(reason="drive_upload_single")
+                except Exception as e:
+                    logger.warning(f"Catalog write-through failed (drive_upload_single): {e}")
+
             _complete_job(job_id, {
                 "status": "success",
                 "uploaded": 1,
@@ -227,9 +270,111 @@ async def _run_single_upload_job(job_id: str, full_path: str, video_path: str) -
         _fail_job(job_id, str(e))
 
 
-def get_sync_status(base_dir: str = "./downloads") -> Dict:
-    """Get sync status between local and Drive"""
-    return drive_manager.get_sync_state(base_dir)
+async def get_sync_status(base_dir: str = "./downloads") -> Dict:
+    """Get sync status between local and Drive (catalog-first)."""
+    if settings.CATALOG_ENABLED:
+        return await run_blocking(
+            get_sync_status_from_catalog,
+            semaphore=get_catalog_semaphore(),
+            label="drive.sync_status.catalog",
+        )
+    return await run_blocking(
+        drive_manager.get_sync_state,
+        base_dir,
+        semaphore=get_drive_semaphore(),
+        label="drive.sync_status",
+    )
+
+
+def _get_catalog_sets(repo: CatalogRepository) -> tuple[set[str], dict[str, str]]:
+    """
+    Returns:
+        local_paths_set: set[str]
+        drive_path_to_file_id: dict[path -> file_id]
+    """
+    local_paths = repo.list_video_asset_paths(location="local")
+    drive_assets = repo.list_drive_video_assets()
+
+    local_set = set(local_paths)
+    drive_map = {a["path"]: a["file_id"] for a in drive_assets if a.get("path") and a.get("file_id")}
+    return local_set, drive_map
+
+
+def get_sync_status_from_catalog() -> Dict:
+    repo = CatalogRepository()
+    counts = repo.get_counts()
+    local_set, drive_map = _get_catalog_sets(repo)
+    drive_set = set(drive_map.keys())
+
+    local_only_count = len(local_set - drive_set)
+    drive_only_count = len(drive_set - local_set)
+    synced_count = len(local_set & drive_set)
+
+    warnings: list[str] = []
+    if counts.get("drive", 0) == 0:
+        warnings.append("Catálogo do Drive vazio: rode /api/catalog/drive/import (máquina nova) ou /api/catalog/drive/rebuild (primeira vez).")
+    if counts.get("local", 0) == 0:
+        warnings.append("Catálogo local vazio: rode /api/catalog/bootstrap-local para indexar seus vídeos locais.")
+
+    return {
+        "total_local": len(local_set),
+        "total_drive": len(drive_set),
+        "local_only_count": local_only_count,
+        "drive_only_count": drive_only_count,
+        "synced_count": synced_count,
+        "warnings": warnings,
+    }
+
+
+async def get_sync_items_from_catalog(*, kind: str, page: int, limit: int) -> Dict:
+    def _run() -> Dict:
+        repo = CatalogRepository()
+        local_set, drive_map = _get_catalog_sets(repo)
+        drive_set = set(drive_map.keys())
+
+        if kind == "local_only":
+            all_items = sorted(local_set - drive_set)
+            items = [{"path": p} for p in all_items]
+        elif kind == "drive_only":
+            all_paths = sorted(drive_set - local_set)
+            items = [{"path": p, "file_id": drive_map.get(p)} for p in all_paths if drive_map.get(p)]
+            all_items = items
+        elif kind == "synced":
+            all_items = sorted(local_set & drive_set)
+            items = [{"path": p} for p in all_items]
+        else:
+            from app.core.exceptions import InvalidRequestException
+
+            raise InvalidRequestException("kind inválido (use: local_only, drive_only, synced)")
+
+        total = len(all_items)
+        offset = (page - 1) * limit
+        page_items = items[offset : offset + limit]
+
+        return {"kind": kind, "total": total, "page": page, "limit": limit, "items": page_items}
+
+    return await run_blocking(
+        _run,
+        semaphore=get_catalog_semaphore(),
+        label="drive.sync_items",
+    )
+
+
+async def resolve_drive_file_id_by_path(*, drive_path: str) -> str:
+    def _run() -> str:
+        repo = CatalogRepository()
+        file_id = repo.find_drive_file_id_by_path(drive_path)
+        if not file_id:
+            from app.core.exceptions import VideoNotFoundException
+
+            raise VideoNotFoundException("Vídeo não encontrado no catálogo do Drive", path=drive_path)
+        return file_id
+
+    return await run_blocking(
+        _run,
+        semaphore=get_catalog_semaphore(),
+        label="drive.resolve_path",
+    )
 
 
 async def sync_all_videos(base_dir: str = "./downloads") -> str:
@@ -283,8 +428,34 @@ async def _run_batch_upload_job(job_id: str, base_dir: str) -> None:
     """
     try:
         # Obter lista de arquivos para upload
-        sync_state = drive_manager.get_sync_state(base_dir)
-        local_only = sync_state["local_only"]
+        if settings.CATALOG_ENABLED:
+            repo = CatalogRepository()
+            counts = await run_blocking(
+                repo.get_counts,
+                semaphore=get_catalog_semaphore(),
+                label="drive.sync.counts",
+            )
+            if counts.get("local", 0) == 0:
+                raise Exception("Catálogo local vazio: rode /api/catalog/bootstrap-local antes de sincronizar.")
+            if counts.get("drive", 0) == 0:
+                raise Exception("Catálogo do Drive vazio: rode /api/catalog/drive/import ou /api/catalog/drive/rebuild antes de sincronizar.")
+
+            local_set, drive_map = await run_blocking(
+                _get_catalog_sets,
+                repo,
+                semaphore=get_catalog_semaphore(),
+                label="drive.sync.sets",
+            )
+            drive_set = set(drive_map.keys())
+            local_only = sorted(local_set - drive_set)
+        else:
+            sync_state = await run_blocking(
+                drive_manager.get_sync_state,
+                base_dir,
+                semaphore=get_drive_semaphore(),
+                label="drive.sync_state",
+            )
+            local_only = sync_state["local_only"]
         total = len(local_only)
 
         if total == 0:
@@ -312,6 +483,8 @@ async def _run_batch_upload_job(job_id: str, base_dir: str) -> None:
         results_lock = asyncio.Lock()
         files_in_progress: List[str] = []
         progress_lock = asyncio.Lock()
+        catalog_state = {"changed": False}
+        catalog_lock = asyncio.Lock()
 
         semaphore = _get_upload_semaphore()
 
@@ -359,7 +532,22 @@ async def _run_batch_upload_job(job_id: str, base_dir: str) -> None:
                             "percent": (done / total) * 100,
                             "current_file": None,
                             "files_in_progress": []
-                        })
+                                })
+
+                    if result.get("status") != "error" and settings.CATALOG_ENABLED:
+                        async with catalog_lock:
+                            try:
+                                video_file_id = result.get("file_id")
+                                if video_file_id:
+                                    await upsert_drive_video_from_upload(
+                                        video_file_id=str(video_file_id),
+                                        drive_path=video_path,
+                                        size_bytes=int(result.get("size") or 0),
+                                        related_files=result.get("related_files_detailed") or [],
+                                    )
+                                    catalog_state["changed"] = True
+                            except Exception as e:
+                                logger.warning(f"Catalog write-through failed (drive_upload_batch): {e}")
 
                 except Exception as e:
                     async with results_lock:
@@ -390,16 +578,31 @@ async def _run_batch_upload_job(job_id: str, base_dir: str) -> None:
             "failed": results["failed"]
         })
 
+        if settings.CATALOG_ENABLED and catalog_state["changed"]:
+            await maybe_publish_drive_snapshot(reason="drive_upload_batch")
+
     except Exception as e:
         _fail_job(job_id, str(e))
 
 
 async def delete_video(file_id: str) -> Dict:
     """Delete a video from Drive"""
-    success = drive_manager.delete_video(file_id)
+    success = await run_blocking(
+        drive_manager.delete_video,
+        file_id,
+        semaphore=get_drive_semaphore(),
+        label="drive.delete_video",
+    )
 
     if not success:
         raise Exception("Failed to delete video")
+
+    if settings.CATALOG_ENABLED:
+        try:
+            await delete_drive_video_from_catalog(video_file_id=file_id)
+            await maybe_publish_drive_snapshot(reason="drive_delete")
+        except Exception as e:
+            logger.warning(f"Catalog write-through failed (drive_delete): {e}")
 
     # Sync with cache
     if settings.DRIVE_CACHE_ENABLED:
@@ -433,7 +636,20 @@ async def delete_videos_batch(file_ids: List[str]) -> Dict:
             "total_failed": 0,
         }
 
-    result = drive_manager.delete_videos_batch(file_ids)
+    result = await run_blocking(
+        drive_manager.delete_videos_batch,
+        file_ids,
+        semaphore=get_drive_semaphore(),
+        label="drive.delete_batch",
+    )
+
+    if settings.CATALOG_ENABLED and result.get("deleted"):
+        try:
+            for deleted_id in result["deleted"]:
+                await delete_drive_video_from_catalog(video_file_id=deleted_id)
+            await maybe_publish_drive_snapshot(reason="drive_delete_batch")
+        except Exception as e:
+            logger.warning(f"Catalog write-through failed (drive_delete_batch): {e}")
 
     # Sync with cache - mark deleted IDs
     if settings.DRIVE_CACHE_ENABLED and result.get("deleted_ids"):
@@ -458,7 +674,9 @@ async def delete_videos_batch(file_ids: List[str]) -> Dict:
 
 def stream_video(
     file_id: str,
-    range_header: Optional[str] = None
+    range_header: Optional[str] = None,
+    file_metadata: Optional[Dict] = None,
+    access_token: Optional[str] = None,
 ) -> tuple[Generator, Dict, int]:
     """
     Stream video from Drive with range request support.
@@ -466,23 +684,22 @@ def stream_video(
     Returns:
         Tuple of (generator, headers dict, status code)
     """
-    file_metadata = drive_manager.get_file_metadata(file_id)
+    file_metadata = file_metadata or drive_manager.get_file_metadata(file_id)
     file_size = int(file_metadata.get('size', 0))
     mime_type = file_metadata.get('mimeType', 'video/mp4')
 
-    # Get credentials for direct request
-    creds = Credentials.from_authorized_user_file(
-        drive_manager.token_path,
-        SCOPES
-    )
-
     download_url = f'https://www.googleapis.com/drive/v3/files/{file_id}?alt=media'
-    auth_headers = {'Authorization': f'Bearer {creds.token}'}
+    if access_token:
+        auth_headers = {'Authorization': f'Bearer {access_token}'}
+    else:
+        creds = Credentials.from_authorized_user_file(
+            drive_manager.token_path,
+            SCOPES
+        )
+        auth_headers = {'Authorization': f'Bearer {creds.token}'}
 
     if range_header:
         # Add Range header to request
-        auth_headers['Range'] = range_header
-
         # Parse Range header for Content-Range
         range_match = re.search(r'bytes=(\d+)-(\d*)', range_header)
         if range_match:
@@ -493,13 +710,13 @@ def stream_video(
             if start >= file_size or end >= file_size or start > end:
                 return None, {"Content-Range": f"bytes */{file_size}"}, 416
 
-            # Make request with Range to Drive
-            response = requests.get(download_url, headers=auth_headers, stream=True)
-
             def iterfile():
-                for chunk in response.iter_content(chunk_size=1024*1024):  # 1MB chunks
-                    if chunk:
-                        yield chunk
+                request_headers = auth_headers.copy()
+                request_headers['Range'] = range_header
+                with requests.get(download_url, headers=request_headers, stream=True) as response:
+                    for chunk in response.iter_content(chunk_size=1024*1024):  # 1MB chunks
+                        if chunk:
+                            yield chunk
 
             content_length = end - start + 1
             headers = {
@@ -513,12 +730,11 @@ def stream_video(
             return iterfile(), headers, 206
 
     # No Range header - full streaming
-    response = requests.get(download_url, headers=auth_headers, stream=True)
-
     def iterfile():
-        for chunk in response.iter_content(chunk_size=2*1024*1024):  # 2MB chunks
-            if chunk:
-                yield chunk
+        with requests.get(download_url, headers=auth_headers, stream=True) as response:
+            for chunk in response.iter_content(chunk_size=2*1024*1024):  # 2MB chunks
+                if chunk:
+                    yield chunk
 
     headers = {
         "Accept-Ranges": "bytes",
@@ -541,6 +757,57 @@ def get_custom_thumbnail(file_id: str) -> Optional[tuple[bytes, str]]:
     Returns tuple of (bytes, mime_type) or None if not available.
     """
     return drive_manager.get_image_file(file_id)
+
+
+async def rename_drive_video(file_id: str, new_name: str) -> Dict:
+    """
+    Rename a video in Drive and write-through the catalog + snapshot publish.
+    """
+    result = await run_blocking(
+        drive_manager.rename_file,
+        file_id,
+        new_name,
+        semaphore=get_drive_semaphore(),
+        label="drive.rename",
+    )
+    if settings.CATALOG_ENABLED and result.get("status") == "success":
+        try:
+            new_file_name = result.get("new_name")
+            if new_file_name:
+                await rename_drive_video_in_catalog(
+                    video_file_id=file_id,
+                    new_file_name=str(new_file_name),
+                )
+                await maybe_publish_drive_snapshot(reason="drive_rename")
+        except Exception as e:
+            logger.warning(f"Catalog write-through failed (drive_rename): {e}")
+    return result
+
+
+async def update_drive_thumbnail(file_id: str, thumbnail_data: bytes, file_ext: str) -> Dict:
+    """
+    Update a Drive thumbnail and write-through the catalog + snapshot publish.
+    """
+    result = await run_blocking(
+        drive_manager.update_thumbnail,
+        file_id,
+        thumbnail_data,
+        file_ext,
+        semaphore=get_drive_semaphore(),
+        label="drive.update_thumbnail",
+    )
+    if settings.CATALOG_ENABLED and result.get("status") == "success":
+        thumbnail_id = result.get("thumbnail_id")
+        if thumbnail_id:
+            try:
+                await set_drive_thumbnail_in_catalog(
+                    video_file_id=file_id,
+                    thumbnail_file_id=str(thumbnail_id),
+                )
+                await maybe_publish_drive_snapshot(reason="drive_update_thumbnail")
+            except Exception as e:
+                logger.warning(f"Catalog write-through failed (drive_update_thumbnail): {e}")
+    return result
 
 
 async def upload_external_files(
@@ -654,6 +921,63 @@ async def _run_external_upload_job(
                         logger.info(f"Synced video to cache: {video_path}")
                     except Exception as cache_err:
                         logger.warning(f"Failed to sync video to cache: {cache_err}")
+
+        if settings.CATALOG_ENABLED:
+            try:
+                by_base: Dict[str, List[Dict]] = {}
+
+                def base_key(name: str) -> str:
+                    lower = name.lower()
+                    if lower.endswith(".info.json"):
+                        return name[:-len(".info.json")]
+                    if lower.endswith(".description"):
+                        return name[:-len(".description")]
+                    return Path(name).stem
+
+                for item in uploaded_files:
+                    if item.get("status") not in {"success", "skipped"}:
+                        continue
+                    file_name = item.get("name")
+                    file_id = item.get("file_id")
+                    if not file_name or not file_id:
+                        continue
+                    key = base_key(str(file_name))
+                    by_base.setdefault(key, []).append(item)
+
+                for items in by_base.values():
+                    video_item = next(
+                        (
+                            it
+                            for it in items
+                            if it.get("name")
+                            and any(
+                                str(it["name"]).lower().endswith(ext)
+                                for ext in settings.VIDEO_EXTENSIONS
+                            )
+                        ),
+                        None,
+                    )
+                    if not video_item:
+                        continue
+                    video_name = str(video_item["name"])
+                    drive_path = f"{folder_name}/{video_name}"
+
+                    related = [
+                        {"name": it.get("name"), "file_id": it.get("file_id")}
+                        for it in items
+                        if it is not video_item
+                    ]
+
+                    await upsert_drive_video_from_upload(
+                        video_file_id=str(video_item.get("file_id")),
+                        drive_path=drive_path,
+                        size_bytes=int(video_item.get("size") or 0),
+                        related_files=related,
+                    )
+
+                await maybe_publish_drive_snapshot(reason="drive_upload_external")
+            except Exception as e:
+                logger.warning(f"Catalog write-through failed (drive_upload_external): {e}")
 
         # Completar job
         _complete_job(job_id, {
@@ -798,6 +1122,29 @@ async def _run_single_download_job(
         )
 
         if result.get("status") != "error":
+            if settings.CATALOG_ENABLED and result.get("status") == "success":
+                try:
+                    out_dir = Path(base_dir).resolve()
+                    video_abs = Path(result.get("path") or "").resolve()
+                    if video_abs.exists() and any(
+                        str(video_abs).lower().endswith(ext) for ext in settings.VIDEO_EXTENSIONS
+                    ):
+                        video_rel = video_abs.relative_to(out_dir).as_posix()
+                        thumb_rel = None
+                        for ext in settings.THUMBNAIL_EXTENSIONS:
+                            candidate = video_abs.with_suffix(ext)
+                            if candidate.exists():
+                                thumb_rel = candidate.relative_to(out_dir).as_posix()
+                                break
+
+                        await upsert_local_video_from_fs(
+                            video_path=video_rel,
+                            base_dir=str(out_dir),
+                            thumbnail_path=thumb_rel,
+                        )
+                except Exception as e:
+                    logger.warning(f"Catalog write-through failed (drive_download_single): {e}")
+
             _complete_download_job(job_id, {
                 "status": "success",
                 "downloaded": 1,
@@ -860,9 +1207,46 @@ async def _run_batch_download_job(job_id: str, base_dir: str) -> None:
     """
     try:
         # Obter lista de arquivos para download (apenas no Drive)
-        sync_state = drive_manager.get_sync_state(base_dir)
-        drive_only = sync_state["drive_only"]
-        total = len(drive_only)
+        if settings.CATALOG_ENABLED:
+            repo = CatalogRepository()
+            counts = await run_blocking(
+                repo.get_counts,
+                semaphore=get_catalog_semaphore(),
+                label="drive.download.counts",
+            )
+            if counts.get("drive", 0) == 0:
+                raise Exception("Catálogo do Drive vazio: rode /api/catalog/drive/import ou /api/catalog/drive/rebuild antes de baixar.")
+            if counts.get("local", 0) == 0:
+                # Sem catálogo local, o diff vira "baixar tudo"; preferimos exigir index local.
+                raise Exception("Catálogo local vazio: rode /api/catalog/bootstrap-local antes de baixar em lote.")
+
+            local_set, drive_map = await run_blocking(
+                _get_catalog_sets,
+                repo,
+                semaphore=get_catalog_semaphore(),
+                label="drive.download.sets",
+            )
+            drive_set = set(drive_map.keys())
+            drive_only_items = [(p, drive_map[p]) for p in sorted(drive_set - local_set) if drive_map.get(p)]
+        else:
+            sync_state = await run_blocking(
+                drive_manager.get_sync_state,
+                base_dir,
+                semaphore=get_drive_semaphore(),
+                label="drive.download.sync_state",
+            )
+            drive_only_items = []
+            for p in sync_state["drive_only"]:
+                v = await run_blocking(
+                    drive_manager.get_video_by_path,
+                    p,
+                    semaphore=get_drive_semaphore(),
+                    label="drive.download.by_path",
+                )
+                if v:
+                    drive_only_items.append((p, v["id"]))
+
+        total = len(drive_only_items)
 
         if total == 0:
             _complete_download_job(job_id, {
@@ -884,10 +1268,6 @@ async def _run_batch_download_job(job_id: str, base_dir: str) -> None:
             "files_in_progress": []
         })
 
-        # Obter lista de vídeos do Drive com IDs
-        drive_videos = drive_manager.list_videos()
-        path_to_video = {v['path']: v for v in drive_videos}
-
         # Contadores thread-safe
         results = {"downloaded": 0, "failed": [], "files": []}
         results_lock = asyncio.Lock()
@@ -896,25 +1276,13 @@ async def _run_batch_download_job(job_id: str, base_dir: str) -> None:
 
         semaphore = _get_download_semaphore()
 
-        async def download_with_semaphore(video_path: str) -> None:
+        async def download_with_semaphore(video_path: str, file_id: str) -> None:
             """Download um arquivo com controle de concorrência."""
             async with semaphore:
                 # Verificar se job foi cancelado
                 job = store.get_job(job_id)
                 if job and job.get("status") == "cancelled":
                     return
-
-                # Obter ID do arquivo
-                video_info = path_to_video.get(video_path)
-                if not video_info:
-                    async with results_lock:
-                        results["failed"].append({
-                            "file": video_path,
-                            "error": "Video not found in Drive"
-                        })
-                    return
-
-                file_id = video_info['id']
 
                 # Marcar arquivo como em progresso
                 async with progress_lock:
@@ -934,27 +1302,33 @@ async def _run_batch_download_job(job_id: str, base_dir: str) -> None:
                         None  # No progress callback for batch
                     )
 
-                    async with results_lock:
-                        if result.get("status") != "error":
-                            results["downloaded"] += 1
-                            results["files"].append(result)
-                        else:
-                            results["failed"].append({
-                                "file": video_path,
-                                "error": result.get("message", "Unknown error")
-                            })
+                    if settings.CATALOG_ENABLED and result.get("status") != "error":
+                        try:
+                            out_dir = Path(base_dir).resolve()
+                            video_abs = Path(result.get("path") or "").resolve()
+                            if (
+                                video_abs.exists()
+                                and video_abs.suffix.lower() in settings.VIDEO_EXTENSIONS
+                            ):
+                                video_rel = video_abs.relative_to(out_dir).as_posix()
+                                thumb_rel = None
+                                for ext in settings.THUMBNAIL_EXTENSIONS:
+                                    candidate = video_abs.with_suffix(ext)
+                                    if candidate.exists():
+                                        thumb_rel = candidate.relative_to(out_dir).as_posix()
+                                        break
 
-                        # Atualizar progresso geral
-                        done = results["downloaded"] + len(results["failed"])
-                        _update_download_progress(job_id, {
-                            "status": "downloading",
-                            "total": total,
-                            "downloaded": results["downloaded"],
-                            "failed": len(results["failed"]),
-                            "percent": (done / total) * 100,
-                            "current_file": None,
-                            "files_in_progress": []
-                        })
+                                await upsert_local_video_from_fs(
+                                    video_path=video_rel,
+                                    base_dir=str(out_dir),
+                                    thumbnail_path=thumb_rel,
+                                )
+                        except Exception as e:
+                            logger.warning(f"Catalog write-through failed (drive_download_batch): {e}")
+
+                    async with results_lock:
+                        results["downloaded"] += 1
+                        results["files"].append(result)
 
                 except Exception as e:
                     async with results_lock:
@@ -963,15 +1337,28 @@ async def _run_batch_download_job(job_id: str, base_dir: str) -> None:
                             "error": str(e)
                         })
                 finally:
-                    # Remover arquivo da lista de em progresso
+                    in_progress_snapshot: List[str]
                     async with progress_lock:
                         if video_path in files_in_progress:
                             files_in_progress.remove(video_path)
+                        in_progress_snapshot = files_in_progress.copy()
+
+                    async with results_lock:
+                        done = results["downloaded"] + len(results["failed"])
+                        _update_download_progress(job_id, {
+                            "status": "downloading",
+                            "total": total,
+                            "downloaded": results["downloaded"],
+                            "failed": len(results["failed"]),
+                            "percent": (done / total) * 100,
+                            "current_file": None,
+                            "files_in_progress": in_progress_snapshot
+                        })
 
         # Criar todas as tasks (semaphore controla concorrência)
         tasks = [
-            download_with_semaphore(video_path)
-            for video_path in drive_only
+            download_with_semaphore(video_path, file_id)
+            for (video_path, file_id) in drive_only_items
         ]
 
         # Aguardar todas completarem

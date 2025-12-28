@@ -7,13 +7,14 @@ Provides endpoints for:
 - Serving thumbnails
 - Deleting videos and related files
 """
+import asyncio
 import re
 from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
 
 from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse, Response
 
 from app.core.logging import get_module_logger
 from app.core.rate_limit import limiter, RateLimits
@@ -21,6 +22,13 @@ from typing import List
 from fastapi import UploadFile, File, Form
 from pydantic import BaseModel
 from .service import get_paginated_videos, delete_video_with_related, delete_videos_batch, rename_video, update_video_thumbnail
+from app.catalog.service import (
+    list_local_videos_paginated,
+    delete_local_video_from_catalog,
+    rename_local_video_in_catalog,
+    upsert_local_video_from_fs,
+)
+from app.core.blocking import run_blocking, get_fs_semaphore
 
 
 class RenameRequest(BaseModel):
@@ -96,7 +104,18 @@ async def list_videos(request: Request, base_dir: str = "./downloads", page: int
     if limit is not None and limit <= 0:
         raise InvalidRequestException("Limite deve ser > 0")
 
-    return get_paginated_videos(base_dir, page, limit)
+    if settings.CATALOG_ENABLED:
+        effective_limit = limit if limit is not None else 1000000
+        return await list_local_videos_paginated(page=page, limit=effective_limit)
+
+    return await run_blocking(
+        get_paginated_videos,
+        base_dir,
+        page,
+        limit,
+        semaphore=get_fs_semaphore(),
+        label="library.list_videos",
+    )
 
 
 @router.get(
@@ -143,25 +162,42 @@ async def stream_video(request: Request, video_path: str, base_dir: str = "./dow
         file_ext = full_path.suffix.lower()
         media_type = settings.VIDEO_MIME_TYPES.get(file_ext, 'video/mp4')
 
-        logger.debug(f"Media type: {media_type}, File size: {full_path.stat().st_size}")
+        file_size = full_path.stat().st_size
+        logger.debug(f"Media type: {media_type}, File size: {file_size}")
 
         # Check for range request
         range_header = request.headers.get("range")
 
         if not range_header:
-            # Normal response without range
+            # Full response without range (streamed to avoid threadpool FileResponse)
+            start = 0
+            end = file_size - 1
+            chunk_size = file_size
+
+            async def iterfile():
+                with open(full_path, 'rb') as f:
+                    while True:
+                        data = f.read(8192)
+                        if not data:
+                            break
+                        yield data
+                        await asyncio.sleep(0)
+
             encoded_filename = encode_filename_for_header(full_path.name)
-            return FileResponse(
-                full_path,
+            headers = {
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(chunk_size),
+                "Content-Disposition": f"inline; filename*=UTF-8''{encoded_filename}",
+            }
+
+            return StreamingResponse(
+                iterfile(),
+                status_code=200,
                 media_type=media_type,
-                headers={
-                    "Accept-Ranges": "bytes",
-                    "Content-Disposition": f"inline; filename*=UTF-8''{encoded_filename}"
-                }
+                headers=headers,
             )
 
         # Process range request
-        file_size = full_path.stat().st_size
         range_match = re.match(r'bytes=(\d+)-(\d*)', range_header)
 
         if not range_match:
@@ -175,7 +211,7 @@ async def stream_video(request: Request, video_path: str, base_dir: str = "./dow
 
         chunk_size = end - start + 1
 
-        def iterfile():
+        async def iterfile():
             with open(full_path, 'rb') as f:
                 f.seek(start)
                 remaining = chunk_size
@@ -186,6 +222,7 @@ async def stream_video(request: Request, video_path: str, base_dir: str = "./dow
                         break
                     remaining -= len(data)
                     yield data
+                    await asyncio.sleep(0)
 
         encoded_filename = encode_filename_for_header(full_path.name)
         headers = {
@@ -241,7 +278,12 @@ async def get_thumbnail(request: Request, thumbnail_path: str, base_dir: str = "
 
         media_type = settings.IMAGE_MIME_TYPES.get(full_path.suffix.lower(), 'image/jpeg')
 
-        return FileResponse(full_path, media_type=media_type)
+        content = await run_blocking(
+            full_path.read_bytes,
+            semaphore=get_fs_semaphore(),
+            label="library.thumbnail",
+        )
+        return Response(content=content, media_type=media_type)
 
     except ThumbnailNotFoundException:
         raise
@@ -292,7 +334,16 @@ async def delete_videos_batch_endpoint(request: Request, video_paths: List[str],
         if len(video_paths) > 100:
             raise InvalidRequestException("Cannot delete more than 100 videos at once")
 
-        return delete_videos_batch(video_paths, base_dir)
+        result = await run_blocking(
+            delete_videos_batch,
+            video_paths,
+            base_dir,
+            semaphore=get_fs_semaphore(),
+            label="library.delete_batch",
+        )
+        for item in result.get("deleted", []):
+            await delete_local_video_from_catalog(video_path=sanitize_path(item.get("path", "")))
+        return result
     except InvalidRequestException:
         raise
     except Exception as e:
@@ -339,7 +390,30 @@ Renomeia um vídeo e todos os arquivos associados.
 async def rename_video_endpoint(request: Request, video_path: str, body: RenameRequest, base_dir: str = "./downloads"):
     """Renomeia um vídeo e seus arquivos associados."""
     try:
-        return rename_video(video_path, body.new_name, base_dir)
+        result = await run_blocking(
+            rename_video,
+            video_path,
+            body.new_name,
+            base_dir,
+            semaphore=get_fs_semaphore(),
+            label="library.rename",
+        )
+        new_path = result.get("new_path")
+        if new_path:
+            # Try to detect new thumbnail path from renamed files
+            new_thumb = None
+            for item in result.get("renamed_files", []):
+                new_file = item.get("new")
+                if isinstance(new_file, str) and Path(new_file).suffix.lower() in settings.THUMBNAIL_EXTENSIONS:
+                    new_thumb = new_file
+                    break
+            await rename_local_video_in_catalog(
+                old_video_path=sanitize_path(video_path),
+                new_video_path=new_path,
+                base_dir=base_dir,
+                new_thumbnail_path=new_thumb,
+            )
+        return result
     except ValueError as e:
         raise InvalidRequestException(str(e))
     except (VideoNotFoundException,):
@@ -399,7 +473,23 @@ async def update_thumbnail_endpoint(
         # Read file content
         thumbnail_data = await thumbnail.read()
 
-        return update_video_thumbnail(video_path, thumbnail_data, file_ext, base_dir)
+        result = await run_blocking(
+            update_video_thumbnail,
+            video_path,
+            thumbnail_data,
+            file_ext,
+            base_dir,
+            semaphore=get_fs_semaphore(),
+            label="library.update_thumbnail",
+        )
+        thumb_path = result.get("thumbnail_path")
+        if thumb_path:
+            await upsert_local_video_from_fs(
+                video_path=sanitize_path(video_path),
+                base_dir=base_dir,
+                thumbnail_path=thumb_path,
+            )
+        return result
     except InvalidRequestException:
         raise
     except ValueError as e:
@@ -450,7 +540,15 @@ Exclui um vídeo e todos os arquivos associados.
 async def delete_video(request: Request, video_path: str, base_dir: str = "./downloads"):
     """Exclui um vídeo e seus arquivos associados."""
     try:
-        return delete_video_with_related(video_path, base_dir)
+        result = await run_blocking(
+            delete_video_with_related,
+            video_path,
+            base_dir,
+            semaphore=get_fs_semaphore(),
+            label="library.delete_video",
+        )
+        await delete_local_video_from_catalog(video_path=sanitize_path(video_path))
+        return result
     except (VideoNotFoundException,):
         raise
     except Exception as e:

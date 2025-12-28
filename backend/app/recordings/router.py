@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 
 from app.core.logging import get_module_logger
 from app.core.rate_limit import limiter, RateLimits
+from app.core.blocking import run_blocking, get_fs_semaphore
 from .service import save_recording
 
 logger = get_module_logger("recordings")
@@ -24,11 +25,14 @@ async def upload_recording(
     Recebe uma gravação enviada pelo frontend e salva na pasta de downloads.
     """
     try:
-        result = save_recording(
+        result = await run_blocking(
+            save_recording,
             file=file.file,
             filename=file.filename,
             target_path=target_path,
             base_dir=base_dir,
+            semaphore=get_fs_semaphore(),
+            label="recordings.save",
         )
         return result
     except HTTPException:

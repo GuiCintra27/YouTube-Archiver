@@ -4,7 +4,7 @@
 
 ### Backend (API)
 
-1. **Novo módulo `drive_manager.py`**
+1. **DriveManager (`backend/app/drive/manager.py`)**
    - Gerenciamento completo do Google Drive
    - Autenticação OAuth 2.0
    - Upload de vídeos mantendo estrutura de pastas
@@ -19,10 +19,12 @@
    - `GET /api/drive/videos` - Listar vídeos no Drive
    - `POST /api/drive/upload/{path}` - Upload de vídeo individual
    - `GET /api/drive/sync-status` - Status de sincronização
+   - `GET /api/drive/sync-items` - Itens paginados (local_only/drive_only/synced)
    - `POST /api/drive/sync-all` - Sincronizar todos os vídeos
    - `DELETE /api/drive/videos/{id}` - Remover vídeo do Drive
    - `POST /api/drive/videos/delete-batch` - Excluir múltiplos vídeos em lote
-   - `POST /api/drive/download/{id}` - Download de vídeo para local
+   - `POST /api/drive/download` - Download de vídeo para local (por path ou file_id)
+   - `POST /api/drive/download-all` - Download em lote (Drive -> local)
    - `PATCH /api/drive/videos/{id}/rename` - Renomear vídeo no Drive
    - `POST /api/drive/videos/{id}/thumbnail` - Atualizar thumbnail no Drive
 
@@ -76,6 +78,9 @@
 Sistema de cache local que armazena metadados de vídeos do Google Drive em SQLite,
 eliminando a necessidade de chamadas à API do Drive para cada listagem.
 
+**Nota:** o catálogo persistente (snapshot + SQLite) é o fluxo principal atual.
+O cache permanece como opção/legado para cenários específicos.
+
 ### Ganhos de Performance
 
 | Operação | Antes (API) | Depois (Cache) | Melhoria |
@@ -119,16 +124,49 @@ curl -X DELETE http://localhost:8000/api/drive/cache
 
 ---
 
+## 📦 Catálogo do Drive (Snapshot + SQLite)
+
+Além do cache, o Drive agora usa um **catálogo persistente**:
+- SQLite local (`backend/database.db`)
+- Snapshot versionado no Drive (`catalog-drive.json.gz`)
+
+### Primeiro uso / Máquina nova
+
+1) **Importar snapshot existente**
+```
+POST /api/catalog/drive/import
+```
+
+2) **Rebuild inicial (Drive já populado, sem snapshot)**
+```
+POST /api/catalog/drive/rebuild
+```
+
+3) **Indexar vídeos locais**
+```
+POST /api/catalog/bootstrap-local
+```
+
+### Endpoints de catálogo
+
+- `GET /api/catalog/status`
+- `POST /api/catalog/bootstrap-local`
+- `POST /api/catalog/drive/import`
+- `POST /api/catalog/drive/publish`
+- `POST /api/catalog/drive/rebuild`
+
 ## 📁 Estrutura de Arquivos Criados
 
 ```
 backend/
-├── drive_manager.py           # Módulo de gerenciamento do Drive
+├── app/drive/manager.py       # DriveManager (OAuth, upload, download)
+├── app/drive/cache/           # Cache SQLite do Drive (opcional)
+├── app/catalog/               # Catálogo persistente (SQLite + snapshot)
 ├── credentials.json.example   # Exemplo de credenciais
-├── drive_cache.db             # Cache SQLite de metadados
-└── api.py (modificado)        # Novos endpoints
+├── drive_cache.db             # Cache SQLite (opcional)
+└── database.db                # Catálogo SQLite (local + drive)
 
-web-ui/src/
+frontend/src/
 ├── app/
 │   ├── layout.tsx (modificado)  # Navegação adicionada
 │   └── drive/
@@ -164,7 +202,7 @@ cd backend
 ./run.sh
 
 # Terminal 2 - Frontend
-cd web-ui
+cd frontend
 npm run dev
 ```
 

@@ -2,7 +2,7 @@
 
 ## Status dos Testes
 
-✅ **Backend API** - 46 testes automatizados (pytest)
+✅ **Backend API** - 63 testes automatizados (pytest, excluindo drive_cache)
 ✅ **Frontend Next.js** - Build funcionando
 
 ---
@@ -13,22 +13,31 @@
 ```bash
 cd backend
 source .venv/bin/activate
-pytest tests/ -v
+python -m pytest -q -k "not drive_cache"
 ```
 
-**Resultado esperado:** `46 passed in ~1.5s`
+**Resultado esperado:** `63 passed in ~2s`
 
 ### Testes com Cobertura
 ```bash
-pytest tests/ --cov=app --cov-report=html
+python -m pytest tests/ --cov=app --cov-report=html -k "not drive_cache"
 # Abrir htmlcov/index.html no navegador
 ```
 
-### Testes Disponíveis (46 total)
+### Testes Disponíveis (63 total, sem drive_cache)
 
 | Arquivo | Testes | Descrição |
 |---------|--------|-----------|
 | `test_cache.py` | 7 | Cache de diretórios (TTL, invalidação, thread-safety) |
+| `test_catalog.py` | 2 | Catálogo SQLite (schema, status) |
+| `test_download_catalog_write_through.py` | 1 | Write-through após download |
+| `test_drive_catalog_bootstrap.py` | 2 | Bootstrap do catálogo local |
+| `test_drive_catalog_listing.py` | 1 | Listagem Drive via catálogo |
+| `test_drive_catalog_write_through.py` | 3 | Write-through no Drive |
+| `test_drive_download_streaming.py` | 3 | Download streaming seguro |
+| `test_drive_snapshot.py` | 2 | Snapshot Drive (encode/decode) |
+| `test_drive_sync_catalog.py` | 1 | Sync status via catálogo |
+| `test_error_handling.py` | 1 | Erros padronizados |
 | `test_health.py` | 2 | Health check e versão |
 | `test_jobs.py` | 8 | Jobs, cancelamento, exclusão |
 | `test_library.py` | 13 | Vídeos, streaming, thumbnails, exclusão |
@@ -37,10 +46,10 @@ pytest tests/ --cov=app --cov-report=html
 ### Rodar Teste Específico
 ```bash
 # Um arquivo
-pytest tests/test_validators.py -v
+python -m pytest tests/test_validators.py -v
 
 # Um teste específico
-pytest tests/test_library.py::TestListVideos::test_list_videos_empty_directory -v
+python -m pytest tests/test_library.py::TestListVideos::test_list_videos_empty_directory -v
 ```
 
 ---
@@ -93,6 +102,11 @@ curl http://localhost:8000/
 ```bash
 curl http://localhost:8000/api/jobs
 # Esperado: {"total":0,"jobs":[]}
+```
+
+#### 2.1 Status do Catálogo
+```bash
+curl http://localhost:8000/api/catalog/status
 ```
 
 #### 3. Obter Info de Vídeo
@@ -213,7 +227,7 @@ yt-archiver/
 
 Antes de usar em produção, verifique:
 
-- [ ] Testes automatizados passam (`pytest tests/ -v` → 46 passed)
+- [ ] Testes automatizados passam (`python -m pytest -q -k "not drive_cache"` → 63 passed)
 - [ ] Backend inicia sem erros (`./run.sh`)
 - [ ] API responde em `/` e `/docs`
 - [ ] Frontend carrega em localhost:3000

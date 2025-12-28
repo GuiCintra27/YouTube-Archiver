@@ -1,26 +1,41 @@
 """
 Pytest configuration and shared fixtures for YT-Archiver tests.
 """
+import os
 import pytest
+import pytest_asyncio
 from pathlib import Path
 from typing import Generator
-from fastapi.testclient import TestClient
+import httpx
+
+# The Drive cache uses `aiosqlite`, which may hang in some environments.
+# For unit tests that don't explicitly target the Drive cache subsystem,
+# disable it to keep the FastAPI app startup deterministic.
+os.environ.setdefault("DRIVE_CACHE_ENABLED", "false")
+os.environ.setdefault("DRIVE_CACHE_FALLBACK_TO_API", "false")
+os.environ.setdefault("CATALOG_DB_PATH", ":memory:")
 
 from app.main import app
 from app.jobs import store as jobs_store
 from app.library.cache import video_cache
+from app.catalog.repository import CatalogRepository
+from app.config import settings
 
 
-@pytest.fixture
-def client() -> Generator[TestClient, None, None]:
+@pytest_asyncio.fixture
+async def client() -> Generator[httpx.AsyncClient, None, None]:
     """
-    Create a test client for the FastAPI application.
+    Create an async test client for the FastAPI application.
 
     Yields:
-        TestClient instance for making HTTP requests
+        httpx.AsyncClient instance for making HTTP requests
     """
-    with TestClient(app) as test_client:
-        yield test_client
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        ) as test_client:
+            yield test_client
 
 
 @pytest.fixture
@@ -101,6 +116,28 @@ def clear_cache():
     video_cache.invalidate()
     yield
     video_cache.invalidate()
+
+
+@pytest.fixture(autouse=True)
+def clear_catalog_and_reset_flags():
+    """
+    Clear the in-memory catalog DB and reset settings flags mutated by tests.
+
+    Some tests monkeypatch `settings.CATALOG_ENABLED` at runtime; since `settings`
+    is a singleton, we must restore defaults to avoid cross-test leakage.
+    """
+    original_catalog_enabled = settings.CATALOG_ENABLED
+    try:
+        repo = CatalogRepository()
+        repo.clear_location("local")
+        repo.clear_location("drive")
+    except Exception:
+        pass
+
+    settings.CATALOG_ENABLED = False
+    yield
+
+    settings.CATALOG_ENABLED = original_catalog_enabled
 
 
 @pytest.fixture

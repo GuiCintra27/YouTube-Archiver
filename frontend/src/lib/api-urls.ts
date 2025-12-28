@@ -11,6 +11,7 @@ export enum APIURLS {
   DRIVE_STREAM = "drive/stream",
   DRIVE_SYNC_ALL = "drive/sync-all",
   DRIVE_SYNC_STATUS = "drive/sync-status",
+  DRIVE_SYNC_ITEMS = "drive/sync-items",
   DRIVE_THUMBNAIL = "drive/thumbnail",
   DRIVE_UPDATE_THUMBNAIL = "drive/update-thumbnail",
   DRIVE_UPLOAD = "drive/upload",

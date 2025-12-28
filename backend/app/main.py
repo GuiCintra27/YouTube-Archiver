@@ -11,6 +11,7 @@ from app.config import settings
 from app.core.logging import setup_logging, logger
 from app.core.errors import register_exception_handlers
 from app.core.rate_limit import setup_rate_limiting
+from app.core.middleware.request_id import RequestIdMiddleware
 
 # Import routers
 from app.downloads.router import router as downloads_router
@@ -18,6 +19,7 @@ from app.jobs.router import router as jobs_router
 from app.library.router import router as library_router
 from app.recordings.router import router as recordings_router
 from app.drive.router import router as drive_router
+from app.catalog.router import router as catalog_router
 
 # Import background tasks
 from app.jobs.cleanup import run_cleanup_loop
@@ -81,6 +83,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Request correlation
+app.add_middleware(RequestIdMiddleware)
+
 # Register exception handlers for standardized error responses
 register_exception_handlers(app)
 
@@ -102,6 +107,7 @@ app.include_router(jobs_router)
 app.include_router(library_router)
 app.include_router(recordings_router)
 app.include_router(drive_router)
+app.include_router(catalog_router)
 
 
 @app.get("/")

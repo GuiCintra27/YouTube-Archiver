@@ -18,14 +18,18 @@ from .service import (
     upload_single_video,
     upload_external_files,
     get_sync_status,
+    get_sync_items_from_catalog,
     sync_all_videos,
     delete_video,
     delete_videos_batch,
+    rename_drive_video as rename_drive_video_service,
+    update_drive_thumbnail as update_drive_thumbnail_service,
     stream_video,
     get_thumbnail,
     get_custom_thumbnail,
     download_single_from_drive,
     download_all_from_drive,
+    resolve_drive_file_id_by_path,
 )
 from .manager import drive_manager
 from app.core.exceptions import (
@@ -34,7 +38,9 @@ from app.core.exceptions import (
     InvalidRequestException,
     ThumbnailNotFoundException,
 )
+from app.core.errors import AppException
 from app.core.rate_limit import limiter, RateLimits
+from app.core.blocking import run_blocking, get_drive_semaphore
 from app.config import settings
 from pydantic import BaseModel
 
@@ -77,7 +83,12 @@ async def auth_url(request: Request):
 async def oauth2callback(request: Request, code: str):
     """OAuth callback - exchange code for tokens"""
     try:
-        result = exchange_auth_code(code)
+        result = await run_blocking(
+            exchange_auth_code,
+            code,
+            semaphore=get_drive_semaphore(),
+            label="drive.oauth",
+        )
 
         # Trigger initial cache sync after successful authentication
         if settings.DRIVE_CACHE_ENABLED:
@@ -132,6 +143,8 @@ async def upload_to_drive(request: Request, video_path: str, base_dir: str = "./
         }
     except DriveNotAuthenticatedException:
         raise
+    except AppException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -144,8 +157,26 @@ async def sync_status(request: Request, base_dir: str = "./downloads"):
     """Get sync status between local and Drive"""
     try:
         _require_auth()
-        return get_sync_status(base_dir)
+        return await get_sync_status(base_dir)
     except DriveNotAuthenticatedException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/sync-items")
+@limiter.limit(RateLimits.GET_STATUS)
+async def sync_items(request: Request, kind: str, page: int = 1, limit: int = 50):
+    """
+    Paginated sync items between local and Drive catalogs.
+
+    kind: local_only | drive_only | synced
+    """
+    try:
+        _require_auth()
+        if page < 1 or limit < 1:
+            raise InvalidRequestException("page and limit must be positive integers")
+        return await get_sync_items_from_catalog(kind=kind, page=page, limit=limit)
+    except (DriveNotAuthenticatedException, InvalidRequestException):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -229,7 +260,7 @@ async def rename_drive_video(request: Request, file_id: str, body: RenameRequest
         if not body.new_name or not body.new_name.strip():
             raise InvalidRequestException("New name cannot be empty")
 
-        return drive_manager.rename_file(file_id, body.new_name.strip())
+        return await rename_drive_video_service(file_id, body.new_name.strip())
     except (DriveNotAuthenticatedException, InvalidRequestException):
         raise
     except Exception as e:
@@ -261,7 +292,7 @@ async def update_drive_thumbnail(
 
         thumbnail_data = await thumbnail.read()
 
-        return drive_manager.update_thumbnail(file_id, thumbnail_data, file_ext)
+        return await update_drive_thumbnail_service(file_id, thumbnail_data, file_ext)
     except (DriveNotAuthenticatedException, InvalidRequestException):
         raise
     except Exception as e:
@@ -279,7 +310,23 @@ async def stream_drive_video(request: Request, file_id: str):
         _require_auth()
 
         range_header = request.headers.get('range')
-        generator, headers, status_code = stream_video(file_id, range_header)
+        file_metadata = await run_blocking(
+            drive_manager.get_file_metadata,
+            file_id,
+            semaphore=get_drive_semaphore(),
+            label="drive.stream.metadata",
+        )
+        access_token = await run_blocking(
+            drive_manager._get_access_token,
+            semaphore=get_drive_semaphore(),
+            label="drive.stream.token",
+        )
+        generator, headers, status_code = stream_video(
+            file_id,
+            range_header,
+            file_metadata=file_metadata,
+            access_token=access_token,
+        )
 
         if generator is None:
             # Range not satisfiable
@@ -307,7 +354,12 @@ async def get_drive_thumbnail(request: Request, file_id: str):
     try:
         _require_auth()
 
-        thumbnail_bytes = get_thumbnail(file_id)
+        thumbnail_bytes = await run_blocking(
+            get_thumbnail,
+            file_id,
+            semaphore=get_drive_semaphore(),
+            label="drive.thumbnail",
+        )
 
         if not thumbnail_bytes:
             raise ThumbnailNotFoundException()
@@ -336,7 +388,12 @@ async def get_drive_custom_thumbnail(request: Request, file_id: str):
     try:
         _require_auth()
 
-        result = get_custom_thumbnail(file_id)
+        result = await run_blocking(
+            get_custom_thumbnail,
+            file_id,
+            semaphore=get_drive_semaphore(),
+            label="drive.custom_thumbnail",
+        )
 
         if not result:
             raise ThumbnailNotFoundException()
@@ -444,6 +501,7 @@ async def upload_external_to_drive(
 async def download_from_drive(
     request: Request,
     path: str,
+    file_id: str | None = None,
     base_dir: str = "./downloads"
 ):
     """
@@ -459,13 +517,22 @@ async def download_from_drive(
     try:
         _require_auth()
 
-        # Buscar file_id pelo path
-        video = drive_manager.get_video_by_path(path)
-        if not video:
-            raise HTTPException(status_code=404, detail=f"Vídeo não encontrado no Drive: {path}")
+        resolved_file_id = file_id
+        if not resolved_file_id:
+            if settings.CATALOG_ENABLED:
+                resolved_file_id = await resolve_drive_file_id_by_path(drive_path=path)
+            else:
+                video = await run_blocking(
+                    drive_manager.get_video_by_path,
+                    path,
+                    semaphore=get_drive_semaphore(),
+                    label="drive.get_video_by_path",
+                )
+                if not video:
+                    raise HTTPException(status_code=404, detail=f"Vídeo não encontrado no Drive: {path}")
+                resolved_file_id = video["id"]
 
-        file_id = video['id']
-        job_id = await download_single_from_drive(file_id, path, base_dir)
+        job_id = await download_single_from_drive(resolved_file_id, path, base_dir)
         return {
             "status": "success",
             "job_id": job_id,

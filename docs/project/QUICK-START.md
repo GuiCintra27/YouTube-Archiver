@@ -81,6 +81,17 @@ Abra: **http://localhost:8000/docs**
 
 Interface Swagger interativa com todos os endpoints.
 
+## 📦 Catálogo (primeira execução)
+
+Se você pretende usar o Drive ou já tem vídeos locais:
+
+1. **Indexar vídeos locais**
+   - `POST /api/catalog/bootstrap-local`
+2. **Drive em máquina nova (snapshot já existe)**
+   - `POST /api/catalog/drive/import`
+3. **Drive já populado, sem snapshot**
+   - `POST /api/catalog/drive/rebuild`
+
 ## 🐛 Troubleshooting Rápido
 
 ### Backend não inicia
@@ -158,9 +169,9 @@ Após testar, explore:
 
 ## 📚 Documentação Completa
 
-- [README.md](./README.md) - Documentação completa do projeto
-- [WEB-UI-README.md](./WEB-UI-README.md) - Detalhes da interface web
-- [CLAUDE.md](./CLAUDE.md) - Instruções para desenvolvimento
+- [README.md](../../README.md) - Documentação completa do projeto
+- [WEB-UI-README.md](../../frontend/docs/project/WEB-UI-README.md) - Detalhes da interface web
+- [CLAUDE.md](../../CLAUDE.md) - Instruções para desenvolvimento
 
 ---
 

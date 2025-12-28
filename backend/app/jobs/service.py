@@ -11,13 +11,19 @@ import uuid
 import asyncio
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional, Dict, Any
+from pathlib import Path
 
 from . import store
 from app.downloads.service import create_download_settings, execute_download
+from app.catalog.service import upsert_local_video_from_fs
+from app.config import settings
+from app.core.logging import get_module_logger
 from app.core.types import JobData, JobProgress, DownloadResult
 
 if TYPE_CHECKING:
     from app.downloads.schemas import DownloadRequest
+
+logger = get_module_logger("jobs.service")
 
 
 def create_job(url: str, request: "DownloadRequest") -> str:
@@ -117,7 +123,7 @@ async def run_download_job(job_id: str, url: str, request: "DownloadRequest") ->
     """
     try:
         # Create settings from request
-        settings = create_download_settings(
+        download_settings = create_download_settings(
             out_dir=request.out_dir,
             archive_file=request.archive_file,
             fmt=request.fmt,
@@ -146,16 +152,50 @@ async def run_download_job(job_id: str, url: str, request: "DownloadRequest") ->
         target_dir = os.path.join(request.out_dir, request.path) if request.path else request.out_dir
         os.makedirs(target_dir, exist_ok=True)
 
+        finished_files: list[str] = []
+
         # Progress callback
         def progress_callback(progress: dict):
+            if progress.get("status") == "finished":
+                fp = progress.get("filepath")
+                if isinstance(fp, str) and fp:
+                    finished_files.append(fp)
             update_job_progress(job_id, progress)
 
         # Execute download
-        result = await execute_download(url, settings, progress_callback)
+        result = await execute_download(url, download_settings, progress_callback)
 
         if result["status"] == "error":
             fail_job(job_id, result.get("error", "Unknown error"))
         else:
+            if settings.CATALOG_ENABLED and finished_files:
+                try:
+                    out_dir = Path(request.out_dir).resolve()
+                    for fp in finished_files:
+                        try:
+                            abs_path = Path(fp).resolve()
+                            if not abs_path.exists():
+                                continue
+                            if abs_path.suffix.lower() not in settings.VIDEO_EXTENSIONS:
+                                continue
+
+                            rel_path = abs_path.relative_to(out_dir).as_posix()
+                            thumb_rel = None
+                            for ext in settings.THUMBNAIL_EXTENSIONS:
+                                candidate = abs_path.with_suffix(ext)
+                                if candidate.exists():
+                                    thumb_rel = candidate.relative_to(out_dir).as_posix()
+                                    break
+
+                            await upsert_local_video_from_fs(
+                                video_path=rel_path,
+                                base_dir=str(out_dir),
+                                thumbnail_path=thumb_rel,
+                            )
+                        except Exception as e:
+                            logger.warning(f"Catalog update skipped for {fp}: {e}")
+                except Exception as e:
+                    logger.warning(f"Catalog write-through failed (download_complete): {e}")
             complete_job(job_id, result)
 
     except Exception as e:

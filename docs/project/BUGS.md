@@ -100,6 +100,92 @@ query = f"name='{escaped_related_name}' and '{current_parent}' in parents and tr
 
 ---
 
+## ✅ BUG #3: Drive Sync Panel lento / travando - **CORRIGIDO**
+
+### Descrição
+O painel de sincronização do Drive ficava lento/travado ao carregar.
+
+### Causa Raiz
+- O sync fazia listagem completa do Drive a cada request.
+- IO bloqueante rodando no event loop.
+
+### Solução Implementada
+1. **Catálogo persistente (SQLite + snapshot)** para evitar listagens diretas.
+2. **Sync paginado** via `/api/drive/sync-items`.
+3. **IO bloqueante offload** com `core/blocking.py`.
+
+### Arquivos Modificados
+- `backend/app/drive/service.py`
+- `backend/app/drive/router.py`
+- `backend/app/catalog/*`
+- `frontend/src/components/drive/sync-panel.tsx`
+
+### Teste de Validação
+✅ Painel abre instantaneamente com listas paginadas.
+
+---
+
+## ✅ BUG #4: Download em lote do Drive não atualizava catálogo local - **CORRIGIDO**
+
+### Descrição
+Downloads em lote concluíam, mas os vídeos não apareciam na biblioteca local.
+
+### Causa Raiz
+Batch download não fazia write-through no catálogo local.
+
+### Solução Implementada
+1. **Write-through após cada download** (`upsert_local_video_from_fs`).
+2. **Atualização de thumbnails** quando existirem.
+
+### Arquivo Modificado
+- `backend/app/drive/service.py`
+
+### Teste de Validação
+✅ Vídeos aparecem imediatamente após o download em lote.
+
+---
+
+## ✅ BUG #5: Crash nativo no download do Drive - **CORRIGIDO**
+
+### Descrição
+Erro ocasional: `double free or corruption (!prev)` durante downloads do Drive.
+
+### Causa Raiz
+Uso concorrente de `googleapiclient` + `MediaIoBaseDownload` + `BytesIO`.
+
+### Solução Implementada
+1. **Download via REST + streaming para disco** (sem `BytesIO`).
+2. **Arquivo `.part`** + validação de tamanho.
+
+### Arquivo Modificado
+- `backend/app/drive/manager.py`
+
+### Teste de Validação
+✅ Downloads em lote sem crash.
+
+---
+
+## ✅ BUG #6: Cleanup job quebrando com jobs_db - **CORRIGIDO**
+
+### Descrição
+Erro em logs: `module 'app.jobs.store' has no attribute 'jobs_db'`.
+
+### Causa Raiz
+Refactor renomeou o dict interno, mas cleanup ainda referenciava `jobs_db`.
+
+### Solução Implementada
+Aliases compatíveis:
+- `jobs_db = _jobs_db`
+- `active_tasks = _active_tasks`
+
+### Arquivo Modificado
+- `backend/app/jobs/store.py`
+
+### Teste de Validação
+✅ Loop de cleanup executa sem erros.
+
+---
+
 ## Status da Aplicação
 
 ### ✅ Funcionalidades Testadas e Funcionando
@@ -141,12 +227,17 @@ query = f"name='{escaped_related_name}' and '{current_parent}' in parents and tr
   - Fix: Escape de aspas simples em queries do Google Drive
   - Testado com nomes complexos (|, ', acentos)
   - Upload de arquivos relacionados funcionando (thumbnails, metadata, legendas)
+- [x] **Painel de Sync do Drive** ✅ **[CORRIGIDO]**
+  - Status e itens paginados funcionando
+  - Sem travas no carregamento
+- [x] **Download em lote do Drive** ✅ **[CORRIGIDO]**
+  - Catálogo local atualizado após cada download
 
 ### ❌ Funcionalidades com Problemas
 *Nenhum bug crítico identificado no momento*
 
 ### ⏳ Funcionalidades Pendentes de Teste
-- [ ] Upload em lote ("Sincronizar Todos")
+- [x] Upload em lote ("Sincronizar Todos")
 - [ ] Deleção de vídeos locais
 - [ ] Deleção de vídeos do Google Drive
 - [ ] Download de playlists completas

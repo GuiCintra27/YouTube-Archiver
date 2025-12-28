@@ -8,11 +8,11 @@ from pathlib import Path
 from typing import Optional, List, Dict, Callable
 
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
-import io
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
+import requests
 
 from app.config import settings
 from app.core.logging import get_module_logger
@@ -135,6 +135,97 @@ class DriveManager:
 
             self._service = build('drive', 'v3', credentials=creds)
             return self._service
+
+    def _get_access_token(self) -> str:
+        """Get a valid OAuth access token (refreshing if needed)."""
+        with self._lock:
+            if not os.path.exists(self.token_path):
+                raise Exception("Not authenticated. Please authenticate first.")
+
+            creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
+            if not creds or not creds.valid:
+                if creds and creds.expired and creds.refresh_token:
+                    creds.refresh(Request())
+                    with open(self.token_path, 'w') as token:
+                        token.write(creds.to_json())
+                else:
+                    raise Exception("Not authenticated. Please authenticate first.")
+
+            if not creds.token:
+                raise Exception("Authentication token missing.")
+
+            return str(creds.token)
+
+    def _drive_api_get_json(self, url: str, params: Dict[str, str]) -> Dict:
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        resp = requests.get(url, headers=headers, params=params, timeout=(10, 60))
+        if resp.status_code >= 400:
+            raise Exception(f"Drive API error {resp.status_code}: {resp.text}")
+
+        data = resp.json()
+        if not isinstance(data, dict):
+            raise Exception("Invalid Drive API response (expected JSON object).")
+        return data
+
+    def _drive_api_download_to_path(
+        self,
+        file_id: str,
+        dest_path: Path,
+        expected_size: int = 0,
+        progress_callback: Optional[Callable] = None,
+        file_name: Optional[str] = None,
+    ) -> int:
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        url = f"https://www.googleapis.com/drive/v3/files/{file_id}"
+        params = {"alt": "media", "acknowledgeAbuse": "true"}
+
+        tmp_path = dest_path.with_suffix(dest_path.suffix + ".part")
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+
+        downloaded_bytes = 0
+        try:
+            with requests.get(url, headers=headers, params=params, stream=True, timeout=(10, 300)) as resp:
+                if resp.status_code >= 400:
+                    raise Exception(f"Drive download error {resp.status_code}: {resp.text}")
+
+                tmp_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(tmp_path, "wb") as f:
+                    for chunk in resp.iter_content(chunk_size=1024 * 1024):
+                        if not chunk:
+                            continue
+                        f.write(chunk)
+                        downloaded_bytes += len(chunk)
+
+                        if progress_callback and expected_size > 0:
+                            percent = int((downloaded_bytes / expected_size) * 100)
+                            if percent > 99:
+                                percent = 99
+                            progress_callback({
+                                "file_name": file_name or dest_path.name,
+                                "progress": percent,
+                            })
+
+            if expected_size > 0 and downloaded_bytes != expected_size:
+                raise Exception(
+                    f"Incomplete download (expected {expected_size} bytes, got {downloaded_bytes})"
+                )
+
+            tmp_path.replace(dest_path)
+            return downloaded_bytes
+        except Exception:
+            try:
+                if tmp_path.exists():
+                    tmp_path.unlink()
+            except Exception:
+                pass
+            raise
 
     def get_or_create_root_folder(self) -> str:
         """Get or create the root 'YouTube Archiver' folder"""
@@ -284,6 +375,7 @@ class DriveManager:
             logger.info(f"Upload completed: {file_name} (ID: {response['id']})")
 
             uploaded_related = []
+            related_files_detailed: List[Dict] = []
             # Upload related files
             for related_file in related_files:
                 try:
@@ -292,6 +384,14 @@ class DriveManager:
                     query = f"name='{escaped_related_name}' and '{current_parent}' in parents and trashed=false"
                     results = service.files().list(q=query, fields='files(id)').execute()
                     if results.get('files', []):
+                        existing_id = results["files"][0].get("id")
+                        related_files_detailed.append(
+                            {
+                                "name": related_file.name,
+                                "file_id": existing_id,
+                                "status": "skipped",
+                            }
+                        )
                         continue  # Already exists, skip
 
                     # Upload
@@ -300,12 +400,19 @@ class DriveManager:
                         'parents': [current_parent]
                     }
                     related_media = MediaFileUpload(str(related_file))
-                    service.files().create(
+                    related_resp = service.files().create(
                         body=related_metadata,
                         media_body=related_media,
                         fields='id, name'
                     ).execute()
                     uploaded_related.append(related_file.name)
+                    related_files_detailed.append(
+                        {
+                            "name": related_resp.get("name") or related_file.name,
+                            "file_id": related_resp.get("id"),
+                            "status": "success",
+                        }
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to upload related file {related_file.name}: {e}")
 
@@ -315,6 +422,7 @@ class DriveManager:
                 "file_name": response['name'],
                 "size": response.get('size', 0),
                 "related_files": uploaded_related,
+                "related_files_detailed": related_files_detailed,
                 "thumbnail_generated": thumbnail_generated,
             }
 
@@ -487,8 +595,10 @@ class DriveManager:
 
                     if results.get('files', []):
                         logger.debug(f"File already exists, skipping: {file_name}")
+                        existing_id = results["files"][0].get("id")
                         uploaded_files.append({
                             "name": file_name,
+                            "file_id": existing_id,
                             "status": "skipped",
                             "message": "Already exists"
                         })
@@ -598,16 +708,13 @@ class DriveManager:
             Dict with status and file info
         """
         try:
-            service = self.get_service()
+            file_metadata = self._drive_api_get_json(
+                f"https://www.googleapis.com/drive/v3/files/{file_id}",
+                {"fields": "name,size,mimeType,parents"},
+            )
 
-            # Get file metadata
-            file_metadata = service.files().get(
-                fileId=file_id,
-                fields='name, size, mimeType'
-            ).execute()
-
-            file_name = file_metadata.get('name', 'unknown')
-            file_size = int(file_metadata.get('size', 0))
+            file_name = file_metadata.get("name", "unknown")
+            file_size = int(file_metadata.get("size") or 0)
 
             # Create local directory structure
             local_path = Path(local_base_dir) / relative_path
@@ -627,30 +734,22 @@ class DriveManager:
 
             logger.debug(f"Downloading: {file_name} to {local_path}")
 
-            # Download file
-            request = service.files().get_media(fileId=file_id)
-            fh = io.BytesIO()
-            downloader = MediaIoBaseDownload(fh, request, chunksize=8 * 1024 * 1024)
-
-            done = False
-            while not done:
-                status, done = downloader.next_chunk()
-                if status and progress_callback:
-                    progress_callback({
-                        "file_name": file_name,
-                        "progress": int(status.progress() * 100)
-                    })
-
-            # Write to file
-            with open(local_path, 'wb') as f:
-                fh.seek(0)
-                f.write(fh.read())
+            self._drive_api_download_to_path(
+                file_id=file_id,
+                dest_path=local_path,
+                expected_size=file_size,
+                progress_callback=progress_callback,
+                file_name=file_name,
+            )
 
             logger.info(f"Download completed: {file_name}")
 
             # Also download related files (thumbnails, metadata, subtitles)
             downloaded_related = self._download_related_files(
-                file_id, file_name, local_path.parent
+                file_id=file_id,
+                video_name=file_name,
+                local_dir=local_path.parent,
+                parent_ids=file_metadata.get("parents") or [],
             )
 
             return {
@@ -667,36 +766,30 @@ class DriveManager:
 
     def _download_related_files(
         self,
-        video_file_id: str,
+        file_id: str,
         video_name: str,
-        local_dir: Path
+        local_dir: Path,
+        parent_ids: List[str],
     ) -> List[str]:
         """
         Download related files (thumbnails, metadata, subtitles) for a video.
 
         Args:
-            video_file_id: The video file ID to find parent folder
+            file_id: The video file ID to find parent folder
             video_name: Video filename to match related files
             local_dir: Local directory to save files
+            parent_ids: Drive parent ids of the video file
 
         Returns:
             List of downloaded related file names
         """
         try:
-            service = self.get_service()
             base_name = Path(video_name).stem
 
-            # Get parent folder ID
-            file_info = service.files().get(
-                fileId=video_file_id,
-                fields='parents'
-            ).execute()
-
-            parents = file_info.get('parents', [])
-            if not parents:
+            if not parent_ids:
                 return []
 
-            parent_id = parents[0]
+            parent_id = parent_ids[0]
 
             # Related file extensions
             related_extensions = [
@@ -709,14 +802,14 @@ class DriveManager:
             # Search for related files in same folder
             escaped_base_name = base_name.replace("'", "\\'")
             query = f"'{parent_id}' in parents and name contains '{escaped_base_name}' and trashed=false"
-            results = service.files().list(
-                q=query,
-                fields='files(id, name, size, mimeType)'
-            ).execute()
+            results = self._drive_api_get_json(
+                "https://www.googleapis.com/drive/v3/files",
+                {"q": query, "fields": "files(id,name,size,mimeType)", "pageSize": "1000"},
+            )
 
             downloaded = []
-            for item in results.get('files', []):
-                item_name = item['name']
+            for item in results.get("files", []):
+                item_name = item.get("name") or ""
                 # Skip the video itself
                 if item_name == video_name:
                     continue
@@ -730,18 +823,17 @@ class DriveManager:
                         continue
 
                     try:
-                        # Download related file
-                        request = service.files().get_media(fileId=item['id'])
-                        fh = io.BytesIO()
-                        downloader = MediaIoBaseDownload(fh, request)
-
-                        done = False
-                        while not done:
-                            _, done = downloader.next_chunk()
-
-                        with open(local_file_path, 'wb') as f:
-                            fh.seek(0)
-                            f.write(fh.read())
+                        item_id = item.get("id")
+                        if not item_id:
+                            continue
+                        item_size = int(item.get("size") or 0)
+                        self._drive_api_download_to_path(
+                            file_id=str(item_id),
+                            dest_path=local_file_path,
+                            expected_size=item_size,
+                            progress_callback=None,
+                            file_name=item_name,
+                        )
 
                         downloaded.append(item_name)
                         logger.debug(f"Downloaded related file: {item_name}")

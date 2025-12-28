@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import List, Optional, Set
 
 from app.config import settings
+from app.core.blocking import run_blocking, get_drive_semaphore
 from app.core.logging import get_module_logger
 from .database import get_database
 from .repository import get_repository
@@ -74,7 +75,11 @@ async def full_sync() -> SyncResult:
 
         # Get videos from Drive API
         logger.debug("Fetching videos from Drive API...")
-        drive_videos = drive_manager.list_videos()
+        drive_videos = await run_blocking(
+            drive_manager.list_videos,
+            semaphore=get_drive_semaphore(),
+            label="drive_cache.full_sync.list_videos",
+        )
 
         if not drive_videos:
             logger.info("No videos found in Drive")
@@ -183,7 +188,11 @@ async def incremental_sync() -> SyncResult:
         logger.debug(f"Starting incremental sync since {last_sync}")
 
         # Get current videos from Drive
-        drive_videos = drive_manager.list_videos()
+        drive_videos = await run_blocking(
+            drive_manager.list_videos,
+            semaphore=get_drive_semaphore(),
+            label="drive_cache.incremental.list_videos",
+        )
 
         if not drive_videos:
             # Drive is empty - mark all cached as deleted

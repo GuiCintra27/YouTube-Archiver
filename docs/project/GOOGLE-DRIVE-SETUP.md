@@ -92,7 +92,7 @@ cd backend
 2. Inicie o frontend (em outro terminal):
 
 ```bash
-cd web-ui
+cd frontend
 npm run dev
 ```
 
@@ -105,6 +105,15 @@ npm run dev
    - Clique em **"Permitir"** para dar acesso ao Drive
 
 6. Após autorizar, você será redirecionado de volta e verá seus vídeos!
+
+### Primeiro uso do catálogo (recomendado)
+
+- **Máquina nova (snapshot já existe no Drive):**
+  - `POST /api/catalog/drive/import`
+- **Drive já populado, sem snapshot:**
+  - `POST /api/catalog/drive/rebuild`
+- **Indexar vídeos locais existentes:**
+  - `POST /api/catalog/bootstrap-local`
 
 ## 🔐 Segurança
 

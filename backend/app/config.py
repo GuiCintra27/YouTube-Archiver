@@ -57,6 +57,51 @@ class Settings(BaseSettings):
         description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)"
     )
 
+    # Blocking IO concurrency (to_thread)
+    BLOCKING_DRIVE_CONCURRENCY: int = Field(
+        default=3,
+        ge=1,
+        description="Max concurrent Drive blocking operations offloaded to threads"
+    )
+    BLOCKING_FS_CONCURRENCY: int = Field(
+        default=2,
+        ge=1,
+        description="Max concurrent filesystem blocking operations offloaded to threads"
+    )
+    BLOCKING_CATALOG_CONCURRENCY: int = Field(
+        default=4,
+        ge=1,
+        description="Max concurrent catalog (sqlite) operations offloaded to threads"
+    )
+
+    # Error handling
+    ENABLE_GENERIC_EXCEPTION_HANDLER: bool = Field(
+        default=True,
+        description="Enable catch-all exception handler for standardized 500 responses"
+    )
+
+    # Catalog (persistent index)
+    CATALOG_ENABLED: bool = Field(
+        default=False,
+        description="Enable catalog-backed listing endpoints"
+    )
+    CATALOG_DB_PATH: str = Field(
+        default="database.db",
+        description="Catalog SQLite DB path (relative paths resolve from backend dir)"
+    )
+    CATALOG_DRIVE_AUTO_PUBLISH: bool = Field(
+        default=True,
+        description="Publish Drive catalog snapshot after Drive mutations when catalog is enabled"
+    )
+    CATALOG_DRIVE_REQUIRE_IMPORT_BEFORE_PUBLISH: bool = Field(
+        default=True,
+        description="Require importing Drive snapshot before publishing when an existing snapshot is detected"
+    )
+    CATALOG_DRIVE_ALLOW_LEGACY_LISTING_FALLBACK: bool = Field(
+        default=False,
+        description="When catalog is enabled and Drive catalog is empty, allow falling back to legacy Drive listing (slow)"
+    )
+
     # CORS - comma-separated string for env var, converted to list
     CORS_ORIGINS: str = Field(
         default="http://localhost:3000,http://localhost:3001,http://localhost:3002",
@@ -145,6 +190,16 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> List[str]:
         """CORS origins as a list"""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def catalog_db_path(self) -> str:
+        """Catalog database path resolved to an absolute path under backend/ when relative."""
+        if self.CATALOG_DB_PATH == ":memory:":
+            return ":memory:"
+        p = Path(self.CATALOG_DB_PATH)
+        if p.is_absolute():
+            return str(p)
+        return str((self.BASE_DIR / p).resolve())
 
     # Static configurations - imported from core.constants for consistency
     # These are duplicated here for backward compatibility with existing code

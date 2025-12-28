@@ -218,6 +218,7 @@ class DownloadProgress:
             progress_data = {
                 "status": "downloading",
                 "filename": os.path.basename(filename) if filename else "",
+                "filepath": filename,
                 "downloaded_bytes": downloaded,
                 "total_bytes": total,
                 "speed": d.get("speed", 0),
@@ -234,6 +235,7 @@ class DownloadProgress:
             self.on_progress({
                 "status": "finished",
                 "filename": os.path.basename(d.get("filename", "")),
+                "filepath": d.get("filename", ""),
             })
 
 

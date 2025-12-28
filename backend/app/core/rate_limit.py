@@ -10,6 +10,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from app.core.errors import ErrorCode, ErrorResponse
+from app.core.request_context import get_request_id
 
 
 def get_client_ip(request: Request) -> str:
@@ -45,6 +46,7 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSO
     """
     # Extract limit info from the exception
     retry_after = exc.detail.split("per ")[1] if "per " in exc.detail else "later"
+    request_id = getattr(getattr(request, "state", None), "request_id", None) or get_request_id()
 
     return JSONResponse(
         status_code=429,
@@ -55,8 +57,10 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSO
                 "limit": exc.detail,
                 "retry_after": retry_after,
             }
+            ,
+            request_id=request_id,
         ).model_dump(),
-        headers={"Retry-After": retry_after},
+        headers={"Retry-After": retry_after, "X-Request-Id": request_id} if request_id else {"Retry-After": retry_after},
     )
 
 

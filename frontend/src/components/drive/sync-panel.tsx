@@ -27,11 +27,28 @@ import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
 
 interface SyncStatus {
-  local_only: string[];
-  drive_only: string[];
-  synced: string[];
   total_local: number;
   total_drive: number;
+  local_only_count: number;
+  drive_only_count: number;
+  synced_count: number;
+  warnings?: string[];
+}
+
+interface SyncItem {
+  path: string;
+}
+
+interface DriveOnlyItem extends SyncItem {
+  file_id: string;
+}
+
+interface SyncItemsResponse<TItem> {
+  kind: string;
+  total: number;
+  page: number;
+  limit: number;
+  items: TItem[];
 }
 
 interface UploadProgress {
@@ -77,6 +94,22 @@ export default function SyncPanel() {
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [showExternalUpload, setShowExternalUpload] = useState(false);
 
+  const [localOnlyItems, setLocalOnlyItems] = useState<SyncItem[]>([]);
+  const [driveOnlyItems, setDriveOnlyItems] = useState<DriveOnlyItem[]>([]);
+  const [syncedItems, setSyncedItems] = useState<SyncItem[]>([]);
+
+  const [localOnlyPage, setLocalOnlyPage] = useState(0);
+  const [driveOnlyPage, setDriveOnlyPage] = useState(0);
+  const [syncedPage, setSyncedPage] = useState(0);
+
+  const [loadingLocalOnly, setLoadingLocalOnly] = useState(false);
+  const [loadingDriveOnly, setLoadingDriveOnly] = useState(false);
+  const [loadingSynced, setLoadingSynced] = useState(false);
+
+  const [openSection, setOpenSection] = useState<string | undefined>(undefined);
+
+  const SYNC_ITEMS_PAGE_SIZE = 50;
+
   // Download states
   const [downloading, setDownloading] = useState(false);
   const [downloadingVideo, setDownloadingVideo] = useState<string | null>(null);
@@ -109,6 +142,13 @@ export default function SyncPanel() {
 
       const data = await response.json();
       setSyncStatus(data);
+      // Clear loaded lists; they will be loaded lazily again
+      setLocalOnlyItems([]);
+      setDriveOnlyItems([]);
+      setSyncedItems([]);
+      setLocalOnlyPage(0);
+      setDriveOnlyPage(0);
+      setSyncedPage(0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
     } finally {
@@ -119,6 +159,137 @@ export default function SyncPanel() {
   useEffect(() => {
     fetchSyncStatus();
   }, [fetchSyncStatus]);
+
+  const fetchSyncItems = useCallback(
+    async (kind: "local_only" | "drive_only" | "synced", pageNumber: number) => {
+      if (!apiUrl) return;
+
+      const url = `${apiUrl}/api/${APIURLS.DRIVE_SYNC_ITEMS}?kind=${kind}&page=${pageNumber}&limit=${SYNC_ITEMS_PAGE_SIZE}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error("Falha ao obter itens de sincronização");
+      }
+      return response.json();
+    },
+    [apiUrl]
+  );
+
+  const ensureSectionLoaded = useCallback(
+    async (section: string | undefined) => {
+      if (!syncStatus) return;
+      if (!section) return;
+
+      try {
+        if (section === "local-only") {
+          if (localOnlyPage > 0 || syncStatus.local_only_count === 0) return;
+          setLoadingLocalOnly(true);
+          const payload: SyncItemsResponse<SyncItem> = await fetchSyncItems(
+            "local_only",
+            1
+          );
+          setLocalOnlyItems(payload.items || []);
+          setLocalOnlyPage(payload.page || 1);
+        }
+
+        if (section === "drive-only") {
+          if (driveOnlyPage > 0 || syncStatus.drive_only_count === 0) return;
+          setLoadingDriveOnly(true);
+          const payload: SyncItemsResponse<DriveOnlyItem> = await fetchSyncItems(
+            "drive_only",
+            1
+          );
+          setDriveOnlyItems(payload.items || []);
+          setDriveOnlyPage(payload.page || 1);
+        }
+
+        if (section === "synced") {
+          if (syncedPage > 0 || syncStatus.synced_count === 0) return;
+          setLoadingSynced(true);
+          const payload: SyncItemsResponse<SyncItem> = await fetchSyncItems(
+            "synced",
+            1
+          );
+          setSyncedItems(payload.items || []);
+          setSyncedPage(payload.page || 1);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Erro ao carregar itens");
+      } finally {
+        setLoadingLocalOnly(false);
+        setLoadingDriveOnly(false);
+        setLoadingSynced(false);
+      }
+    },
+    [
+      syncStatus,
+      localOnlyPage,
+      driveOnlyPage,
+      syncedPage,
+      fetchSyncItems,
+      setError,
+    ]
+  );
+
+  useEffect(() => {
+    ensureSectionLoaded(openSection);
+  }, [openSection, ensureSectionLoaded]);
+
+  const loadMoreLocalOnly = useCallback(async () => {
+    if (!syncStatus || !apiUrl) return;
+    if (localOnlyItems.length >= syncStatus.local_only_count) return;
+    try {
+      setLoadingLocalOnly(true);
+      const nextPage = localOnlyPage + 1;
+      const payload: SyncItemsResponse<SyncItem> = await fetchSyncItems(
+        "local_only",
+        nextPage
+      );
+      setLocalOnlyItems((prev) => [...prev, ...(payload.items || [])]);
+      setLocalOnlyPage(payload.page || nextPage);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao carregar mais");
+    } finally {
+      setLoadingLocalOnly(false);
+    }
+  }, [syncStatus, apiUrl, localOnlyItems.length, localOnlyPage, fetchSyncItems]);
+
+  const loadMoreDriveOnly = useCallback(async () => {
+    if (!syncStatus || !apiUrl) return;
+    if (driveOnlyItems.length >= syncStatus.drive_only_count) return;
+    try {
+      setLoadingDriveOnly(true);
+      const nextPage = driveOnlyPage + 1;
+      const payload: SyncItemsResponse<DriveOnlyItem> = await fetchSyncItems(
+        "drive_only",
+        nextPage
+      );
+      setDriveOnlyItems((prev) => [...prev, ...(payload.items || [])]);
+      setDriveOnlyPage(payload.page || nextPage);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao carregar mais");
+    } finally {
+      setLoadingDriveOnly(false);
+    }
+  }, [syncStatus, apiUrl, driveOnlyItems.length, driveOnlyPage, fetchSyncItems]);
+
+  const loadMoreSynced = useCallback(async () => {
+    if (!syncStatus || !apiUrl) return;
+    if (syncedItems.length >= syncStatus.synced_count) return;
+    try {
+      setLoadingSynced(true);
+      const nextPage = syncedPage + 1;
+      const payload: SyncItemsResponse<SyncItem> = await fetchSyncItems(
+        "synced",
+        nextPage
+      );
+      setSyncedItems((prev) => [...prev, ...(payload.items || [])]);
+      setSyncedPage(payload.page || nextPage);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao carregar mais");
+    } finally {
+      setLoadingSynced(false);
+    }
+  }, [syncStatus, apiUrl, syncedItems.length, syncedPage, fetchSyncItems]);
 
   const pollJobProgress = useCallback(
     async (jobId: string, onComplete: (result: JobResponse) => void) => {
@@ -174,7 +345,7 @@ export default function SyncPanel() {
   );
 
   const handleSyncAll = useCallback(async () => {
-    if (!syncStatus || syncStatus.local_only.length === 0 || !apiUrl) return;
+    if (!syncStatus || syncStatus.local_only_count === 0 || !apiUrl) return;
 
     try {
       setSyncing(true);
@@ -182,7 +353,7 @@ export default function SyncPanel() {
       setSuccessMessage(null);
       setUploadProgress({
         status: "initializing",
-        total: syncStatus.local_only.length,
+        total: syncStatus.local_only_count,
         uploaded: 0,
         failed: 0,
         percent: 0,
@@ -338,7 +509,7 @@ export default function SyncPanel() {
 
   // Download all videos from Drive to local
   const handleDownloadAll = useCallback(async () => {
-    if (!syncStatus || syncStatus.drive_only.length === 0 || !apiUrl) return;
+    if (!syncStatus || syncStatus.drive_only_count === 0 || !apiUrl) return;
 
     try {
       setDownloading(true);
@@ -346,7 +517,7 @@ export default function SyncPanel() {
       setSuccessMessage(null);
       setDownloadProgress({
         status: "initializing",
-        total: syncStatus.drive_only.length,
+        total: syncStatus.drive_only_count,
         downloaded: 0,
         failed: 0,
         percent: 0,
@@ -403,10 +574,10 @@ export default function SyncPanel() {
 
   // Download single video from Drive to local
   const handleDownloadSingle = useCallback(
-    async (videoPath: string) => {
+    async (item: DriveOnlyItem) => {
       if (!apiUrl) return;
       try {
-        setDownloadingVideo(videoPath);
+        setDownloadingVideo(item.path);
         setError(null);
         setSuccessMessage(null);
         // Inicializar progresso para download individual
@@ -416,11 +587,13 @@ export default function SyncPanel() {
           downloaded: 0,
           failed: 0,
           percent: 0,
-          current_file: videoPath,
+          current_file: item.path,
         });
 
         const response = await fetch(
-          `${apiUrl}/api/${APIURLS.DRIVE_DOWNLOAD}?path=${encodeURIComponent(videoPath)}`,
+          `${apiUrl}/api/${APIURLS.DRIVE_DOWNLOAD}?path=${encodeURIComponent(
+            item.path
+          )}&file_id=${encodeURIComponent(item.file_id)}`,
           { method: "POST" }
         );
 
@@ -474,7 +647,7 @@ export default function SyncPanel() {
 
   const syncPercentage = syncStatus
     ? syncStatus.total_local > 0
-      ? (syncStatus.synced.length / syncStatus.total_local) * 100
+      ? (syncStatus.synced_count / syncStatus.total_local) * 100
       : 100
     : 0;
 
@@ -512,6 +685,14 @@ export default function SyncPanel() {
             </AlertDescription>
           </Alert>
         )}
+
+        {syncStatus?.warnings?.length ? (
+          <Alert className="bg-yellow/10 border-yellow/20">
+            <AlertDescription className="text-yellow">
+              {syncStatus.warnings.join(" ")}
+            </AlertDescription>
+          </Alert>
+        ) : null}
 
         {/* Upload Progress */}
         {uploadProgress && syncing && (
@@ -587,17 +768,17 @@ export default function SyncPanel() {
                 </div>
               </div>
 
-              <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-teal/10 border border-teal/20">
-                <CheckCircle2 className="h-5 w-5 text-teal" />
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-white">
-                    {syncStatus.synced.length}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Sincronizados
-                  </div>
-                </div>
-              </div>
+	              <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-teal/10 border border-teal/20">
+	                <CheckCircle2 className="h-5 w-5 text-teal" />
+	                <div className="text-center">
+	                  <div className="text-2xl font-bold text-white">
+	                    {syncStatus.synced_count}
+	                  </div>
+	                  <div className="text-xs text-muted-foreground">
+	                    Sincronizados
+	                  </div>
+	                </div>
+	              </div>
             </div>
 
             {/* Progress */}
@@ -637,7 +818,7 @@ export default function SyncPanel() {
                 Upload Externo
               </Button>
 
-              {syncStatus.local_only.length > 0 && (
+              {syncStatus.local_only_count > 0 && (
                 <Button
                   size="sm"
                   onClick={handleSyncAll}
@@ -652,13 +833,13 @@ export default function SyncPanel() {
                   ) : (
                     <>
                       <Upload className="h-4 w-4 mr-2" />
-                      Sincronizar Todos ({syncStatus.local_only.length})
+                      Sincronizar Todos ({syncStatus.local_only_count})
                     </>
                   )}
                 </Button>
               )}
 
-              {syncStatus.drive_only.length > 0 && (
+              {syncStatus.drive_only_count > 0 && (
                 <Button
                   size="sm"
                   onClick={handleDownloadAll}
@@ -673,7 +854,7 @@ export default function SyncPanel() {
                   ) : (
                     <>
                       <Download className="h-4 w-4 mr-2" />
-                      Baixar Todos ({syncStatus.drive_only.length})
+                      Baixar Todos ({syncStatus.drive_only_count})
                     </>
                   )}
                 </Button>
@@ -681,34 +862,40 @@ export default function SyncPanel() {
             </div>
 
             {/* Details Accordion */}
-            <Accordion type="single" collapsible className="w-full space-y-2">
+            <Accordion
+              type="single"
+              collapsible
+              className="w-full space-y-2"
+              value={openSection}
+              onValueChange={setOpenSection}
+            >
               {/* Local Only */}
-              {syncStatus.local_only.length > 0 && (
+              {syncStatus.local_only_count > 0 && (
                 <AccordionItem value="local-only" className="border-white/10 rounded-xl overflow-hidden">
                   <AccordionTrigger className="px-4 py-3 hover:bg-white/5 hover:no-underline">
                     <div className="flex items-center gap-2">
                       <HardDrive className="h-4 w-4 text-teal" />
-                      <span className="text-white">Apenas Local ({syncStatus.local_only.length})</span>
+                      <span className="text-white">Apenas Local ({syncStatus.local_only_count})</span>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="px-4 pb-3">
                     <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {syncStatus.local_only.map((video) => (
+                      {localOnlyItems.map((item) => (
                         <div
-                          key={video}
+                          key={item.path}
                           className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10"
                         >
                           <span className="text-sm truncate flex-1 text-white">
-                            {video}
+                            {item.path}
                           </span>
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleUploadSingle(video)}
+                            onClick={() => handleUploadSingle(item.path)}
                             disabled={uploadingVideo !== null || syncing}
                             className="text-muted-foreground hover:text-cyan hover:bg-cyan/10"
                           >
-                            {uploadingVideo === video ? (
+                            {uploadingVideo === item.path ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                               <Upload className="h-4 w-4" />
@@ -717,37 +904,58 @@ export default function SyncPanel() {
                         </div>
                       ))}
                     </div>
+                    <div className="pt-3">
+                      {loadingLocalOnly ? (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Carregando...
+                        </div>
+                      ) : localOnlyItems.length < syncStatus.local_only_count ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={loadMoreLocalOnly}
+                          className="text-muted-foreground hover:text-teal hover:bg-teal/10"
+                        >
+                          Carregar mais ({localOnlyItems.length}/{syncStatus.local_only_count})
+                        </Button>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Mostrando {localOnlyItems.length} de {syncStatus.local_only_count}
+                        </p>
+                      )}
+                    </div>
                   </AccordionContent>
                 </AccordionItem>
               )}
 
               {/* Drive Only */}
-              {syncStatus.drive_only.length > 0 && (
+              {syncStatus.drive_only_count > 0 && (
                 <AccordionItem value="drive-only" className="border-white/10 rounded-xl overflow-hidden">
                   <AccordionTrigger className="px-4 py-3 hover:bg-white/5 hover:no-underline">
                     <div className="flex items-center gap-2">
                       <Cloud className="h-4 w-4 text-cyan" />
-                      <span className="text-white">Apenas Drive ({syncStatus.drive_only.length})</span>
+                      <span className="text-white">Apenas Drive ({syncStatus.drive_only_count})</span>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="px-4 pb-3">
                     <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {syncStatus.drive_only.map((video) => (
+                      {driveOnlyItems.map((item) => (
                         <div
-                          key={video}
+                          key={item.path}
                           className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10"
                         >
                           <span className="text-sm truncate flex-1 text-white">
-                            {video}
+                            {item.path}
                           </span>
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleDownloadSingle(video)}
+                            onClick={() => handleDownloadSingle(item)}
                             disabled={downloadingVideo !== null || downloading || syncing || uploadingVideo !== null}
                             className="text-muted-foreground hover:text-purple hover:bg-purple/10"
                           >
-                            {downloadingVideo === video ? (
+                            {downloadingVideo === item.path ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                               <Download className="h-4 w-4" />
@@ -756,30 +964,72 @@ export default function SyncPanel() {
                         </div>
                       ))}
                     </div>
+                    <div className="pt-3">
+                      {loadingDriveOnly ? (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Carregando...
+                        </div>
+                      ) : driveOnlyItems.length < syncStatus.drive_only_count ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={loadMoreDriveOnly}
+                          className="text-muted-foreground hover:text-cyan hover:bg-cyan/10"
+                        >
+                          Carregar mais ({driveOnlyItems.length}/{syncStatus.drive_only_count})
+                        </Button>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Mostrando {driveOnlyItems.length} de {syncStatus.drive_only_count}
+                        </p>
+                      )}
+                    </div>
                   </AccordionContent>
                 </AccordionItem>
               )}
 
               {/* Synced */}
-              {syncStatus.synced.length > 0 && (
+              {syncStatus.synced_count > 0 && (
                 <AccordionItem value="synced" className="border-white/10 rounded-xl overflow-hidden">
                   <AccordionTrigger className="px-4 py-3 hover:bg-white/5 hover:no-underline">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-teal" />
-                      <span className="text-white">Sincronizados ({syncStatus.synced.length})</span>
+                      <span className="text-white">Sincronizados ({syncStatus.synced_count})</span>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="px-4 pb-3">
                     <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {syncStatus.synced.map((video) => (
+                      {syncedItems.map((item) => (
                         <div
-                          key={video}
+                          key={item.path}
                           className="flex items-center p-2 rounded-lg bg-teal/5 border border-teal/20"
                         >
                           <CheckCircle2 className="h-4 w-4 text-teal mr-2" />
-                          <span className="text-sm truncate text-white">{video}</span>
+                          <span className="text-sm truncate text-white">{item.path}</span>
                         </div>
                       ))}
+                    </div>
+                    <div className="pt-3">
+                      {loadingSynced ? (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Carregando...
+                        </div>
+                      ) : syncedItems.length < syncStatus.synced_count ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={loadMoreSynced}
+                          className="text-muted-foreground hover:text-teal hover:bg-teal/10"
+                        >
+                          Carregar mais ({syncedItems.length}/{syncStatus.synced_count})
+                        </Button>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Mostrando {syncedItems.length} de {syncStatus.synced_count}
+                        </p>
+                      )}
                     </div>
                   </AccordionContent>
                 </AccordionItem>

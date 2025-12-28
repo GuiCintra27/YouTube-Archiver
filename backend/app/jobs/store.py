@@ -18,6 +18,7 @@ class JobType(str, Enum):
     DRIVE_UPLOAD = "drive_upload"
     DRIVE_SYNC = "drive_sync"
     DRIVE_DOWNLOAD = "drive_download"
+    CATALOG_DRIVE_REBUILD = "catalog_drive_rebuild"
 
 
 # Type aliases for clarity
@@ -29,6 +30,10 @@ _jobs_db: Dict[JobId, JobDict] = {}
 
 # Active asyncio tasks (for cancellation)
 _active_tasks: Dict[JobId, asyncio.Task[None]] = {}
+
+# Backward-compatible aliases (some modules still reference these directly)
+jobs_db = _jobs_db
+active_tasks = _active_tasks
 
 
 def get_job(job_id: JobId) -> Optional[JobDict]:
@@ -171,6 +176,11 @@ def clear_all_jobs() -> int:
     """
     count: int = len(_jobs_db)
     _jobs_db.clear()
+    for task in list(_active_tasks.values()):
+        try:
+            task.cancel()
+        except Exception:
+            pass
     _active_tasks.clear()
     return count
 

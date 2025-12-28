@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
 from app.core.logging import get_module_logger
+from app.core.request_context import get_request_id
+from app.config import settings
 
 logger = get_module_logger("errors")
 
@@ -80,6 +82,7 @@ class ErrorResponse(BaseModel):
     error_code: str
     message: str
     details: Optional[Any] = None
+    request_id: Optional[str] = None
 
     class Config:
         json_schema_extra = {
@@ -131,6 +134,7 @@ def create_error_response(
     error_code: str,
     message: str,
     details: Optional[Any] = None,
+    request_id: Optional[str] = None,
 ) -> JSONResponse:
     """
     Create a standardized JSON error response.
@@ -144,14 +148,18 @@ def create_error_response(
     Returns:
         JSONResponse with standardized error format
     """
-    return JSONResponse(
+    response = JSONResponse(
         status_code=status_code,
         content=ErrorResponse(
             error_code=error_code,
             message=message,
             details=details,
+            request_id=request_id,
         ).model_dump(),
     )
+    if request_id:
+        response.headers.setdefault("X-Request-Id", request_id)
+    return response
 
 
 def raise_error(
@@ -188,9 +196,10 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
     """
     Handle AppException and return standardized error response.
     """
+    request_id = getattr(getattr(request, "state", None), "request_id", None) or get_request_id()
     logger.warning(
         f"AppException: {exc.error_code} - {exc.message}",
-        extra={"details": exc.details, "path": request.url.path}
+        extra={"details": exc.details, "path": request.url.path, "request_id": request_id}
     )
 
     return create_error_response(
@@ -198,6 +207,7 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
         error_code=exc.error_code,
         message=exc.message,
         details=exc.details,
+        request_id=request_id,
     )
 
 
@@ -217,16 +227,18 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     }
 
     error_code = error_code_map.get(exc.status_code, ErrorCode.INTERNAL_ERROR)
+    request_id = getattr(getattr(request, "state", None), "request_id", None) or get_request_id()
 
     logger.warning(
         f"HTTPException: {exc.status_code} - {exc.detail}",
-        extra={"path": request.url.path}
+        extra={"path": request.url.path, "request_id": request_id}
     )
 
     return create_error_response(
         status_code=exc.status_code,
         error_code=error_code,
         message=str(exc.detail),
+        request_id=request_id,
     )
 
 
@@ -248,7 +260,12 @@ async def validation_exception_handler(
 
     logger.warning(
         f"Validation error: {len(errors)} errors",
-        extra={"errors": errors, "path": request.url.path}
+        extra={
+            "errors": errors,
+            "path": request.url.path,
+            "request_id": getattr(getattr(request, "state", None), "request_id", None)
+            or get_request_id(),
+        }
     )
 
     return create_error_response(
@@ -256,6 +273,7 @@ async def validation_exception_handler(
         error_code=ErrorCode.VALIDATION_ERROR,
         message="Validation error in request",
         details={"errors": errors},
+        request_id=getattr(getattr(request, "state", None), "request_id", None) or get_request_id(),
     )
 
 
@@ -263,10 +281,11 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
     """
     Handle unexpected exceptions and return standardized error response.
     """
+    request_id = getattr(getattr(request, "state", None), "request_id", None) or get_request_id()
     logger.error(
         f"Unhandled exception: {type(exc).__name__} - {exc}",
         exc_info=True,
-        extra={"path": request.url.path}
+        extra={"path": request.url.path, "request_id": request_id}
     )
 
     return create_error_response(
@@ -274,6 +293,7 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
         error_code=ErrorCode.INTERNAL_ERROR,
         message="An unexpected error occurred",
         details={"type": type(exc).__name__} if logger.level <= 10 else None,  # DEBUG level
+        request_id=request_id,
     )
 
 
@@ -291,5 +311,5 @@ def register_exception_handlers(app) -> None:
     app.add_exception_handler(AppException, app_exception_handler)
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
-    # Uncomment to catch all unhandled exceptions (may hide useful errors in dev)
-    # app.add_exception_handler(Exception, generic_exception_handler)
+    if settings.ENABLE_GENERIC_EXCEPTION_HANDLER:
+        app.add_exception_handler(Exception, generic_exception_handler)

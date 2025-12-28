@@ -1,4 +1,5 @@
 """
 Downloads module - video download functionality
 """
-from .router import router
+
+__all__ = []

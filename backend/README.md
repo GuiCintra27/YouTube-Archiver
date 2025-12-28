@@ -19,13 +19,13 @@ Ativa o ambiente virtual automaticamente e inicia o servidor.
 ### Opção 2: Manual
 ```bash
 source .venv/bin/activate
-python api.py
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 ### Opção 3: Com reload automático (desenvolvimento)
 ```bash
 source .venv/bin/activate
-uvicorn api:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ---
@@ -49,6 +49,13 @@ uvicorn api:app --reload --host 0.0.0.0 --port 8000
 - **GET** `/api/videos/thumbnail/{thumbnail_path}` - Serve thumbnail
 - **DELETE** `/api/videos/{video_path}` - Exclui vídeo e arquivos relacionados
 
+### 📦 Catálogo (SQLite)
+- **GET** `/api/catalog/status` - Status do catálogo (local/drive)
+- **POST** `/api/catalog/bootstrap-local` - Indexa vídeos locais
+- **POST** `/api/catalog/drive/import` - Importa snapshot do Drive
+- **POST** `/api/catalog/drive/publish` - Publica snapshot do Drive
+- **POST** `/api/catalog/drive/rebuild` - Reconstrói catálogo lendo o Drive
+
 ### ☁️ Google Drive
 - **GET** `/api/drive/auth-status` - Verifica autenticação
 - **GET** `/api/drive/auth-url` - Gera URL OAuth
@@ -57,9 +64,12 @@ uvicorn api:app --reload --host 0.0.0.0 --port 8000
 - **POST** `/api/drive/upload/{video_path}` - Upload de vídeo individual
 - **POST** `/api/drive/sync-all` - Sincroniza todos os vídeos locais
 - **GET** `/api/drive/sync-status` - Status de sincronização (local vs Drive)
+- **GET** `/api/drive/sync-items` - Itens paginados (local_only/drive_only/synced)
 - **GET** `/api/drive/stream/{file_id}` - Stream de vídeo do Drive
 - **GET** `/api/drive/thumbnail/{file_id}` - Thumbnail do Drive
 - **DELETE** `/api/drive/videos/{file_id}` - Remove vídeo do Drive
+- **POST** `/api/drive/download` - Download de vídeo do Drive (por path ou file_id)
+- **POST** `/api/drive/download-all` - Download em lote (Drive -> local)
 
 **Documentação completa:** http://localhost:8000/docs
 
@@ -69,16 +79,25 @@ uvicorn api:app --reload --host 0.0.0.0 --port 8000
 
 ```
 backend/
-├── api.py                  # ⭐ Endpoints principais
-├── downloader.py           # ⭐ Wrapper do yt-dlp
-├── drive_manager.py        # ⭐ Google Drive integration
+├── app/                    # ⭐ Pacote principal
+│   ├── main.py             # Entry point FastAPI
+│   ├── config.py           # Settings globais
+│   ├── core/               # Utilitários (logging, blocking, errors)
+│   ├── catalog/            # Catálogo SQLite (local + drive)
+│   ├── downloads/          # Downloads (yt-dlp)
+│   ├── jobs/               # Jobs assíncronos (in-memory)
+│   ├── library/            # Biblioteca local
+│   ├── recordings/         # Upload de gravações
+│   └── drive/              # Drive (router/service/manager/cache)
 ├── requirements.txt        # Dependências Python
 ├── run.sh                  # Script de inicialização
 ├── .venv/                  # Ambiente virtual (gitignored)
 ├── downloads/              # Vídeos baixados (gitignored)
 ├── archive.txt             # Controle de duplicatas
 ├── credentials.json        # OAuth Google (gitignored)
-└── token.json              # Token OAuth (gitignored)
+├── token.json              # Token OAuth (gitignored)
+├── database.db             # Catálogo SQLite (gitignored)
+└── drive_cache.db          # Cache SQLite do Drive (opcional)
 ```
 
 ---
@@ -107,12 +126,12 @@ backend/
 
 ### Erro: "ModuleNotFoundError: No module named 'fastapi'"
 
-**Causa:** Executou `python api.py` sem ativar o venv.
+**Causa:** Executou o backend sem ativar o venv ou fora do script `./run.sh`.
 
 **Solução:** Use `./run.sh` ou ative o venv antes:
 ```bash
 source .venv/bin/activate
-python api.py
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 ### Erro: "address already in use" (porta 8000)
@@ -127,11 +146,11 @@ lsof -ti:8000 | xargs kill -9
 
 ### Erro: "You must pass the application as an import string to enable 'reload'"
 
-**Causa:** Usou `reload=True` ao executar diretamente com `python api.py`.
+**Causa:** Usou `reload=True` sem passar o app como import string.
 
 **Solução:** Use uvicorn como módulo:
 ```bash
-uvicorn api:app --reload
+uvicorn app.main:app --reload
 ```
 
 ### Erro: "FileNotFoundError: credentials.json"
@@ -168,6 +187,7 @@ uvicorn api:app --reload
 - **Uvicorn** - Servidor ASGI
 - **Pydantic** - Validação de dados
 - **Google API Client** - Integração com Google Drive
+- **SQLite** - Catálogo persistente (local + drive)
 - **Python 3.12+** - Runtime
 
 ---
@@ -179,10 +199,20 @@ uvicorn api:app --reload
 - Progresso reportado via callbacks
 - Estado armazenado em memória (limpar com DELETE)
 
+### Concorrência (ASGI)
+- Operações bloqueantes (Drive/FS/SQLite) são movidas para threads via `core/blocking.py`.
+- Limites configuráveis: `BLOCKING_DRIVE_CONCURRENCY`, `BLOCKING_FS_CONCURRENCY`, `BLOCKING_CATALOG_CONCURRENCY`.
+- Para múltiplos workers em produção, migre o storage de jobs para Redis/DB.
+
 ### Streaming de Vídeos
 - Suporte a range requests (HTTP 206 Partial Content)
 - Chunks de 8KB para streaming eficiente
 - MIME type detectado automaticamente (.mp4, .webm, .mkv, etc.)
+
+### Catálogo (SQLite)
+- Mantém índice local e do Drive para listagens rápidas.
+- Primeira execução: use `POST /api/catalog/drive/rebuild` (Drive já populado) ou `POST /api/catalog/drive/import` (snapshot existente).
+- Para indexar vídeos locais existentes: `POST /api/catalog/bootstrap-local`.
 
 ### Google Drive API
 - OAuth 2.0 flow completo

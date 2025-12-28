@@ -84,7 +84,7 @@ randomize_delay: bool = Field(default=False, ...)
 
 ### Frontend
 
-#### `web-ui/src/components/download-form.tsx`
+#### `frontend/src/components/download-form.tsx`
 
 **Adicionado ao `DownloadProgress` interface:**
 ```typescript

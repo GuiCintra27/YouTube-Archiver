@@ -36,6 +36,7 @@ Guia de consulta rápida para desenvolvimento e troubleshooting.
 | Download | yt-dlp | Latest | Video downloader |
 | OAuth | google-auth-oauthlib | Latest | Google Drive auth |
 | Drive API | google-api-python-client | Latest | Drive operations |
+| Catalog DB | SQLite | Built-in | Catálogo persistente (local + drive) |
 | Runtime | Python | 3.12+ | Backend runtime |
 
 ### Frontend
@@ -64,6 +65,7 @@ backend/app/
 │
 ├── core/                           # Módulo central compartilhado
 │   ├── logging.py                  # ⭐ Sistema de logging estruturado
+│   ├── blocking.py                 # ⭐ Offload de IO bloqueante (to_thread)
 │   ├── validators.py               # ⭐ Validação de URLs, paths, filenames
 │   ├── errors.py                   # ⭐ ErrorCode, AppException, raise_error()
 │   ├── rate_limit.py               # Rate limiting com slowapi
@@ -71,6 +73,13 @@ backend/app/
 │   ├── types.py                    # TypedDicts e type aliases
 │   ├── exceptions.py               # HTTPExceptions customizadas (legacy)
 │   └── security.py                 # Validações de path, sanitização (legacy)
+│
+├── catalog/                        # Catálogo persistente (SQLite)
+│   ├── router.py                   # Endpoints /api/catalog/*
+│   ├── service.py                  # Regras de catálogo
+│   ├── repository.py               # Acesso ao SQLite
+│   ├── database.py                 # Schema e conexões
+│   └── drive_snapshot.py           # Snapshot drive (catalog-drive.json.gz)
 │
 ├── downloads/                      # Módulo de downloads
 │   ├── router.py                   # Endpoints /api/download, /api/video-info
@@ -121,7 +130,9 @@ backend/
 ├── pytest.ini                      # Configuração do pytest
 ├── .env.example                    # ⭐ Exemplo de variáveis de ambiente
 ├── run.sh                          # ⭐ Script de inicialização
-└── credentials.json.example        # Template de credenciais
+├── credentials.json.example        # Template de credenciais
+├── database.db                     # Catálogo SQLite (gitignored)
+└── drive_cache.db                  # Cache SQLite do Drive (opcional)
 ```
 
 ### Frontend (TypeScript/React)
@@ -205,6 +216,15 @@ GET  /api/videos/thumbnail/{path}   # Thumbnail
 DELETE /api/videos/{path}           # Exclui vídeo
 ```
 
+### Catálogo (SQLite)
+```bash
+GET  /api/catalog/status            # Status do catálogo
+POST /api/catalog/bootstrap-local   # Indexa vídeos locais
+POST /api/catalog/drive/import      # Importa snapshot do Drive
+POST /api/catalog/drive/publish     # Publica snapshot no Drive
+POST /api/catalog/drive/rebuild     # Reconstrói catálogo lendo o Drive
+```
+
 ### Google Drive
 ```bash
 GET  /api/drive/auth-status         # Verifica auth
@@ -214,9 +234,12 @@ GET  /api/drive/videos              # Lista vídeos
 POST /api/drive/upload/{path}       # Upload individual
 POST /api/drive/sync-all            # Upload em lote
 GET  /api/drive/sync-status         # Status sync
+GET  /api/drive/sync-items          # Itens paginados (diff)
 GET  /api/drive/stream/{id}         # Stream (206)
 GET  /api/drive/thumbnail/{id}      # Thumbnail
 DELETE /api/drive/videos/{id}       # Remove vídeo
+POST /api/drive/download            # Download (Drive -> local)
+POST /api/drive/download-all        # Download em lote (Drive -> local)
 ```
 
 ---
@@ -361,8 +384,10 @@ const result = await response.json();
 1. **SEMPRE escapar `'` em queries Drive:** `name.replace("'", "\\'")`
 2. **SEMPRE usar RFC 5987 em headers:** `filename*=UTF-8''{quote(name)}`
 3. **SEMPRE ativar venv:** Use `./run.sh`, não `python app/main.py`
-4. **SEMPRE try/except com traceback em endpoints**
-5. **SEMPRE seguir o padrão modular:** router.py → service.py → schemas.py
+4. **IO bloqueante deve sair do event loop:** use `core/blocking.py` (to_thread)
+5. **Jobs são in-memory:** múltiplos workers exigem storage compartilhado (Redis/DB)
+6. **SEMPRE try/except com traceback em endpoints**
+7. **SEMPRE seguir o padrão modular:** router.py → service.py → schemas.py
 
 ### TypeScript
 1. **SEMPRE usar `"use client"` em componentes interativos**
@@ -388,11 +413,21 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:3001
 DOWNLOADS_DIR=./downloads          # Diretório de downloads
 DEFAULT_MAX_RESOLUTION=1080        # Resolução padrão
 JOB_EXPIRY_HOURS=24               # Tempo para limpeza de jobs
+CATALOG_ENABLED=false              # Catálogo SQLite (local + drive)
+CATALOG_DB_PATH=database.db        # Caminho do catálogo
+CATALOG_DRIVE_AUTO_PUBLISH=true    # Publica snapshot após mutações do Drive
+CATALOG_DRIVE_REQUIRE_IMPORT_BEFORE_PUBLISH=true  # Proteção contra overwrite
+CATALOG_DRIVE_ALLOW_LEGACY_LISTING_FALLBACK=false # Fallback para listagem direta
+BLOCKING_DRIVE_CONCURRENCY=3       # Limite de IO bloqueante (Drive)
+BLOCKING_FS_CONCURRENCY=2          # Limite de IO bloqueante (filesystem)
+BLOCKING_CATALOG_CONCURRENCY=4     # Limite de IO bloqueante (catalog)
 
 # Arquivos de configuração:
 backend/credentials.json    # OAuth Google (obter no Cloud Console)
 backend/token.json          # Gerado automaticamente após auth
 backend/archive.txt         # Gerado automaticamente
+backend/database.db         # Catálogo SQLite (local + drive)
+backend/drive_cache.db      # Cache SQLite do Drive (opcional)
 ```
 
 ### Frontend
@@ -435,11 +470,11 @@ cd frontend && npm run dev
 
 ### Testing
 ```bash
-# Backend - Testes automatizados (pytest) - 46 testes
+# Backend - Testes automatizados (pytest) - 63 testes (sem drive_cache)
 cd backend && source .venv/bin/activate
-pytest tests/ -v                    # Todos os testes
-pytest tests/ --cov=app             # Com cobertura de código
-pytest tests/test_validators.py -v  # Apenas um arquivo
+python -m pytest -q -k "not drive_cache"
+python -m pytest tests/ --cov=app --cov-report=html -k "not drive_cache"
+python -m pytest tests/test_validators.py -v  # Apenas um arquivo
 
 # Frontend - Lint e Build
 cd frontend

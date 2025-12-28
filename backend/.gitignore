@@ -33,3 +33,10 @@ cookies.txt
 .DS_Store
 Thumbs.db
 drive_cache.db
+
+# Catalog DB (local index)
+database.db
+database.db-*
+
+# Accidental local file (from tests)
+:memory:

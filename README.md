@@ -18,7 +18,7 @@ O YT-Archiver combina uma API REST robusta com uma interface web moderna para fa
 - ✅ Cookies personalizados via arquivo Netscape
 - ✅ **Biblioteca de vídeos local** - Visualize, reproduza e gerencie vídeos baixados
 - ✅ **Sincronização com Google Drive** - Upload, visualização e streaming de vídeos no Drive
-- ✅ **Cache SQLite para Drive** - Listagem ultrarrápida com cache local de metadados
+- ✅ **Catálogo persistente (SQLite)** - Índice local + snapshot no Drive para listagem rápida
 - ✅ **Sistema de jobs assíncronos** - Downloads em background com progresso em tempo real
 - ✅ Sistema de arquivamento para evitar downloads duplicados
 - ✅ Controle de qualidade e formato de saída
@@ -178,6 +178,16 @@ npm run dev
    - ▶️ Reproduza vídeos diretamente do Drive
    - 🗑️ Exclua vídeos do Drive
 
+**Catálogo do Drive (primeira execução / máquina nova):**
+
+- O Drive agora usa um **catálogo persistente** (SQLite local + snapshot no Drive).
+- Para o primeiro uso em uma máquina nova, importe o snapshot:
+  - `POST /api/catalog/drive/import`
+- Para a primeira vez em que o Drive já tem vídeos mas não existe snapshot:
+  - `POST /api/catalog/drive/rebuild`
+- Para indexar vídeos locais existentes:
+  - `POST /api/catalog/bootstrap-local`
+
 ---
 
 ## 🔌 API REST
@@ -219,6 +229,18 @@ A API FastAPI oferece endpoints completos para integração:
 
 **GET** `/api/videos/thumbnail/{thumbnail_path}` - Serve thumbnail de vídeo local
 
+### Endpoints de Catálogo (SQLite)
+
+**GET** `/api/catalog/status` - Status do catálogo (local/drive)
+
+**POST** `/api/catalog/bootstrap-local` - Indexa vídeos locais (1ª vez)
+
+**POST** `/api/catalog/drive/import` - Importa snapshot do Drive
+
+**POST** `/api/catalog/drive/publish` - Publica snapshot no Drive
+
+**POST** `/api/catalog/drive/rebuild` - Reconstrói catálogo lendo o Drive
+
 **DELETE** `/api/videos/{video_path}` - Exclui vídeo e arquivos relacionados
 
 **POST** `/api/videos/delete-batch` - Exclui múltiplos vídeos em lote
@@ -237,6 +259,8 @@ A API FastAPI oferece endpoints completos para integração:
 
 **GET** `/api/drive/sync-status` - Status de sincronização (local vs Drive)
 
+**GET** `/api/drive/sync-items` - Itens paginados (local_only/drive_only/synced)
+
 **POST** `/api/drive/sync-all` - Sincroniza todos os vídeos locais para Drive
 
 **GET** `/api/drive/stream/{file_id}` - Stream de vídeo do Drive (com range requests)
@@ -247,9 +271,11 @@ A API FastAPI oferece endpoints completos para integração:
 
 **POST** `/api/drive/videos/delete-batch` - Exclui múltiplos vídeos do Drive em lote
 
-**POST** `/api/drive/download/{file_id}` - Download de vídeo do Drive para armazenamento local
+**POST** `/api/drive/download` - Download de vídeo do Drive para armazenamento local
 
-### Endpoints de Cache do Drive
+**POST** `/api/drive/download-all` - Download em lote (Drive -> local)
+
+### Endpoints de Cache do Drive (opcional)
 
 **POST** `/api/drive/cache/sync` - Sincronização manual do cache (`?full=true` para rebuild)
 
@@ -272,8 +298,15 @@ yt-archiver/
 │   │   ├── main.py               # Entry point FastAPI
 │   │   ├── config.py             # Configurações globais
 │   │   ├── core/                 # Módulo central
+│   │   │   ├── blocking.py       # Helper para IO bloqueante (to_thread)
 │   │   │   ├── exceptions.py     # Exceções HTTP customizadas
+│   │   │   ├── logging.py        # Logging estruturado
 │   │   │   └── security.py       # Validações e sanitização
+│   │   ├── catalog/              # Catálogo persistente (SQLite)
+│   │   │   ├── router.py         # Endpoints /api/catalog/*
+│   │   │   ├── service.py        # Regras de catálogo
+│   │   │   ├── repository.py     # Acesso ao SQLite
+│   │   │   └── database.py       # Schema e conexões
 │   │   ├── downloads/            # Módulo de downloads
 │   │   │   ├── router.py         # Endpoints /api/download, /api/video-info
 │   │   │   ├── service.py        # Lógica de negócio
@@ -308,7 +341,8 @@ yt-archiver/
 │   ├── archive.txt               # Controle de downloads
 │   ├── credentials.json          # Credenciais OAuth Google (gitignored)
 │   ├── token.json                # Token OAuth (gitignored)
-│   └── drive_cache.db            # Cache SQLite de metadados do Drive
+│   ├── drive_cache.db            # Cache SQLite do Drive (legado/opt-in)
+│   └── database.db               # Catálogo SQLite local (local + drive)
 │
 ├── frontend/                     # Interface Next.js
 │   ├── src/
@@ -364,12 +398,19 @@ O backend segue uma arquitetura modular com separação clara de responsabilidad
 | `recordings` | Upload de gravações de tela | `/api/recordings/upload` |
 | `drive` | Integração Google Drive | `/api/drive/*` |
 | `drive/cache` | Cache SQLite para metadados | `/api/drive/cache/*` |
+| `catalog` | Catálogo persistente (SQLite + snapshot) | `/api/catalog/*` |
 | `core` | Exceções, segurança, utilitários | - |
 
 **Padrão de cada módulo:**
 - `router.py` - Define endpoints (APIRouter)
 - `service.py` - Lógica de negócio
 - `schemas.py` - Modelos Pydantic (request/response)
+
+### Concorrência e IO Bloqueante
+
+- O backend roda em 1 worker por padrão e mantém **jobs em memória**.
+- IO bloqueante (Google Drive, filesystem, SQLite) é offload para threads via `core/blocking.py`.
+- Para múltiplos workers em produção, é necessário mover o estado dos jobs para storage compartilhado (Redis/DB).
 
 ### Frontend
 - **Next.js 15** - Framework React com App Router
