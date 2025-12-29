@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Callable
 
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
@@ -873,6 +874,206 @@ class DriveManager:
             logger.error(f"Error deleting file {file_id}: {e}")
             return False
 
+    def _list_related_files(self, parent_id: str, base_name: str) -> List[Dict]:
+        """List related files (thumbs, metadata, subtitles) in a Drive folder."""
+        service = self.get_service()
+        related_extensions = [ext.lower() for ext in settings.THUMBNAIL_EXTENSIONS] + [
+            ".info.json",
+            ".vtt",
+            ".srt",
+            ".ass",
+            ".description",
+            ".txt",
+        ]
+
+        escaped_base = base_name.replace("'", "\\'")
+        query = f"'{parent_id}' in parents and name contains '{escaped_base}' and trashed=false"
+        results = service.files().list(
+            q=query,
+            fields="files(id, name)",
+        ).execute()
+
+        related = []
+        for item in results.get("files", []):
+            name = item.get("name") or ""
+            if not name.startswith(base_name + "."):
+                continue
+            remaining = name[len(base_name):]
+            remaining_lower = remaining.lower()
+            if any(remaining_lower.endswith(ext) or remaining_lower == ext for ext in related_extensions):
+                related.append({"id": item.get("id"), "name": name})
+        return related
+
+    def delete_video_with_related(
+        self,
+        file_id: str,
+        related_file_ids: Optional[List[str]] = None,
+    ) -> Dict:
+        """
+        Remove a video from Drive along with related files (thumbnails, subtitles, metadata).
+
+        Returns:
+            Dict with deleted/failed lists and candidate parent folder ids.
+        """
+        service = self.get_service()
+        related_ids = set(related_file_ids or [])
+        parent_ids: List[str] = []
+        base_name: Optional[str] = None
+
+        try:
+            metadata = service.files().get(
+                fileId=file_id,
+                fields="id, name, parents",
+            ).execute()
+            name = metadata.get("name")
+            base_name = Path(name).stem if name else None
+            parent_ids = metadata.get("parents", []) or []
+        except HttpError as e:
+            if getattr(e, "resp", None) is not None and e.resp.status == 404:
+                logger.warning(f"Drive file not found (delete): {file_id}")
+            else:
+                logger.error(f"Error reading Drive metadata {file_id}: {e}")
+                raise
+
+        if base_name and parent_ids:
+            try:
+                fallback_related = self._list_related_files(parent_ids[0], base_name)
+                related_ids.update([item["id"] for item in fallback_related if item.get("id")])
+            except Exception as e:
+                logger.warning(f"Failed to list related files for {file_id}: {e}")
+
+        to_delete = {file_id}
+        to_delete.update({rid for rid in related_ids if isinstance(rid, str) and rid})
+
+        deleted: List[str] = []
+        failed: List[Dict[str, str]] = []
+        missing: List[str] = []
+
+        for target_id in to_delete:
+            try:
+                service.files().delete(fileId=target_id).execute()
+                deleted.append(target_id)
+            except HttpError as e:
+                if getattr(e, "resp", None) is not None and e.resp.status == 404:
+                    missing.append(target_id)
+                    deleted.append(target_id)
+                else:
+                    failed.append({"file_id": target_id, "error": str(e)})
+            except Exception as e:
+                failed.append({"file_id": target_id, "error": str(e)})
+
+        return {
+            "deleted": deleted,
+            "failed": failed,
+            "missing": missing,
+            "total_deleted": len(deleted),
+            "total_failed": len(failed),
+            "parent_ids": parent_ids,
+            "video_deleted": file_id in deleted,
+        }
+
+    def delete_videos_with_related(
+        self,
+        file_ids: List[str],
+        related_map: Optional[Dict[str, List[str]]] = None,
+    ) -> Dict:
+        """
+        Delete multiple videos and their related files.
+        """
+        deleted: List[str] = []
+        failed: List[Dict[str, str]] = []
+        missing: List[str] = []
+        parent_ids: List[str] = []
+        deleted_videos: List[str] = []
+
+        for file_id in file_ids:
+            try:
+                related_ids = (related_map or {}).get(file_id) if related_map else None
+                result = self.delete_video_with_related(file_id, related_ids)
+
+                deleted.extend(result.get("deleted", []))
+                failed.extend(result.get("failed", []))
+                missing.extend(result.get("missing", []))
+                parent_ids.extend(result.get("parent_ids", []))
+                if result.get("video_deleted"):
+                    deleted_videos.append(file_id)
+            except Exception as e:
+                failed.append({"file_id": file_id, "error": str(e)})
+
+        return {
+            "deleted": deleted,
+            "failed": failed,
+            "missing": missing,
+            "parent_ids": list(dict.fromkeys(parent_ids)),
+            "deleted_videos": deleted_videos,
+            "total_deleted": len(deleted),
+            "total_failed": len(failed),
+        }
+
+    def _folder_has_children(self, folder_id: str) -> bool:
+        service = self.get_service()
+        query = f"'{folder_id}' in parents and trashed=false"
+        results = service.files().list(
+            q=query,
+            fields="files(id)",
+            pageSize=1,
+        ).execute()
+        return bool(results.get("files"))
+
+    def cleanup_empty_folders(self, folder_ids: List[str], root_id: Optional[str] = None) -> Dict:
+        """
+        Recursively delete empty folders up to the root folder.
+
+        Returns:
+            Dict with deleted and skipped folders.
+        """
+        service = self.get_service()
+        root_id = root_id or self.get_or_create_root_folder()
+        deleted: List[Dict[str, str]] = []
+        skipped: List[Dict[str, str]] = []
+        visited = set()
+
+        for folder_id in folder_ids:
+            current_id = folder_id
+            while current_id and current_id not in visited:
+                visited.add(current_id)
+
+                if current_id == root_id:
+                    skipped.append({"folder_id": current_id, "reason": "root"})
+                    break
+
+                try:
+                    if self._folder_has_children(current_id):
+                        skipped.append({"folder_id": current_id, "reason": "not_empty"})
+                        break
+
+                    metadata = service.files().get(
+                        fileId=current_id,
+                        fields="id, name, parents, mimeType",
+                    ).execute()
+                    if metadata.get("mimeType") != "application/vnd.google-apps.folder":
+                        skipped.append({"folder_id": current_id, "reason": "not_folder"})
+                        break
+
+                    folder_name = metadata.get("name") or ""
+                    if folder_name == ".catalog":
+                        skipped.append({"folder_id": current_id, "reason": "catalog"})
+                        break
+
+                    service.files().delete(fileId=current_id).execute()
+                    deleted.append({"folder_id": current_id, "name": folder_name})
+
+                    parents = metadata.get("parents", []) or []
+                    current_id = parents[0] if parents else None
+                except HttpError as e:
+                    skipped.append({"folder_id": current_id, "reason": str(e)})
+                    break
+                except Exception as e:
+                    skipped.append({"folder_id": current_id, "reason": str(e)})
+                    break
+
+        return {"deleted": deleted, "skipped": skipped}
+
     def rename_file(self, file_id: str, new_name: str) -> Dict:
         """
         Rename a file in Google Drive.
@@ -1123,7 +1324,7 @@ class DriveManager:
         service = self.get_service()
         return service.files().get(
             fileId=file_id,
-            fields='size, mimeType, name'
+            fields='size, mimeType, name, parents'
         ).execute()
 
     def get_thumbnail(self, file_id: str) -> Optional[bytes]:

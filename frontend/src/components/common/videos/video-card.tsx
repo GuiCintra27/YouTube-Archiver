@@ -45,6 +45,7 @@ interface VideoCardProps {
   createdAt?: string;
   onPlay: () => void;
   onDelete: () => void;
+  deleteScope?: "local" | "drive";
   // Optional selection props
   selectable?: boolean;
   selected?: boolean;
@@ -65,6 +66,7 @@ export default function VideoCard({
   createdAt,
   onPlay,
   onDelete,
+  deleteScope = "local",
   selectable = false,
   selected = false,
   onSelectionChange,
@@ -344,10 +346,11 @@ export default function VideoCard({
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="glass border-white/10">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Excluir video?</AlertDialogTitle>
+            <AlertDialogTitle className="text-white">Excluir vídeo?</AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
-              Esta acao nao pode ser desfeita. O video &quot;{title}&quot; sera
-              permanentemente excluido do seu dispositivo.
+              {deleteScope === "drive"
+                ? `Esta ação não poderá ser desfeita. O vídeo "${title}" será permanentemente excluído do Google Drive.`
+                : `Esta ação não poderá ser desfeita. O vídeo "${title}" será permanentemente excluído do seu dispositivo.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

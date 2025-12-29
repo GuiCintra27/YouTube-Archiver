@@ -318,6 +318,7 @@ export default function DriveVideoGrid() {
                 createdAt={video.created_at}
                 onPlay={() => setSelectedVideo(video)}
                 onDelete={() => handleDelete(video)}
+                deleteScope="drive"
                 selectable={true}
                 selected={selectedIds.has(video.id)}
                 onSelectionChange={() => toggleSelection(video.id)}

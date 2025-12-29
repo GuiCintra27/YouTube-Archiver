@@ -239,7 +239,7 @@ Aliases compatíveis:
 ### ⏳ Funcionalidades Pendentes de Teste
 - [x] Upload em lote ("Sincronizar Todos")
 - [ ] Deleção de vídeos locais
-- [ ] Deleção de vídeos do Google Drive
+- [x] Deleção de vídeos do Google Drive
 - [ ] Download de playlists completas
 - [ ] Opções avançadas de download (qualidade, formato, legendas)
 

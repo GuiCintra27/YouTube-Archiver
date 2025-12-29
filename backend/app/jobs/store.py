@@ -19,6 +19,7 @@ class JobType(str, Enum):
     DRIVE_SYNC = "drive_sync"
     DRIVE_DOWNLOAD = "drive_download"
     CATALOG_DRIVE_REBUILD = "catalog_drive_rebuild"
+    DRIVE_CLEANUP = "drive_cleanup"
 
 
 # Type aliases for clarity

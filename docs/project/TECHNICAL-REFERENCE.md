@@ -237,7 +237,7 @@ GET  /api/drive/sync-status         # Status sync
 GET  /api/drive/sync-items          # Itens paginados (diff)
 GET  /api/drive/stream/{id}         # Stream (206)
 GET  /api/drive/thumbnail/{id}      # Thumbnail
-DELETE /api/drive/videos/{id}       # Remove vídeo
+DELETE /api/drive/videos/{id}       # Remove vídeo + relacionados (retorna cleanup_job_id)
 POST /api/drive/download            # Download (Drive -> local)
 POST /api/drive/download-all        # Download em lote (Drive -> local)
 ```

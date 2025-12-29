@@ -147,6 +147,15 @@ class CatalogRepository:
             ).fetchone()
         return str(row["video_uid"]) if row else None
 
+    def get_drive_assets_by_file_id(self, file_id: str) -> List[Dict[str, Any]]:
+        """
+        Return Drive assets for a video given its Drive file_id.
+        """
+        video_uid = self.find_drive_video_uid_by_file_id(file_id)
+        if not video_uid:
+            return []
+        return self.get_assets(video_uid=video_uid, location="drive")
+
     def get_assets(self, *, video_uid: str, location: str) -> List[Dict[str, Any]]:
         with self.db.connection() as con:
             rows = con.execute(

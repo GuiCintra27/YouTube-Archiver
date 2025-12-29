@@ -10,7 +10,7 @@
    - Upload de vídeos mantendo estrutura de pastas
    - Listagem de vídeos no Drive
    - Sincronização Local <-> Drive
-   - Remoção de vídeos do Drive
+   - Remoção de vídeos do Drive (inclui arquivos relacionados + limpeza de pastas em background)
 
 2. **Novos endpoints na API:**
    - `GET /api/drive/auth-status` - Verificar autenticação
@@ -21,7 +21,7 @@
    - `GET /api/drive/sync-status` - Status de sincronização
    - `GET /api/drive/sync-items` - Itens paginados (local_only/drive_only/synced)
    - `POST /api/drive/sync-all` - Sincronizar todos os vídeos
-   - `DELETE /api/drive/videos/{id}` - Remover vídeo do Drive
+   - `DELETE /api/drive/videos/{id}` - Remover vídeo do Drive (retorna cleanup_job_id)
    - `POST /api/drive/videos/delete-batch` - Excluir múltiplos vídeos em lote
    - `POST /api/drive/download` - Download de vídeo para local (por path ou file_id)
    - `POST /api/drive/download-all` - Download em lote (Drive -> local)

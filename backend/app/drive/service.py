@@ -65,6 +65,60 @@ def _fail_job(job_id: str, error: str) -> None:
         job["completed_at"] = datetime.now().isoformat()
 
 
+async def _run_drive_cleanup_job(job_id: str, folder_ids: List[str]) -> None:
+    try:
+        job = store.get_job(job_id)
+        if job:
+            job["status"] = "running"
+            job["progress"]["status"] = "running"
+
+        result = await run_blocking(
+            drive_manager.cleanup_empty_folders,
+            folder_ids,
+            semaphore=get_drive_semaphore(),
+            label="drive.cleanup_folders",
+        )
+
+        job = store.get_job(job_id)
+        if job:
+            job["status"] = "completed"
+            job["result"] = result
+            job["progress"]["status"] = "completed"
+            job["progress"]["folders_deleted"] = len(result.get("deleted", []))
+            job["completed_at"] = datetime.now().isoformat()
+    except Exception as e:
+        job = store.get_job(job_id)
+        if job:
+            job["status"] = "error"
+            job["error"] = str(e)
+            job["completed_at"] = datetime.now().isoformat()
+
+
+def _enqueue_drive_cleanup(folder_ids: List[str]) -> Optional[str]:
+    if not folder_ids:
+        return None
+
+    job_id = str(uuid.uuid4())
+    job_data = {
+        "job_id": job_id,
+        "type": JobType.DRIVE_CLEANUP.value,
+        "status": "pending",
+        "created_at": datetime.now().isoformat(),
+        "progress": {
+            "status": "queued",
+            "folders_total": len(folder_ids),
+            "folders_deleted": 0,
+        },
+        "result": None,
+        "error": None,
+    }
+    store.set_job(job_id, job_data)
+
+    task = asyncio.create_task(_run_drive_cleanup_job(job_id, folder_ids))
+    store.set_task(job_id, task)
+    return job_id
+
+
 def _get_upload_semaphore() -> asyncio.Semaphore:
     """Get or create the upload semaphore (must be created in event loop context)."""
     global UPLOAD_SEMAPHORE
@@ -587,14 +641,28 @@ async def _run_batch_upload_job(job_id: str, base_dir: str) -> None:
 
 async def delete_video(file_id: str) -> Dict:
     """Delete a video from Drive"""
-    success = await run_blocking(
-        drive_manager.delete_video,
+    related_ids: List[str] = []
+    if settings.CATALOG_ENABLED:
+        def _get_related_ids() -> List[str]:
+            repo = CatalogRepository()
+            assets = repo.get_drive_assets_by_file_id(file_id)
+            return [str(a["drive_file_id"]) for a in assets if a.get("drive_file_id")]
+
+        related_ids = await run_blocking(
+            _get_related_ids,
+            semaphore=get_catalog_semaphore(),
+            label="drive.delete.related_ids",
+        )
+
+    result = await run_blocking(
+        drive_manager.delete_video_with_related,
         file_id,
+        related_ids,
         semaphore=get_drive_semaphore(),
         label="drive.delete_video",
     )
 
-    if not success:
+    if not result.get("video_deleted"):
         raise Exception("Failed to delete video")
 
     if settings.CATALOG_ENABLED:
@@ -612,9 +680,13 @@ async def delete_video(file_id: str) -> Dict:
         except Exception as e:
             logger.warning(f"Failed to sync deletion to cache: {e}")
 
+    cleanup_job_id = _enqueue_drive_cleanup(result.get("parent_ids") or [])
+
     return {
         "status": "success",
-        "message": "Video deleted from Drive"
+        "message": "Video deleted from Drive",
+        "cleanup_job_id": cleanup_job_id,
+        "deleted_related": max(0, result.get("total_deleted", 0) - 1),
     }
 
 
@@ -636,38 +708,60 @@ async def delete_videos_batch(file_ids: List[str]) -> Dict:
             "total_failed": 0,
         }
 
+    related_map: Dict[str, List[str]] = {}
+    if settings.CATALOG_ENABLED:
+        def _get_related_map() -> Dict[str, List[str]]:
+            repo = CatalogRepository()
+            mapping: Dict[str, List[str]] = {}
+            for vid in file_ids:
+                assets = repo.get_drive_assets_by_file_id(vid)
+                mapping[vid] = [str(a["drive_file_id"]) for a in assets if a.get("drive_file_id")]
+            return mapping
+
+        related_map = await run_blocking(
+            _get_related_map,
+            semaphore=get_catalog_semaphore(),
+            label="drive.delete_batch.related_map",
+        )
+
     result = await run_blocking(
-        drive_manager.delete_videos_batch,
+        drive_manager.delete_videos_with_related,
         file_ids,
+        related_map,
         semaphore=get_drive_semaphore(),
         label="drive.delete_batch",
     )
 
-    if settings.CATALOG_ENABLED and result.get("deleted"):
+    deleted_video_ids = result.get("deleted_videos", [])
+
+    if settings.CATALOG_ENABLED and deleted_video_ids:
         try:
-            for deleted_id in result["deleted"]:
+            for deleted_id in deleted_video_ids:
                 await delete_drive_video_from_catalog(video_file_id=deleted_id)
             await maybe_publish_drive_snapshot(reason="drive_delete_batch")
         except Exception as e:
             logger.warning(f"Catalog write-through failed (drive_delete_batch): {e}")
 
     # Sync with cache - mark deleted IDs
-    if settings.DRIVE_CACHE_ENABLED and result.get("deleted_ids"):
+    if settings.DRIVE_CACHE_ENABLED and deleted_video_ids:
         try:
             from .cache import get_repository
             repo = get_repository()
-            await repo.mark_videos_deleted_batch(result["deleted_ids"])
+            await repo.mark_videos_deleted_batch(deleted_video_ids)
         except Exception as e:
             logger.warning(f"Failed to sync batch deletion to cache: {e}")
 
+    cleanup_job_id = _enqueue_drive_cleanup(result.get("parent_ids") or [])
+
     status = "success" if result["total_failed"] == 0 else "partial"
-    message = f"{result['total_deleted']} vídeo(s) excluído(s)"
+    message = f"{len(deleted_video_ids)} vídeo(s) excluído(s)"
     if result["total_failed"] > 0:
         message += f", {result['total_failed']} falha(s)"
 
     return {
         "status": status,
         "message": message,
+        "cleanup_job_id": cleanup_job_id,
         **result,
     }
 

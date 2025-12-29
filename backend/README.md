@@ -67,9 +67,14 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - **GET** `/api/drive/sync-items` - Itens paginados (local_only/drive_only/synced)
 - **GET** `/api/drive/stream/{file_id}` - Stream de vídeo do Drive
 - **GET** `/api/drive/thumbnail/{file_id}` - Thumbnail do Drive
-- **DELETE** `/api/drive/videos/{file_id}` - Remove vídeo do Drive
+- **DELETE** `/api/drive/videos/{file_id}` - Remove vídeo do Drive (vídeo + arquivos relacionados)
+- **POST** `/api/drive/videos/delete-batch` - Exclui múltiplos vídeos em lote
 - **POST** `/api/drive/download` - Download de vídeo do Drive (por path ou file_id)
 - **POST** `/api/drive/download-all` - Download em lote (Drive -> local)
+
+**Notas do delete (Drive):**
+- A exclusão remove o vídeo e arquivos relacionados (thumb, legendas, metadata).
+- A limpeza de pastas vazias ocorre em background e retorna `cleanup_job_id`.
 
 **Documentação completa:** http://localhost:8000/docs
 
