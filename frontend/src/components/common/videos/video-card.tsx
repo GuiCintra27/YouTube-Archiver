@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { Trash2, Play, MoreVertical, Info, Clock, HardDrive, Calendar, FileVideo, Pencil, Loader2, ImageIcon } from "lucide-react";
+import { Trash2, Play, MoreVertical, Info, Clock, HardDrive, Calendar, FileVideo, Pencil, Loader2, ImageIcon, Share2, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +32,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useApiUrl } from "@/hooks/use-api-url";
+import { APIURLS } from "@/lib/api-urls";
 import { formatBytes } from "@/lib/utils";
 
 interface VideoCardProps {
@@ -53,9 +55,12 @@ interface VideoCardProps {
   // Optional edit props
   editable?: boolean;
   onEdit?: (newTitle: string, newThumbnail?: File) => Promise<void>;
+  // Optional share props
+  shareScope?: "drive" | "none";
 }
 
 export default function VideoCard({
+  id,
   title,
   channel,
   thumbnail,
@@ -72,12 +77,19 @@ export default function VideoCard({
   onSelectionChange,
   editable = false,
   onEdit,
+  shareScope = "none",
 }: VideoCardProps) {
   const apiUrl = useApiUrl();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareEnabled, setShareEnabled] = useState(false);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
   // Edit form state
   const [editTitle, setEditTitle] = useState(title);
@@ -92,6 +104,11 @@ export default function VideoCard({
     : thumbnail && apiUrl
       ? `${apiUrl}/api/videos/thumbnail/${encodeURIComponent(thumbnail)}`
       : null;
+
+  const canShare = shareScope === "drive";
+  const shareEndpoint = canShare && apiUrl
+    ? `${apiUrl}/api/${APIURLS.DRIVE_VIDEOS}/${id}/${APIURLS.DRIVE_SHARE}`
+    : null;
 
   const handleDelete = useCallback(() => {
     setShowDeleteDialog(false);
@@ -154,6 +171,102 @@ export default function VideoCard({
       return null;
     }
   };
+
+  const fetchShareStatus = useCallback(async () => {
+    if (!shareEndpoint) {
+      setShareError("API indisponível.");
+      return;
+    }
+
+    try {
+      setShareLoading(true);
+      setShareError(null);
+      const response = await fetch(shareEndpoint);
+
+      if (!response.ok) {
+        throw new Error("Falha ao carregar compartilhamento");
+      }
+
+      const data = await response.json();
+      const shared = Boolean(data.shared);
+      const link = typeof data.link === "string" ? data.link : null;
+
+      setShareEnabled(shared);
+      setShareLink(link);
+    } catch (error) {
+      console.error("Error fetching share status:", error);
+      setShareError("Falha ao carregar compartilhamento.");
+      setShareEnabled(false);
+      setShareLink(null);
+    } finally {
+      setShareLoading(false);
+    }
+  }, [shareEndpoint]);
+
+  const handleOpenShareDialog = useCallback(() => {
+    setShowShareDialog(true);
+    setShareCopied(false);
+    setShareError(null);
+    fetchShareStatus();
+  }, [fetchShareStatus]);
+
+  const handleShareDialogChange = useCallback((open: boolean) => {
+    setShowShareDialog(open);
+    if (!open) {
+      setShareError(null);
+      setShareCopied(false);
+    }
+  }, []);
+
+  const handleShareToggle = useCallback(
+    async (nextEnabled: boolean) => {
+      if (!shareEndpoint) {
+        setShareError("API indisponível.");
+        return;
+      }
+
+      try {
+        setShareLoading(true);
+        setShareError(null);
+
+        const response = await fetch(shareEndpoint, {
+          method: nextEnabled ? "POST" : "DELETE",
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            nextEnabled
+              ? "Falha ao habilitar compartilhamento"
+              : "Falha ao revogar compartilhamento"
+          );
+        }
+
+        const data = await response.json();
+        const shared = Boolean(data.shared);
+        const link = typeof data.link === "string" ? data.link : null;
+
+        setShareEnabled(shared);
+        setShareLink(shared ? link : null);
+      } catch (error) {
+        console.error("Error toggling share:", error);
+        setShareError("Falha ao atualizar compartilhamento.");
+      } finally {
+        setShareLoading(false);
+      }
+    },
+    [shareEndpoint]
+  );
+
+  const handleCopyLink = useCallback(async () => {
+    if (!shareLink) return;
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setShareCopied(true);
+    } catch (error) {
+      console.error("Error copying share link:", error);
+      setShareError("Não foi possível copiar o link.");
+    }
+  }, [shareLink]);
 
   return (
     <>
@@ -260,6 +373,15 @@ export default function VideoCard({
                   <Info className="mr-2 h-4 w-4 text-teal" />
                   Informacoes
                 </DropdownMenuItem>
+                {canShare && (
+                  <DropdownMenuItem
+                    onClick={handleOpenShareDialog}
+                    className="cursor-pointer text-white focus:bg-white/10 focus:text-white"
+                  >
+                    <Share2 className="mr-2 h-4 w-4 text-cyan" />
+                    Opções de compartilhamento
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator className="bg-white/10" />
                 <DropdownMenuItem
                   onClick={() => setShowDeleteDialog(true)}
@@ -338,6 +460,81 @@ export default function VideoCard({
               </p>
               <p className="text-sm text-white">{channel}</p>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de compartilhamento */}
+      <Dialog open={showShareDialog} onOpenChange={handleShareDialogChange}>
+        <DialogContent className="sm:max-w-md glass border-white/10">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <Share2 className="h-5 w-5 text-cyan" />
+              Opções de compartilhamento
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/5 p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-white">Compartilhável publicamente</p>
+                <p className="text-xs text-muted-foreground">
+                  Qualquer pessoa com o link poderá visualizar.
+                </p>
+              </div>
+              <Switch
+                checked={shareEnabled}
+                onCheckedChange={handleShareToggle}
+                disabled={shareLoading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-white">Link público</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={shareLink || ""}
+                  readOnly
+                  placeholder="Ative o compartilhamento para gerar um link"
+                  className="glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCopyLink}
+                  disabled={!shareLink}
+                  className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white"
+                >
+                  {shareCopied ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4 text-teal" />
+                      Copiado
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copiar
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {shareError && (
+              <p className="text-xs text-red-400">{shareError}</p>
+            )}
+
+            {shareLoading && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Atualizando compartilhamento...
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground">
+              O link é público e não expira automaticamente. Você pode revogar o
+              acesso quando quiser.
+            </p>
           </div>
         </DialogContent>
       </Dialog>

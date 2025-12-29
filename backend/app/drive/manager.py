@@ -21,7 +21,7 @@ from app.core.thumbnail import ensure_thumbnail
 
 logger = get_module_logger("drive")
 
-SCOPES = ['https://www.googleapis.com/auth/drive.file']
+SCOPES = ['https://www.googleapis.com/auth/drive']
 DRIVE_ROOT_FOLDER = "YouTube Archiver"
 
 
@@ -53,7 +53,6 @@ class DriveManager:
 
         auth_url, _ = flow.authorization_url(
             access_type='offline',
-            include_granted_scopes='true',
             prompt='consent'
         )
 
@@ -1331,6 +1330,80 @@ class DriveManager:
             fileId=file_id,
             fields='size, mimeType, name, parents'
         ).execute()
+
+    def get_share_status(self, file_id: str) -> Dict:
+        """Get current public sharing status for a file."""
+        service = self.get_service()
+        try:
+            metadata = service.files().get(
+                fileId=file_id,
+                fields='id, webViewLink, permissions(id,type,role)'
+            ).execute()
+        except HttpError as e:
+            logger.error(f"Failed to get share status for {file_id}: {e}")
+            raise
+
+        permissions = metadata.get("permissions", []) or []
+        public_permission = None
+        for permission in permissions:
+            if permission.get("type") == "anyone" and permission.get("role") == "reader":
+                public_permission = permission
+                break
+
+        shared = public_permission is not None
+        return {
+            "shared": shared,
+            "link": metadata.get("webViewLink") if shared else None,
+            "permission_id": public_permission.get("id") if shared else None,
+        }
+
+    def enable_share(self, file_id: str) -> Dict:
+        """Enable public read sharing for a file and return link info."""
+        service = self.get_service()
+        try:
+            current = self.get_share_status(file_id)
+            if current.get("shared"):
+                return current
+
+            permission = service.permissions().create(
+                fileId=file_id,
+                body={"type": "anyone", "role": "reader"},
+                fields="id",
+            ).execute()
+
+            metadata = service.files().get(
+                fileId=file_id,
+                fields='id, webViewLink'
+            ).execute()
+        except HttpError as e:
+            logger.error(f"Failed to enable share for {file_id}: {e}")
+            raise
+
+        return {
+            "shared": True,
+            "link": metadata.get("webViewLink"),
+            "permission_id": permission.get("id"),
+        }
+
+    def disable_share(self, file_id: str, permission_id: Optional[str] = None) -> Dict:
+        """Revoke public sharing for a file."""
+        service = self.get_service()
+        try:
+            perm_id = permission_id
+            if not perm_id:
+                status = self.get_share_status(file_id)
+                perm_id = status.get("permission_id")
+            if perm_id:
+                service.permissions().delete(fileId=file_id, permissionId=perm_id).execute()
+        except HttpError as e:
+            logger.error(f"Failed to revoke share for {file_id}: {e}")
+            raise
+
+        return {
+            "shared": False,
+            "link": None,
+            "permission_id": None,
+        }
 
     def get_thumbnail(self, file_id: str) -> Optional[bytes]:
         """

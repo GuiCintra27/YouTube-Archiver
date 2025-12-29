@@ -224,7 +224,7 @@ uvicorn app.main:app --reload
 
 ### Google Drive API
 - OAuth 2.0 flow completo
-- Escopo: `https://www.googleapis.com/auth/drive.file`
+- Escopo: `https://www.googleapis.com/auth/drive` (necessário para permissões de compartilhamento)
 - Pasta raiz: "YouTube Archiver" (criada automaticamente)
 - Upload preserva estrutura de pastas local
 - Arquivos relacionados (thumbnails, legendas, metadata) enviados junto

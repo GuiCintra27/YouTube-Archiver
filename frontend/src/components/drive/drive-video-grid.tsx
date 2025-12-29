@@ -324,6 +324,7 @@ export default function DriveVideoGrid() {
                 onSelectionChange={() => toggleSelection(video.id)}
                 editable={true}
                 onEdit={(newTitle, newThumbnail) => handleEdit(video, newTitle, newThumbnail)}
+                shareScope="drive"
               />
             ))}
           </div>

@@ -23,6 +23,9 @@
    - `POST /api/drive/sync-all` - Sincronizar todos os vídeos
    - `DELETE /api/drive/videos/{id}` - Remover vídeo do Drive (retorna cleanup_job_id)
    - `POST /api/drive/videos/delete-batch` - Excluir múltiplos vídeos em lote
+   - `GET /api/drive/videos/{id}/share` - Status do compartilhamento público
+   - `POST /api/drive/videos/{id}/share` - Habilitar link público de compartilhamento
+   - `DELETE /api/drive/videos/{id}/share` - Revogar compartilhamento público
    - `POST /api/drive/download` - Download de vídeo para local (por path ou file_id)
    - `POST /api/drive/download-all` - Download em lote (Drive -> local)
    - `PATCH /api/drive/videos/{id}/rename` - Renomear vídeo no Drive
@@ -64,6 +67,7 @@
    - Seleção múltipla com checkboxes
    - Exclusão individual ou em lote
    - Edição de vídeos (renomear e atualizar thumbnail)
+   - Compartilhamento público (link com toggle de ativação)
    - Componente VideoCard unificado (mesmo usado na biblioteca local)
 
 5. **Componente `Navigation`**
@@ -281,7 +285,7 @@ Todos já estão no `.gitignore`!
 
 - Autenticação segura via Google
 - Tokens com renovação automática
-- Escopo mínimo: `drive.file` (apenas arquivos criados pelo app)
+- Escopo atual: `drive` (necessário para gerenciar permissões de compartilhamento)
 
 ## 🐛 Troubleshooting
 
@@ -324,7 +328,7 @@ rm backend/token.json
 - [ ] Conflitos de versão
 - [ ] Progress bar durante uploads grandes
 - [ ] Compressão antes do upload
-- [ ] Compartilhamento de links do Drive
+- [x] Compartilhamento de links do Drive ✅ (v2.4.x)
 - [ ] Backup automático agendado
 
 ## 🎉 Conclusão

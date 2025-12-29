@@ -23,6 +23,8 @@ from app.catalog.service import (
     maybe_publish_drive_snapshot,
     rename_drive_video_in_catalog,
     set_drive_thumbnail_in_catalog,
+    set_drive_share_metadata_in_catalog,
+    clear_drive_share_metadata_in_catalog,
     upsert_drive_video_from_upload,
 )
 from app.catalog.service import upsert_local_video_from_fs
@@ -775,6 +777,73 @@ async def delete_videos_batch(file_ids: List[str]) -> Dict:
         "message": message,
         "cleanup_job_id": cleanup_job_id,
         **result,
+    }
+
+
+async def get_drive_share_status(file_id: str) -> Dict:
+    """Get current public sharing status for a Drive file."""
+    result = await run_blocking(
+        drive_manager.get_share_status,
+        file_id,
+        semaphore=get_drive_semaphore(),
+        label="drive.share.status",
+    )
+
+    return {
+        "status": "success",
+        "shared": bool(result.get("shared")),
+        "link": result.get("link"),
+    }
+
+
+async def share_drive_video(file_id: str) -> Dict:
+    """Enable public sharing for a Drive video."""
+    result = await run_blocking(
+        drive_manager.enable_share,
+        file_id,
+        semaphore=get_drive_semaphore(),
+        label="drive.share.enable",
+    )
+
+    permission_id = result.get("permission_id")
+    share_link = result.get("link")
+
+    if settings.CATALOG_ENABLED and permission_id and share_link:
+        try:
+            await set_drive_share_metadata_in_catalog(
+                video_file_id=file_id,
+                share_link=str(share_link),
+                permission_id=str(permission_id),
+            )
+        except Exception as e:
+            logger.warning(f"Catalog write-through failed (drive_share_enable): {e}")
+
+    return {
+        "status": "success",
+        "shared": True,
+        "link": share_link,
+    }
+
+
+async def unshare_drive_video(file_id: str) -> Dict:
+    """Disable public sharing for a Drive video."""
+    await run_blocking(
+        drive_manager.disable_share,
+        file_id,
+        semaphore=get_drive_semaphore(),
+        label="drive.share.disable",
+    )
+
+    if settings.CATALOG_ENABLED:
+        try:
+            await clear_drive_share_metadata_in_catalog(video_file_id=file_id)
+        except Exception as e:
+            logger.warning(f"Catalog write-through failed (drive_share_disable): {e}")
+
+    return {
+        "status": "success",
+        "shared": False,
+        "link": None,
     }
 
 

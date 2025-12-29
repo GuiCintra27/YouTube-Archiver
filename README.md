@@ -18,6 +18,7 @@ O YT-Archiver combina uma API REST robusta com uma interface web moderna para fa
 - ✅ Cookies personalizados via arquivo Netscape
 - ✅ **Biblioteca de vídeos local** - Visualize, reproduza e gerencie vídeos baixados
 - ✅ **Sincronização com Google Drive** - Upload, visualização e streaming de vídeos no Drive
+- ✅ **Compartilhamento no Drive** - Gere link público para visualizar vídeos
 - ✅ **Catálogo persistente (SQLite)** - Índice local + snapshot no Drive para listagem rápida
 - ✅ **Sistema de jobs assíncronos** - Downloads em background com progresso em tempo real
 - ✅ Sistema de arquivamento para evitar downloads duplicados
@@ -102,6 +103,7 @@ npm run dev
 - 🔄 Painel de sincronização mostrando diferenças entre local e Drive
 - ▶️ Streaming direto do Google Drive com suporte a seek/skip
 - 🗑️ Exclusão individual ou em lote de vídeos do Drive
+- 🔗 Compartilhamento público com link (ativar/desativar por vídeo)
 - ℹ️ Modal de informações detalhadas do vídeo
 
 **Global Player (Background Playback):**
@@ -266,6 +268,12 @@ A API FastAPI oferece endpoints completos para integração:
 **GET** `/api/drive/stream/{file_id}` - Stream de vídeo do Drive (com range requests)
 
 **GET** `/api/drive/thumbnail/{file_id}` - Thumbnail de vídeo do Drive
+
+**GET** `/api/drive/videos/{file_id}/share` - Status de compartilhamento público
+
+**POST** `/api/drive/videos/{file_id}/share` - Habilita compartilhamento público
+
+**DELETE** `/api/drive/videos/{file_id}/share` - Revoga compartilhamento público
 
 **DELETE** `/api/drive/videos/{file_id}` - Remove vídeo do Drive
 

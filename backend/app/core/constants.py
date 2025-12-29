@@ -188,7 +188,7 @@ class DriveConfig:
     """Constants for Google Drive integration."""
 
     # OAuth Scopes
-    SCOPES: List[str] = ['https://www.googleapis.com/auth/drive.file']
+    SCOPES: List[str] = ['https://www.googleapis.com/auth/drive']
 
     # Folder MIME type
     FOLDER_MIME_TYPE: str = 'application/vnd.google-apps.folder'

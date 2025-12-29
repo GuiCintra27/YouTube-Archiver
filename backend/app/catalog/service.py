@@ -493,6 +493,100 @@ async def set_drive_thumbnail_in_catalog(
     )
 
 
+async def set_drive_share_metadata_in_catalog(
+    *,
+    video_file_id: str,
+    share_link: str,
+    permission_id: str,
+    repo: Optional[CatalogRepository] = None,
+) -> bool:
+    if not settings.CATALOG_ENABLED:
+        return False
+    repo = repo or CatalogRepository()
+
+    def _run() -> bool:
+        video_uid = repo.find_drive_video_uid_by_file_id(video_file_id)
+        if not video_uid:
+            return False
+
+        row = repo.get_video(video_uid)
+        extra = {}
+        if row.get("extra_json"):
+            try:
+                extra = json.loads(row["extra_json"])
+            except Exception:
+                extra = {}
+
+        extra["share_link"] = share_link
+        extra["share_permission_id"] = permission_id
+
+        repo.upsert_video(
+            video_uid=video_uid,
+            location="drive",
+            source=row.get("source") or "custom",
+            title=row.get("title"),
+            channel=row.get("channel"),
+            duration_seconds=row.get("duration_seconds"),
+            created_at=row.get("created_at"),
+            modified_at=_iso_now(),
+            status=row.get("status") or "available",
+            extra=extra,
+        )
+        return True
+
+    return await run_blocking(
+        _run,
+        semaphore=get_catalog_semaphore(),
+        label="catalog.set_drive_share",
+    )
+
+
+async def clear_drive_share_metadata_in_catalog(
+    *,
+    video_file_id: str,
+    repo: Optional[CatalogRepository] = None,
+) -> bool:
+    if not settings.CATALOG_ENABLED:
+        return False
+    repo = repo or CatalogRepository()
+
+    def _run() -> bool:
+        video_uid = repo.find_drive_video_uid_by_file_id(video_file_id)
+        if not video_uid:
+            return False
+
+        row = repo.get_video(video_uid)
+        extra = {}
+        if row.get("extra_json"):
+            try:
+                extra = json.loads(row["extra_json"])
+            except Exception:
+                extra = {}
+
+        extra.pop("share_link", None)
+        extra.pop("share_permission_id", None)
+
+        repo.upsert_video(
+            video_uid=video_uid,
+            location="drive",
+            source=row.get("source") or "custom",
+            title=row.get("title"),
+            channel=row.get("channel"),
+            duration_seconds=row.get("duration_seconds"),
+            created_at=row.get("created_at"),
+            modified_at=_iso_now(),
+            status=row.get("status") or "available",
+            extra=extra,
+        )
+        return True
+
+    return await run_blocking(
+        _run,
+        semaphore=get_catalog_semaphore(),
+        label="catalog.clear_drive_share",
+    )
+
+
 async def import_drive_snapshot_bytes(
     *, snapshot_bytes: bytes, repo: Optional[CatalogRepository] = None
 ) -> Dict[str, Any]:

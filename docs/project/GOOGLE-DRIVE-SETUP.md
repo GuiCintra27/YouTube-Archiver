@@ -41,8 +41,8 @@ Este guia explica como configurar a integração com Google Drive para sincroniz
 
 1. Clique em **"Adicionar ou remover escopos"**
 2. Adicione o escopo:
-   - `https://www.googleapis.com/auth/drive.file`
-   - (Permite criar e modificar arquivos que o app criou)
+   - `https://www.googleapis.com/auth/drive`
+   - (Necessário para gerenciar permissões de compartilhamento público)
 3. Clique em **"Atualizar"** e depois **"Salvar e continuar"**
 
 ### 3.3 Adicionar Usuários de Teste
@@ -185,6 +185,15 @@ O token expira após algum tempo. O sistema automaticamente renovará o token us
 
 1. Delete `backend/token.json`
 2. Autentique novamente no `/drive`
+
+### Erro: "Scope has changed"
+
+**Causa:** O token antigo foi gerado com um escopo diferente.
+
+**Solução:**
+1. Delete `backend/token.json`
+2. Reinicie o backend
+3. Autentique novamente no `/drive`
 
 ## 🎯 Próximos Passos
 

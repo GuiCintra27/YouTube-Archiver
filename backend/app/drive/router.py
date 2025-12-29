@@ -22,7 +22,10 @@ from .service import (
     sync_all_videos,
     delete_video,
     delete_videos_batch,
+    get_drive_share_status,
     rename_drive_video as rename_drive_video_service,
+    share_drive_video,
+    unshare_drive_video,
     update_drive_thumbnail as update_drive_thumbnail_service,
     stream_video,
     get_thumbnail,
@@ -242,6 +245,45 @@ async def delete_drive_videos_batch(request: Request, file_ids: List[str]):
 
         return await delete_videos_batch(file_ids)
     except (DriveNotAuthenticatedException, InvalidRequestException):
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/videos/{file_id}/share")
+@limiter.limit(RateLimits.DEFAULT)
+async def get_drive_share(request: Request, file_id: str):
+    """Get public sharing status for a Drive video"""
+    try:
+        _require_auth()
+        return await get_drive_share_status(file_id)
+    except DriveNotAuthenticatedException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/videos/{file_id}/share")
+@limiter.limit(RateLimits.DEFAULT)
+async def share_drive(request: Request, file_id: str):
+    """Enable public sharing for a Drive video"""
+    try:
+        _require_auth()
+        return await share_drive_video(file_id)
+    except DriveNotAuthenticatedException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/videos/{file_id}/share")
+@limiter.limit(RateLimits.DEFAULT)
+async def unshare_drive(request: Request, file_id: str):
+    """Disable public sharing for a Drive video"""
+    try:
+        _require_auth()
+        return await unshare_drive_video(file_id)
+    except DriveNotAuthenticatedException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
