@@ -357,6 +357,8 @@ def _get_catalog_sets(repo: CatalogRepository) -> tuple[set[str], dict[str, str]
 def get_sync_status_from_catalog() -> Dict:
     repo = CatalogRepository()
     counts = repo.get_counts()
+    drive_state = repo.get_state("drive")
+    drive_imported = bool(drive_state.get("last_imported_at"))
     local_set, drive_map = _get_catalog_sets(repo)
     drive_set = set(drive_map.keys())
 
@@ -366,7 +368,10 @@ def get_sync_status_from_catalog() -> Dict:
 
     warnings: list[str] = []
     if counts.get("drive", 0) == 0:
-        warnings.append("Catálogo do Drive vazio: rode /api/catalog/drive/import (máquina nova) ou /api/catalog/drive/rebuild (primeira vez).")
+        if drive_imported:
+            warnings.append("Catálogo do Drive vazio (importado). Você pode sincronizar para enviar seus vídeos.")
+        else:
+            warnings.append("Catálogo do Drive vazio: rode /api/catalog/drive/import (máquina nova) ou /api/catalog/drive/rebuild (primeira vez).")
     if counts.get("local", 0) == 0:
         warnings.append("Catálogo local vazio: rode /api/catalog/bootstrap-local para indexar seus vídeos locais.")
 
@@ -489,9 +494,16 @@ async def _run_batch_upload_job(job_id: str, base_dir: str) -> None:
                 semaphore=get_catalog_semaphore(),
                 label="drive.sync.counts",
             )
+            drive_state = await run_blocking(
+                repo.get_state,
+                "drive",
+                semaphore=get_catalog_semaphore(),
+                label="drive.sync.state",
+            )
+            drive_imported = bool(drive_state.get("last_imported_at"))
             if counts.get("local", 0) == 0:
                 raise Exception("Catálogo local vazio: rode /api/catalog/bootstrap-local antes de sincronizar.")
-            if counts.get("drive", 0) == 0:
+            if counts.get("drive", 0) == 0 and not drive_imported:
                 raise Exception("Catálogo do Drive vazio: rode /api/catalog/drive/import ou /api/catalog/drive/rebuild antes de sincronizar.")
 
             local_set, drive_map = await run_blocking(
@@ -1308,11 +1320,15 @@ async def _run_batch_download_job(job_id: str, base_dir: str) -> None:
                 semaphore=get_catalog_semaphore(),
                 label="drive.download.counts",
             )
-            if counts.get("drive", 0) == 0:
+            drive_state = await run_blocking(
+                repo.get_state,
+                "drive",
+                semaphore=get_catalog_semaphore(),
+                label="drive.download.state",
+            )
+            drive_imported = bool(drive_state.get("last_imported_at"))
+            if counts.get("drive", 0) == 0 and not drive_imported:
                 raise Exception("Catálogo do Drive vazio: rode /api/catalog/drive/import ou /api/catalog/drive/rebuild antes de baixar.")
-            if counts.get("local", 0) == 0:
-                # Sem catálogo local, o diff vira "baixar tudo"; preferimos exigir index local.
-                raise Exception("Catálogo local vazio: rode /api/catalog/bootstrap-local antes de baixar em lote.")
 
             local_set, drive_map = await run_blocking(
                 _get_catalog_sets,

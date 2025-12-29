@@ -5,6 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   FolderSync,
   Loader2,
   RefreshCw,
@@ -93,6 +103,8 @@ export default function SyncPanel() {
   const [uploadingVideo, setUploadingVideo] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [showExternalUpload, setShowExternalUpload] = useState(false);
+  const [showEmptyDriveConfirm, setShowEmptyDriveConfirm] = useState(false);
+  const [showEmptyLocalConfirm, setShowEmptyLocalConfirm] = useState(false);
 
   const [localOnlyItems, setLocalOnlyItems] = useState<SyncItem[]>([]);
   const [driveOnlyItems, setDriveOnlyItems] = useState<DriveOnlyItem[]>([]);
@@ -344,7 +356,7 @@ export default function SyncPanel() {
     [apiUrl, uploadProgress]
   );
 
-  const handleSyncAll = useCallback(async () => {
+  const startSyncAll = useCallback(async () => {
     if (!syncStatus || syncStatus.local_only_count === 0 || !apiUrl) return;
 
     try {
@@ -407,6 +419,15 @@ export default function SyncPanel() {
       setUploadProgress(null);
     }
   }, [syncStatus, apiUrl, fetchSyncStatus, pollJobProgress]);
+
+  const handleSyncAll = useCallback(() => {
+    if (!syncStatus || syncStatus.local_only_count === 0 || !apiUrl) return;
+    if (syncStatus.total_drive === 0) {
+      setShowEmptyDriveConfirm(true);
+      return;
+    }
+    startSyncAll();
+  }, [syncStatus, apiUrl, startSyncAll]);
 
   const handleUploadSingle = useCallback(
     async (videoPath: string) => {
@@ -508,7 +529,7 @@ export default function SyncPanel() {
   );
 
   // Download all videos from Drive to local
-  const handleDownloadAll = useCallback(async () => {
+  const startDownloadAll = useCallback(async () => {
     if (!syncStatus || syncStatus.drive_only_count === 0 || !apiUrl) return;
 
     try {
@@ -571,6 +592,15 @@ export default function SyncPanel() {
       setDownloadProgress(null);
     }
   }, [syncStatus, apiUrl, fetchSyncStatus, pollDownloadProgress]);
+
+  const handleDownloadAll = useCallback(() => {
+    if (!syncStatus || syncStatus.drive_only_count === 0 || !apiUrl) return;
+    if (syncStatus.total_local === 0) {
+      setShowEmptyLocalConfirm(true);
+      return;
+    }
+    startDownloadAll();
+  }, [syncStatus, apiUrl, startDownloadAll]);
 
   // Download single video from Drive to local
   const handleDownloadSingle = useCallback(
@@ -1044,6 +1074,72 @@ export default function SyncPanel() {
           onOpenChange={setShowExternalUpload}
           onUploadComplete={fetchSyncStatus}
         />
+
+        <AlertDialog
+          open={showEmptyDriveConfirm}
+          onOpenChange={setShowEmptyDriveConfirm}
+        >
+          <AlertDialogContent className="glass border-white/10">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-white">
+                Nenhum vídeo detectado no Drive
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-muted-foreground">
+                O catálogo atual não detectou vídeos no Drive. Se você continuar,
+                todos os vídeos locais serão enviados. Isso pode gerar duplicatas
+                caso existam vídeos no Drive que ainda não foram importados para o
+                catálogo. Deseja sincronizar mesmo assim?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white">
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setShowEmptyDriveConfirm(false);
+                  startSyncAll();
+                }}
+                className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
+              >
+                Sincronizar mesmo assim
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          open={showEmptyLocalConfirm}
+          onOpenChange={setShowEmptyLocalConfirm}
+        >
+          <AlertDialogContent className="glass border-white/10">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-white">
+                Catálogo local vazio
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-muted-foreground">
+                Não detectamos vídeos locais no catálogo. Se você continuar,
+                todos os vídeos do Drive serão baixados. Isso pode gerar
+                duplicatas caso existam vídeos locais que ainda não foram
+                indexados. Deseja baixar mesmo assim?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white">
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setShowEmptyLocalConfirm(false);
+                  startDownloadAll();
+                }}
+                className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
+              >
+                Baixar mesmo assim
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

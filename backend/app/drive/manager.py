@@ -36,6 +36,7 @@ class DriveManager:
         self.credentials_path = credentials_path
         self.token_path = token_path
         self._service = None
+        self._service_local = threading.local()
         self._lock = threading.Lock()
         self._root_folder_id = None
 
@@ -117,10 +118,11 @@ class DriveManager:
 
     def get_service(self):
         """Get authenticated Google Drive service"""
-        with self._lock:
-            if self._service is not None:
-                return self._service
+        cached = getattr(self._service_local, "service", None)
+        if cached is not None:
+            return cached
 
+        with self._lock:
             creds = None
             if os.path.exists(self.token_path):
                 creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
@@ -134,8 +136,11 @@ class DriveManager:
                 else:
                     raise Exception("Not authenticated. Please authenticate first.")
 
-            self._service = build('drive', 'v3', credentials=creds)
-            return self._service
+            service = build('drive', 'v3', credentials=creds, cache_discovery=False)
+            self._service_local.service = service
+            if threading.current_thread().name == "MainThread":
+                self._service = service
+            return service
 
     def _get_access_token(self) -> str:
         """Get a valid OAuth access token (refreshing if needed)."""
