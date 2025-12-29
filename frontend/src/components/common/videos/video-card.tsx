@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { Trash2, Play, MoreVertical, Info, Clock, HardDrive, Calendar, FileVideo, Pencil, Loader2, ImageIcon, Share2, Copy, Check } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -298,10 +299,12 @@ export default function VideoCard({
         {/* Thumbnail Container */}
         <div className="relative aspect-video bg-navy overflow-hidden">
           {thumbnailUrl && !imageError ? (
-            <img
+            <Image
               src={thumbnailUrl}
               alt={title}
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+              className="object-cover transition-transform duration-300 group-hover:scale-105"
               onError={() => setImageError(true)}
             />
           ) : (

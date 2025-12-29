@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
+import Image from "next/image";
 import { X, Play, Pause, PictureInPicture2, Loader2, Volume2, VolumeX } from "lucide-react";
 import type { MediaPlayerInstance } from "@vidstack/react";
 import { MediaPlayer, MediaProvider } from "@vidstack/react";
@@ -137,10 +138,12 @@ export default function GlobalPlayer() {
           {/* Thumbnail */}
           <div className="relative h-12 w-12 flex-shrink-0 rounded overflow-hidden bg-muted">
             {thumbnailUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 src={thumbnailUrl}
                 alt={video.title}
+                width={48}
+                height={48}
+                sizes="48px"
                 className="h-full w-full object-cover"
               />
             ) : (
