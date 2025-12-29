@@ -26,6 +26,19 @@ if TYPE_CHECKING:
 logger = get_module_logger("jobs.service")
 
 
+def _resolve_video_path(candidate: Path) -> Optional[Path]:
+    if candidate.exists() and candidate.suffix.lower() in settings.VIDEO_EXTENSIONS:
+        return candidate
+
+    stem = candidate.stem
+    parent = candidate.parent
+    for ext in settings.VIDEO_EXTENSIONS:
+        alt = parent / f"{stem}{ext}"
+        if alt.exists():
+            return alt
+    return None
+
+
 def create_job(url: str, request: "DownloadRequest") -> str:
     """
     Create a new download job.
@@ -168,21 +181,26 @@ async def run_download_job(job_id: str, url: str, request: "DownloadRequest") ->
         if result["status"] == "error":
             fail_job(job_id, result.get("error", "Unknown error"))
         else:
-            if settings.CATALOG_ENABLED and finished_files:
+            file_candidates = set(finished_files)
+            for item in result.get("results", []) or []:
+                fp = item.get("filepath")
+                if isinstance(fp, str) and fp:
+                    file_candidates.add(fp)
+
+            if settings.CATALOG_ENABLED and file_candidates:
                 try:
                     out_dir = Path(settings.DOWNLOADS_DIR).resolve()
-                    for fp in finished_files:
+                    for fp in sorted(file_candidates):
                         try:
                             abs_path = Path(fp).resolve()
-                            if not abs_path.exists():
-                                continue
-                            if abs_path.suffix.lower() not in settings.VIDEO_EXTENSIONS:
+                            resolved = _resolve_video_path(abs_path)
+                            if not resolved:
                                 continue
 
-                            rel_path = abs_path.relative_to(out_dir).as_posix()
+                            rel_path = resolved.relative_to(out_dir).as_posix()
                             thumb_rel = None
                             for ext in settings.THUMBNAIL_EXTENSIONS:
-                                candidate = abs_path.with_suffix(ext)
+                                candidate = resolved.with_suffix(ext)
                                 if candidate.exists():
                                     thumb_rel = candidate.relative_to(out_dir).as_posix()
                                     break

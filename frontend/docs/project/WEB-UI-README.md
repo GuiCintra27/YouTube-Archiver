@@ -118,6 +118,11 @@ Inicia um novo download.
 }
 ```
 
+**Notas:**
+- Diretório de saída é fixo e usa `DOWNLOADS_DIR` do backend.
+- Arquivos são salvos como `Uploader/Playlist/Titulo.ext` (sem data/ID).
+- Se o nome já existir, o download falha sem sobrescrever.
+
 ### `GET /api/jobs/{job_id}`
 
 Obtém status de um download.

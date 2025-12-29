@@ -50,6 +50,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - **DELETE** `/api/videos/{video_path}` - Exclui vídeo e arquivos relacionados
 
 **Nota:** downloads sempre usam o diretório padrão configurado em `DOWNLOADS_DIR` (default `./downloads`).
+**Naming:** os arquivos são salvos como `Uploader/Playlist/Titulo.ext` (sem data/ID). Se o nome já existir, o download falha com erro amigável (sem sobrescrever).
 
 ### 📦 Catálogo (SQLite)
 - **GET** `/api/catalog/status` - Status do catálogo (local/drive)

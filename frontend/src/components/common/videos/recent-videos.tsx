@@ -65,6 +65,16 @@ export default function RecentVideos({
     fetchVideos();
   }, [fetchVideos, refreshToken]);
 
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchVideos();
+    };
+    window.addEventListener("yt-archiver:videos-updated", handleRefresh);
+    return () => {
+      window.removeEventListener("yt-archiver:videos-updated", handleRefresh);
+    };
+  }, [fetchVideos]);
+
   const handleDelete = useCallback(
     async (video: Video) => {
       if (!apiUrl) return;

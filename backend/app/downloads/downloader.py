@@ -17,11 +17,22 @@ from yt_dlp import YoutubeDL
 DEFAULT_TEMPLATE = os.path.join(
     "{out}",
     "%(uploader|Unknown)s",
-    "%(playlist_title|NoPlaylist)s",
-    "%(upload_date>%Y-%m-%d|0000-00-00)s - %(title).180B [%(id)s].%(ext)s",
+    "%(playlist_title|)s",
+    "%(title).180B.%(ext)s",
 )
 
-MEDIA_EXTS = {".mp4", ".mkv", ".webm", ".mp3", ".m4a", ".mov"}
+MEDIA_EXTS = {
+    ".mp4",
+    ".mkv",
+    ".webm",
+    ".avi",
+    ".mov",
+    ".flv",
+    ".wmv",
+    ".m4v",
+    ".mp3",
+    ".m4a",
+}
 
 
 @dataclass
@@ -76,7 +87,7 @@ def _outtmpl(s: Settings) -> str:
         name_tmpl = (
             (s.file_name.strip() + ".%(ext)s")
             if s.file_name
-            else "%(upload_date>%Y-%m-%d|0000-00-00)s - %(title).180B [%(id)s].%(ext)s"
+            else "%(title).180B.%(ext)s"
         )
         return os.path.join(base_dir, name_tmpl)
     return DEFAULT_TEMPLATE.format(out=s.out_dir)
@@ -122,6 +133,7 @@ def _base_opts(s: Settings) -> dict:
         "no_warnings": True,
         "skip_download": s.dry_run,
         "writeinfojson": True,
+        "nooverwrites": True,
     }
 
     # Cookies opcionais
@@ -129,6 +141,48 @@ def _base_opts(s: Settings) -> dict:
         ydl_opts["cookiefile"] = s.cookies_file
 
     return ydl_opts
+
+
+def _find_existing_media(path: pathlib.Path) -> Optional[pathlib.Path]:
+    if path.exists():
+        return path
+
+    stem = path.stem
+    parent = path.parent
+    for ext in MEDIA_EXTS:
+        candidate = parent / f"{stem}{ext}"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _detect_conflict(ydl: YoutubeDL, info: dict) -> Optional[pathlib.Path]:
+    candidates: list[str] = []
+    for key in ("_filename", "filepath", "filename"):
+        value = info.get(key)
+        if isinstance(value, str) and value:
+            candidates.append(value)
+    try:
+        candidates.append(ydl.prepare_filename(info))
+    except Exception:
+        pass
+
+    for candidate in candidates:
+        existing = _find_existing_media(pathlib.Path(candidate))
+        if existing:
+            return existing
+    return None
+
+
+def _resolve_output_path(ydl: YoutubeDL, info: dict) -> Optional[str]:
+    for key in ("_filename", "filepath", "filename"):
+        value = info.get(key)
+        if isinstance(value, str) and value:
+            return value
+    try:
+        return ydl.prepare_filename(info)
+    except Exception:
+        return None
 
 
 def _extract_entries(url: str, limit: Optional[int]) -> list[str]:
@@ -283,15 +337,39 @@ def download_video(
 
             # Baixar
             with YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(video_url, download=False)
+
+                if not info:
+                    results.append({
+                        "url": video_url,
+                        "status": "error",
+                        "message": "Falha ao obter metadados do vídeo",
+                    })
+                    continue
+
+                conflict = _detect_conflict(ydl, info)
+                if conflict:
+                    rel_path = str(conflict)
+                    try:
+                        rel_path = str(conflict.resolve().relative_to(pathlib.Path(settings.out_dir).resolve()))
+                    except Exception:
+                        rel_path = str(conflict)
+                    return {
+                        "status": "error",
+                        "error": f"Arquivo já existe no destino: {rel_path}",
+                    }
+
                 info = ydl.extract_info(video_url, download=True)
 
                 if info:
+                    output_path = _resolve_output_path(ydl, info)
                     results.append({
                         "url": video_url,
                         "status": "success",
                         "title": info.get("title"),
                         "id": info.get("id"),
                         "duration": info.get("duration"),
+                        "filepath": output_path,
                     })
 
                     # Adicionar ao arquivo de archive

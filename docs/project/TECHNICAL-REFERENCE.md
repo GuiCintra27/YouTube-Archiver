@@ -530,6 +530,11 @@ cd frontend && npm run build && npm start
 }
 ```
 
+Notas (Download):
+- Diretório de saída é fixo (`DOWNLOADS_DIR`).
+- Naming: `Uploader/Playlist/Titulo.ext` (sem data/ID).
+- Se o arquivo já existir, o download falha e não sobrescreve.
+
 ### Job (Response)
 ```python
 {

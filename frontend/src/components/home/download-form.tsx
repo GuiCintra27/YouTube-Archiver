@@ -57,7 +57,11 @@ interface JobStatus {
   error?: string;
 }
 
-export default function DownloadForm() {
+interface DownloadFormProps {
+  onDownloadComplete?: () => void;
+}
+
+export default function DownloadForm({ onDownloadComplete }: DownloadFormProps) {
   // API URL from centralized hook
   const apiUrl = useApiUrl();
 
@@ -170,6 +174,10 @@ export default function DownloadForm() {
           // Parar polling se completou, falhou ou foi cancelado
           if (["completed", "error", "cancelled"].includes(status.status)) {
             setIsDownloading(false);
+            if (status.status === "completed") {
+              onDownloadComplete?.();
+              window.dispatchEvent(new Event("yt-archiver:videos-updated"));
+            }
             return; // Não agendar próximo poll
           }
 
@@ -204,7 +212,7 @@ export default function DownloadForm() {
         }
       };
     },
-    [apiUrl]
+    [apiUrl, onDownloadComplete]
   );
 
   const startDownload = useCallback(async () => {
