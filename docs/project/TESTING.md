@@ -122,10 +122,10 @@ curl -X POST http://localhost:8000/api/download \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    "out_dir": "./downloads",
     "max_res": 720
   }'
 # Retorna: {"status":"success","job_id":"..."}
+# Nota: o diretorio de saida e fixo e usa o padrao do backend (DOWNLOADS_DIR).
 ```
 
 #### 5. Verificar Status do Job

@@ -75,7 +75,6 @@ export default function DownloadForm() {
   const pollingCleanupRef = useRef<(() => void) | null>(null);
 
   // Configurações avançadas
-  const [outDir, setOutDir] = useState("./downloads");
   const [maxRes, setMaxRes] = useState("");
   const [subs, setSubs] = useState(true);
   const [autoSubs, setAutoSubs] = useState(true);
@@ -229,7 +228,6 @@ export default function DownloadForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: url.trim(),
-          out_dir: outDir,
           max_res: maxRes ? parseInt(maxRes) : null,
           subs,
           auto_subs: autoSubs,
@@ -265,7 +263,6 @@ export default function DownloadForm() {
     url,
     urlType,
     apiUrl,
-    outDir,
     maxRes,
     subs,
     autoSubs,
@@ -471,7 +468,8 @@ export default function DownloadForm() {
                   )}
                   <div>
                     <span className="font-medium text-white">
-                      {jobStatus.status === "completed" && "Download Concluido!"}
+                      {jobStatus.status === "completed" &&
+                        "Download Concluido!"}
                       {jobStatus.status === "error" && "Erro no Download"}
                       {jobStatus.status === "cancelled" && "Download Cancelado"}
                       {jobStatus.status === "downloading" && "Baixando..."}
@@ -576,21 +574,6 @@ export default function DownloadForm() {
               <AccordionContent className="px-4 pb-4">
                 <div className="space-y-6 pt-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Diretório */}
-                    <div className="space-y-2">
-                      <Label htmlFor="outDir" className="text-white text-sm">
-                        Diretorio de Saida
-                      </Label>
-                      <Input
-                        id="outDir"
-                        value={outDir}
-                        onChange={(e) => setOutDir(e.target.value)}
-                        placeholder="./downloads"
-                        disabled={isDownloading}
-                        className="glass-input bg-white/5 border-white/10 text-white placeholder:text-muted-foreground"
-                      />
-                    </div>
-
                     {/* Resolução Máxima */}
                     <div className="space-y-2">
                       <Label htmlFor="maxRes" className="text-white text-sm">
@@ -671,7 +654,7 @@ export default function DownloadForm() {
                     </div>
 
                     {/* Cookies File */}
-                    <div className="space-y-2 md:col-span-2">
+                    <div className="space-y-2">
                       <Label htmlFor="cookies" className="text-white text-sm">
                         Arquivo de Cookies
                       </Label>

@@ -24,6 +24,7 @@ async def test_download_completion_upserts_local_catalog(tmp_path: Path, monkeyp
 
     out_dir = tmp_path / "downloads"
     out_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(settings, "DOWNLOADS_DIR", str(out_dir))
 
     video = out_dir / "Channel" / "video.mp4"
     video.parent.mkdir(parents=True, exist_ok=True)
@@ -39,7 +40,6 @@ async def test_download_completion_upserts_local_catalog(tmp_path: Path, monkeyp
 
     request = DownloadRequest(
         url="https://www.youtube.com/watch?v=test123",
-        out_dir=str(out_dir),
     )
     job_id = create_job(request.url, request)
 
@@ -48,4 +48,3 @@ async def test_download_completion_upserts_local_catalog(tmp_path: Path, monkeyp
     assert repo.get_counts()["local"] == 1
     row = repo.get_video("local:Channel/video.mp4")
     assert row
-

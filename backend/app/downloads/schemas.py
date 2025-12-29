@@ -51,10 +51,6 @@ class DownloadRequest(BaseModel):
         description="URL do vídeo, playlist ou arquivo .txt com URLs",
         json_schema_extra={"example": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
     )
-    out_dir: str = Field(
-        default="./downloads",
-        description="Diretório de saída para os arquivos baixados"
-    )
     archive_file: str = Field(
         default="./archive.txt",
         description="Arquivo de controle para evitar downloads duplicados"

@@ -49,6 +49,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - **GET** `/api/videos/thumbnail/{thumbnail_path}` - Serve thumbnail
 - **DELETE** `/api/videos/{video_path}` - Exclui vídeo e arquivos relacionados
 
+**Nota:** downloads sempre usam o diretório padrão configurado em `DOWNLOADS_DIR` (default `./downloads`).
+
 ### 📦 Catálogo (SQLite)
 - **GET** `/api/catalog/status` - Status do catálogo (local/drive)
 - **POST** `/api/catalog/bootstrap-local` - Indexa vídeos locais

@@ -101,12 +101,13 @@ Inicia um novo download.
 ```json
 {
   "url": "https://www.youtube.com/watch?v=...",
-  "out_dir": "./downloads",
   "max_res": 1080,
   "subs": true,
   "audio_only": false
 }
 ```
+
+**Nota:** o diretório de saída é fixo e usa o padrão configurado no backend (`DOWNLOADS_DIR`).
 
 **Response:**
 ```json

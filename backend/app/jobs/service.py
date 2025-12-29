@@ -124,7 +124,7 @@ async def run_download_job(job_id: str, url: str, request: "DownloadRequest") ->
     try:
         # Create settings from request
         download_settings = create_download_settings(
-            out_dir=request.out_dir,
+            out_dir=settings.DOWNLOADS_DIR,
             archive_file=request.archive_file,
             fmt=request.fmt,
             max_res=request.max_res,
@@ -149,7 +149,7 @@ async def run_download_job(job_id: str, url: str, request: "DownloadRequest") ->
         )
 
         # Create output directory
-        target_dir = os.path.join(request.out_dir, request.path) if request.path else request.out_dir
+        target_dir = os.path.join(settings.DOWNLOADS_DIR, request.path) if request.path else settings.DOWNLOADS_DIR
         os.makedirs(target_dir, exist_ok=True)
 
         finished_files: list[str] = []
@@ -170,7 +170,7 @@ async def run_download_job(job_id: str, url: str, request: "DownloadRequest") ->
         else:
             if settings.CATALOG_ENABLED and finished_files:
                 try:
-                    out_dir = Path(request.out_dir).resolve()
+                    out_dir = Path(settings.DOWNLOADS_DIR).resolve()
                     for fp in finished_files:
                         try:
                             abs_path = Path(fp).resolve()
