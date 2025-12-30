@@ -78,6 +78,7 @@ def update_job_progress(job_id: str, progress: Dict[str, Any]) -> None:
         job["progress"] = progress
         if progress.get("status") == "downloading":
             job["status"] = "downloading"
+        store.set_job(job_id, job)
 
 
 def complete_job(job_id: str, result: Dict[str, Any]) -> None:
@@ -94,6 +95,7 @@ def complete_job(job_id: str, result: Dict[str, Any]) -> None:
         job["result"] = result
         job["progress"] = {"status": "completed", "percentage": 100}
         job["completed_at"] = datetime.now().isoformat()
+        store.set_job(job_id, job)
 
 
 def fail_job(job_id: str, error: str) -> None:
@@ -109,6 +111,7 @@ def fail_job(job_id: str, error: str) -> None:
         job["status"] = "error"
         job["error"] = error
         job["completed_at"] = datetime.now().isoformat()
+        store.set_job(job_id, job)
 
 
 def cancel_job(job_id: str) -> None:
@@ -123,6 +126,7 @@ def cancel_job(job_id: str) -> None:
         job["status"] = "cancelled"
         job["error"] = "Download cancelado pelo usuário"
         job["completed_at"] = datetime.now().isoformat()
+        store.set_job(job_id, job)
 
 
 async def run_download_job(job_id: str, url: str, request: "DownloadRequest") -> None:

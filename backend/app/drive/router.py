@@ -35,6 +35,20 @@ from .service import (
     resolve_drive_file_id_by_path,
 )
 from .manager import drive_manager
+from .schemas import (
+    DriveAuthStatus,
+    DriveAuthUrl,
+    DriveAuthResult,
+    DriveVideoListResponse,
+    DriveSyncStatus,
+    DriveSyncItemsResponse,
+    DriveJobResponse,
+    DriveDeleteResult,
+    DriveShareStatusResponse,
+    DriveRenameResponse,
+    DriveThumbnailUpdateResponse,
+    DriveExternalUploadResponse,
+)
 from app.core.exceptions import (
     DriveNotAuthenticatedException,
     DriveCredentialsNotFoundException,
@@ -61,14 +75,14 @@ def _require_auth():
         raise DriveNotAuthenticatedException()
 
 
-@router.get("/auth-status")
+@router.get("/auth-status", response_model=DriveAuthStatus)
 @limiter.limit(RateLimits.GET_STATUS)
 async def auth_status(request: Request):
     """Check if user is authenticated with Google Drive"""
     return get_auth_status()
 
 
-@router.get("/auth-url")
+@router.get("/auth-url", response_model=DriveAuthUrl)
 @limiter.limit(RateLimits.AUTH)
 async def auth_url(request: Request):
     """Generate OAuth authentication URL"""
@@ -81,7 +95,7 @@ async def auth_url(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/oauth2callback")
+@router.get("/oauth2callback", response_model=DriveAuthResult)
 @limiter.limit(RateLimits.AUTH)
 async def oauth2callback(request: Request, code: str):
     """OAuth callback - exchange code for tokens"""
@@ -110,7 +124,7 @@ async def oauth2callback(request: Request, code: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/videos")
+@router.get("/videos", response_model=DriveVideoListResponse)
 @limiter.limit(RateLimits.LIST_VIDEOS)
 async def list_videos(request: Request, page: int = 1, limit: int = 24):
     """List videos in Google Drive with pagination"""
@@ -127,7 +141,7 @@ async def list_videos(request: Request, page: int = 1, limit: int = 24):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/upload/{video_path:path}")
+@router.post("/upload/{video_path:path}", response_model=DriveJobResponse)
 @limiter.limit(RateLimits.UPLOAD)
 async def upload_to_drive(request: Request, video_path: str, base_dir: str = "./downloads"):
     """
@@ -154,7 +168,7 @@ async def upload_to_drive(request: Request, video_path: str, base_dir: str = "./
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/sync-status")
+@router.get("/sync-status", response_model=DriveSyncStatus)
 @limiter.limit(RateLimits.GET_STATUS)
 async def sync_status(request: Request, base_dir: str = "./downloads"):
     """Get sync status between local and Drive"""
@@ -166,7 +180,7 @@ async def sync_status(request: Request, base_dir: str = "./downloads"):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/sync-items")
+@router.get("/sync-items", response_model=DriveSyncItemsResponse)
 @limiter.limit(RateLimits.GET_STATUS)
 async def sync_items(request: Request, kind: str, page: int = 1, limit: int = 50):
     """
@@ -185,7 +199,7 @@ async def sync_items(request: Request, kind: str, page: int = 1, limit: int = 50
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/sync-all")
+@router.post("/sync-all", response_model=DriveJobResponse)
 @limiter.limit(RateLimits.DOWNLOAD_BATCH)
 async def sync_all(request: Request, base_dir: str = "./downloads"):
     """
@@ -209,7 +223,7 @@ async def sync_all(request: Request, base_dir: str = "./downloads"):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/videos/{file_id}")
+@router.delete("/videos/{file_id}", response_model=DriveDeleteResult)
 @limiter.limit(RateLimits.DELETE)
 async def delete_drive_video(request: Request, file_id: str):
     """Remove a video from Google Drive"""
@@ -222,7 +236,7 @@ async def delete_drive_video(request: Request, file_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/videos/delete-batch")
+@router.post("/videos/delete-batch", response_model=DriveDeleteResult)
 @limiter.limit(RateLimits.DELETE)
 async def delete_drive_videos_batch(request: Request, file_ids: List[str]):
     """
@@ -250,7 +264,7 @@ async def delete_drive_videos_batch(request: Request, file_ids: List[str]):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/videos/{file_id}/share")
+@router.get("/videos/{file_id}/share", response_model=DriveShareStatusResponse)
 @limiter.limit(RateLimits.DEFAULT)
 async def get_drive_share(request: Request, file_id: str):
     """Get public sharing status for a Drive video"""
@@ -263,7 +277,7 @@ async def get_drive_share(request: Request, file_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/videos/{file_id}/share")
+@router.post("/videos/{file_id}/share", response_model=DriveShareStatusResponse)
 @limiter.limit(RateLimits.DEFAULT)
 async def share_drive(request: Request, file_id: str):
     """Enable public sharing for a Drive video"""
@@ -276,7 +290,7 @@ async def share_drive(request: Request, file_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/videos/{file_id}/share")
+@router.delete("/videos/{file_id}/share", response_model=DriveShareStatusResponse)
 @limiter.limit(RateLimits.DEFAULT)
 async def unshare_drive(request: Request, file_id: str):
     """Disable public sharing for a Drive video"""
@@ -289,7 +303,7 @@ async def unshare_drive(request: Request, file_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.patch("/videos/{file_id}/rename")
+@router.patch("/videos/{file_id}/rename", response_model=DriveRenameResponse)
 @limiter.limit(RateLimits.DEFAULT)
 async def rename_drive_video(request: Request, file_id: str, body: RenameRequest):
     """
@@ -309,7 +323,7 @@ async def rename_drive_video(request: Request, file_id: str, body: RenameRequest
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/videos/{file_id}/thumbnail")
+@router.post("/videos/{file_id}/thumbnail", response_model=DriveThumbnailUpdateResponse)
 @limiter.limit(RateLimits.DEFAULT)
 async def update_drive_thumbnail(
     request: Request,
@@ -455,7 +469,7 @@ async def get_drive_custom_thumbnail(request: Request, file_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/upload-external")
+@router.post("/upload-external", response_model=DriveExternalUploadResponse)
 @limiter.limit(RateLimits.UPLOAD)
 async def upload_external_to_drive(
     request: Request,
@@ -538,7 +552,7 @@ async def upload_external_to_drive(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/download")
+@router.post("/download", response_model=DriveJobResponse)
 @limiter.limit(RateLimits.DOWNLOAD_BATCH)
 async def download_from_drive(
     request: Request,
@@ -588,7 +602,7 @@ async def download_from_drive(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/download-all")
+@router.post("/download-all", response_model=DriveJobResponse)
 @limiter.limit(RateLimits.DOWNLOAD_BATCH)
 async def download_all_from_drive_endpoint(
     request: Request,

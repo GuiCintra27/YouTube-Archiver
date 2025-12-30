@@ -18,6 +18,13 @@ from app.catalog.service import (
     publish_drive_snapshot,
     rebuild_drive_catalog_from_drive,
 )
+from app.catalog.schemas import (
+    CatalogStatusResponse,
+    CatalogBootstrapResponse,
+    CatalogDriveImportResponse,
+    CatalogDrivePublishResponse,
+    CatalogJobResponse,
+)
 from app.drive.manager import drive_manager
 from app.core.exceptions import DriveNotAuthenticatedException
 import io
@@ -28,19 +35,19 @@ from app.jobs.store import JobType
 router = APIRouter(prefix="/api/catalog", tags=["catalog"])
 
 
-@router.get("/status")
+@router.get("/status", response_model=CatalogStatusResponse)
 @limiter.limit(RateLimits.GET_STATUS)
 async def catalog_status(request: Request):
     return await get_catalog_status()
 
 
-@router.post("/bootstrap-local")
+@router.post("/bootstrap-local", response_model=CatalogBootstrapResponse)
 @limiter.limit(RateLimits.DOWNLOAD_BATCH)
 async def bootstrap_local(request: Request, base_dir: str = "./downloads"):
     return await bootstrap_local_catalog(base_dir=base_dir)
 
 
-@router.post("/drive/import")
+@router.post("/drive/import", response_model=CatalogDriveImportResponse)
 @limiter.limit(RateLimits.DOWNLOAD_BATCH)
 async def import_drive_catalog(request: Request):
     """
@@ -89,7 +96,7 @@ async def import_drive_catalog(request: Request):
     return {"status": "success", "file_id": file_id, **result}
 
 
-@router.post("/drive/publish")
+@router.post("/drive/publish", response_model=CatalogDrivePublishResponse)
 @limiter.limit(RateLimits.DOWNLOAD_BATCH)
 async def publish_drive_catalog(request: Request, force: bool = False):
     """Publish the current Drive catalog snapshot to Google Drive."""
@@ -125,7 +132,7 @@ async def _run_drive_rebuild_job(job_id: str) -> None:
         store.set_job(job_id, job)
 
 
-@router.post("/drive/rebuild")
+@router.post("/drive/rebuild", response_model=CatalogJobResponse)
 @limiter.limit(RateLimits.DOWNLOAD_BATCH)
 async def rebuild_drive_catalog(request: Request):
     """

@@ -22,6 +22,13 @@ from typing import List
 from fastapi import UploadFile, File, Form
 from pydantic import BaseModel
 from .service import get_paginated_videos, delete_video_with_related, delete_videos_batch, rename_video, update_video_thumbnail
+from .schemas import (
+    VideoListResponse,
+    DeleteVideoResponse,
+    BatchDeleteResponse,
+    RenameVideoResponse,
+    ThumbnailUpdateResponse,
+)
 from app.catalog.service import (
     list_local_videos_paginated,
     delete_local_video_from_catalog,
@@ -94,7 +101,8 @@ Os resultados são cacheados por 30 segundos para melhor performance.
             }
         },
         400: {"description": "Parâmetros de paginação inválidos"},
-    }
+    },
+    response_model=VideoListResponse,
 )
 @limiter.limit(RateLimits.LIST_VIDEOS)
 async def list_videos(request: Request, base_dir: str = "./downloads", page: int = 1, limit: Optional[int] = None):
@@ -322,7 +330,8 @@ Exclui múltiplos vídeos e todos os arquivos associados de uma só vez.
             }
         },
         400: {"description": "Requisição inválida"},
-    }
+    },
+    response_model=BatchDeleteResponse,
 )
 @limiter.limit(RateLimits.DELETE)
 async def delete_videos_batch_endpoint(request: Request, video_paths: List[str], base_dir: str = "./downloads"):
@@ -384,7 +393,8 @@ Renomeia um vídeo e todos os arquivos associados.
         },
         404: {"description": "Vídeo não encontrado"},
         400: {"description": "Nome inválido"},
-    }
+    },
+    response_model=RenameVideoResponse,
 )
 @limiter.limit(RateLimits.DEFAULT)
 async def rename_video_endpoint(request: Request, video_path: str, body: RenameRequest, base_dir: str = "./downloads"):
@@ -451,7 +461,8 @@ JPG, JPEG, PNG, WebP
         },
         404: {"description": "Vídeo não encontrado"},
         400: {"description": "Formato de imagem inválido"},
-    }
+    },
+    response_model=ThumbnailUpdateResponse,
 )
 @limiter.limit(RateLimits.DEFAULT)
 async def update_thumbnail_endpoint(
@@ -534,7 +545,8 @@ Exclui um vídeo e todos os arquivos associados.
             }
         },
         404: {"description": "Vídeo não encontrado"},
-    }
+    },
+    response_model=DeleteVideoResponse,
 )
 @limiter.limit(RateLimits.DELETE)
 async def delete_video(request: Request, video_path: str, base_dir: str = "./downloads"):

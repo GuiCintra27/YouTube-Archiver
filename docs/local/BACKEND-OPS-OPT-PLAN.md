@@ -103,6 +103,12 @@ Implementacao
 - Remover respostas ad-hoc quando possivel, mantendo campos atuais.
 - Alinhar erros com estrutura padronizada.
 
+Status da fase 4
+
+- Jobs router padronizado com response_model (JobStatus/JobList/JobAction).
+- /api/health agora usa HealthResponse.
+- Catalog, Drive, Library e Recordings com schemas de resposta e response_model aplicados nos endpoints principais.
+
 Fase 5 - Testes de integracao
 
 Implementacao

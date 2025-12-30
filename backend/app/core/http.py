@@ -35,14 +35,23 @@ def request_with_retry(
     attempt = 0
     while True:
         try:
-            response = requests.request(
-                method_upper,
-                url,
-                headers=headers,
-                params=params,
-                stream=stream,
-                timeout=timeout,
-            )
+            if method_upper == "GET":
+                response = requests.get(
+                    url,
+                    headers=headers,
+                    params=params,
+                    stream=stream,
+                    timeout=timeout,
+                )
+            else:
+                response = requests.request(
+                    method_upper,
+                    url,
+                    headers=headers,
+                    params=params,
+                    stream=stream,
+                    timeout=timeout,
+                )
             if (
                 retryable
                 and response.status_code in retry_statuses_set

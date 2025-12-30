@@ -335,12 +335,20 @@ async def get_sync_status(base_dir: str = "./downloads") -> Dict:
             semaphore=get_catalog_semaphore(),
             label="drive.sync_status.catalog",
         )
-    return await run_blocking(
+    result = await run_blocking(
         drive_manager.get_sync_state,
         base_dir,
         semaphore=get_drive_semaphore(),
         label="drive.sync_status",
     )
+    local_only = result.get("local_only") or []
+    drive_only = result.get("drive_only") or []
+    synced = result.get("synced") or []
+    result.setdefault("local_only_count", len(local_only))
+    result.setdefault("drive_only_count", len(drive_only))
+    result.setdefault("synced_count", len(synced))
+    result.setdefault("warnings", [])
+    return result
 
 
 def _get_catalog_sets(repo: CatalogRepository) -> tuple[set[str], dict[str, str]]:

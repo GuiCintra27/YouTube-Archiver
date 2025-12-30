@@ -17,6 +17,7 @@ from fastapi.responses import StreamingResponse
 from app.core.rate_limit import limiter, RateLimits
 from . import store
 from .service import cancel_job
+from .schemas import JobListResponse, JobStatus, JobActionResponse
 from app.core.exceptions import JobNotFoundException, InvalidRequestException
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
@@ -37,6 +38,7 @@ Lista todos os jobs de download registrados.
 
 Os jobs são automaticamente removidos após 24 horas.
     """,
+    response_model=JobListResponse,
     responses={
         200: {
             "description": "Lista de jobs",
@@ -55,7 +57,7 @@ Os jobs são automaticamente removidos após 24 horas.
     }
 )
 @limiter.limit(RateLimits.GET_STATUS)
-async def list_jobs(request: Request):
+async def list_jobs(request: Request) -> JobListResponse:
     """Lista todos os jobs."""
     jobs = store.get_all_jobs()
     return {
@@ -76,17 +78,19 @@ Retorna o status atual de um job específico.
 - `eta`: Tempo estimado restante
 - `filename`: Nome do arquivo atual
     """,
+    response_model=JobStatus,
     responses={
         200: {"description": "Detalhes do job"},
         404: {"description": "Job não encontrado"},
     }
 )
 @limiter.limit(RateLimits.GET_STATUS)
-async def get_job_status(request: Request, job_id: str):
+async def get_job_status(request: Request, job_id: str) -> JobStatus:
     """Obtém o status de um job."""
     job = store.get_job(job_id)
     if not job:
         raise JobNotFoundException()
+    job.setdefault("job_id", job_id)
     return job
 
 
@@ -99,6 +103,7 @@ Cancela um job em execução.
 Apenas jobs com status `pending` ou `downloading` podem ser cancelados.
 Jobs já finalizados (`completed`, `error`, `cancelled`) não podem ser cancelados.
     """,
+    response_model=JobActionResponse,
     responses={
         200: {"description": "Job cancelado com sucesso"},
         400: {"description": "Job não está em execução"},
@@ -106,7 +111,7 @@ Jobs já finalizados (`completed`, `error`, `cancelled`) não podem ser cancelad
     }
 )
 @limiter.limit(RateLimits.DELETE)
-async def cancel_job_endpoint(request: Request, job_id: str):
+async def cancel_job_endpoint(request: Request, job_id: str) -> JobActionResponse:
     """Cancela um job em execução."""
     job = store.get_job(job_id)
     if not job:
@@ -137,13 +142,14 @@ Remove um job do histórico.
 Se o job ainda estiver em execução, ele será cancelado primeiro.
 Esta ação não pode ser desfeita.
     """,
+    response_model=JobActionResponse,
     responses={
         200: {"description": "Job removido com sucesso"},
         404: {"description": "Job não encontrado"},
     }
 )
 @limiter.limit(RateLimits.DELETE)
-async def delete_job(request: Request, job_id: str):
+async def delete_job(request: Request, job_id: str) -> JobActionResponse:
     """Remove um job do histórico."""
     if not store.job_exists(job_id):
         raise JobNotFoundException()

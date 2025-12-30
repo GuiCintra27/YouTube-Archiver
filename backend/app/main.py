@@ -14,6 +14,7 @@ from app.core.errors import register_exception_handlers
 from app.core.rate_limit import setup_rate_limiting
 from app.core.middleware.request_id import RequestIdMiddleware
 from app.core.middleware.metrics import MetricsMiddleware
+from app.core.schemas import HealthResponse
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
 # Import routers
@@ -145,7 +146,7 @@ async def root():
     }
 
 
-@app.get("/api/health")
+@app.get("/api/health", response_model=HealthResponse)
 async def health():
     """Basic health check with runtime details."""
     return {

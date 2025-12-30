@@ -7,13 +7,14 @@ from app.core.logging import get_module_logger
 from app.core.rate_limit import limiter, RateLimits
 from app.core.blocking import run_blocking, get_fs_semaphore
 from .service import save_recording
+from .schemas import RecordingUploadResponse
 
 logger = get_module_logger("recordings")
 
 router = APIRouter(prefix="/api/recordings", tags=["recordings"])
 
 
-@router.post("/upload")
+@router.post("/upload", response_model=RecordingUploadResponse)
 @limiter.limit(RateLimits.UPLOAD)
 async def upload_recording(
     request: Request,
