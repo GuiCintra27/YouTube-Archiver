@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, memo } from "react";
 import { Trash2, Play, MoreVertical, Info, Clock, HardDrive, Calendar, FileVideo, Pencil, Loader2, ImageIcon, Share2, Copy, Check } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -65,7 +65,7 @@ interface VideoCardProps {
   priority?: boolean;
 }
 
-export default function VideoCard({
+function VideoCardComponent({
   id,
   title,
   channel,
@@ -653,3 +653,29 @@ export default function VideoCard({
     </>
   );
 }
+
+function arePropsEqual(prev: VideoCardProps, next: VideoCardProps) {
+  return (
+    prev.id === next.id &&
+    prev.title === next.title &&
+    prev.channel === next.channel &&
+    prev.thumbnail === next.thumbnail &&
+    prev.thumbnailUrl === next.thumbnailUrl &&
+    prev.path === next.path &&
+    prev.duration === next.duration &&
+    prev.size === next.size &&
+    prev.createdAt === next.createdAt &&
+    prev.deleteScope === next.deleteScope &&
+    prev.selectable === next.selectable &&
+    prev.selected === next.selected &&
+    prev.editable === next.editable &&
+    prev.shareScope === next.shareScope &&
+    prev.priority === next.priority &&
+    Boolean(prev.onEdit) === Boolean(next.onEdit) &&
+    Boolean(prev.onSelectionChange) === Boolean(next.onSelectionChange)
+  );
+}
+
+const VideoCard = memo(VideoCardComponent, arePropsEqual);
+
+export default VideoCard;

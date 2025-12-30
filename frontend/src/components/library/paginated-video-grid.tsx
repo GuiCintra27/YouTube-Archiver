@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import VideoCard from "@/components/common/videos/video-card";
 import VideoPlayerLoading from "@/components/common/videos/video-player-loading";
@@ -158,12 +158,19 @@ export default function PaginatedVideoGrid({
     setSelectedPaths(new Set());
   }, []);
 
+  const selectedPathsArray = useMemo(
+    () => Array.from(selectedPaths),
+    [selectedPaths]
+  );
+  const selectedCount = selectedPathsArray.length;
+  const hasSelection = selectedCount > 0;
+
   const handleBatchDeleteConfirm = useCallback(async () => {
-    if (deleting || selectedPaths.size === 0) return;
+    if (deleting || selectedCount === 0) return;
 
     try {
       setDeleting(true);
-      const result = await deleteLocalVideosBatch(Array.from(selectedPaths));
+      const result = await deleteLocalVideosBatch(selectedPathsArray);
 
       if (!!result.total_failed && result.total_failed > 0) {
         setError(
@@ -180,7 +187,7 @@ export default function PaginatedVideoGrid({
     } finally {
       setDeleting(false);
     }
-  }, [selectedPaths, page, fetchVideos, deleting]);
+  }, [selectedCount, selectedPathsArray, page, fetchVideos, deleting]);
 
   const handleBatchDialogChange = useCallback(
     (open: boolean) => {
@@ -215,7 +222,6 @@ export default function PaginatedVideoGrid({
     [page, fetchVideos]
   );
 
-  const hasSelection = selectedPaths.size > 0;
 
   return (
     <>
@@ -311,8 +317,8 @@ export default function PaginatedVideoGrid({
                 <CheckSquare className="h-4 w-4 text-teal" />
               </div>
               <span className="font-medium text-white">
-                {selectedPaths.size}{" "}
-                {selectedPaths.size === 1 ? "selecionado" : "selecionados"}
+                {selectedCount}{" "}
+                {selectedCount === 1 ? "selecionado" : "selecionados"}
               </span>
             </div>
 
@@ -323,7 +329,7 @@ export default function PaginatedVideoGrid({
                 variant="ghost"
                 size="sm"
                 onClick={selectAll}
-                disabled={deleting || selectedPaths.size === videos.length}
+                disabled={deleting || selectedCount === videos.length}
                 className="text-muted-foreground hover:text-white hover:bg-white/10"
               >
                 Selecionar todos
@@ -354,7 +360,7 @@ export default function PaginatedVideoGrid({
                 ) : (
                   <>
                     <Trash2 className="h-4 w-4 mr-1" />
-                    Excluir ({selectedPaths.size})
+                    Excluir ({selectedCount})
                   </>
                 )}
               </Button>
@@ -372,11 +378,11 @@ export default function PaginatedVideoGrid({
           <AlertDialogHeader>
             <AlertDialogTitle className="text-white flex items-center gap-2">
               <Trash2 className="h-5 w-5 text-red-400" />
-              Excluir {selectedPaths.size} vídeos?
+              Excluir {selectedCount} vídeos?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
-              Tem certeza que deseja excluir {selectedPaths.size}{" "}
-              {selectedPaths.size === 1 ? "vídeo" : "vídeos"} da biblioteca?
+              Tem certeza que deseja excluir {selectedCount}{" "}
+              {selectedCount === 1 ? "vídeo" : "vídeos"} da biblioteca?
               Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -398,8 +404,8 @@ export default function PaginatedVideoGrid({
                   Excluindo...
                 </>
               ) : (
-                `Excluir ${selectedPaths.size} ${
-                  selectedPaths.size === 1 ? "vídeo" : "vídeos"
+                `Excluir ${selectedCount} ${
+                  selectedCount === 1 ? "vídeo" : "vídeos"
                 }`
               )}
             </AlertDialogAction>

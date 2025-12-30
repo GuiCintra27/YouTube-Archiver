@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -151,12 +151,19 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
     setSelectedIds(new Set());
   }, []);
 
+  const selectedIdsArray = useMemo(
+    () => Array.from(selectedIds),
+    [selectedIds]
+  );
+  const selectedCount = selectedIdsArray.length;
+  const hasSelection = selectedCount > 0;
+
   const handleBatchDeleteConfirm = useCallback(async () => {
-    if (deleting || selectedIds.size === 0) return;
+    if (deleting || selectedCount === 0) return;
 
     try {
       setDeleting(true);
-      const result = await deleteDriveVideosBatch(Array.from(selectedIds));
+      const result = await deleteDriveVideosBatch(selectedIdsArray);
 
       if (!!result.total_failed && result.total_failed > 0) {
         setError(
@@ -173,7 +180,7 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
     } finally {
       setDeleting(false);
     }
-  }, [selectedIds, page, fetchVideos, deleting]);
+  }, [selectedCount, selectedIdsArray, page, fetchVideos, deleting]);
 
   const handleBatchDialogChange = useCallback(
     (open: boolean) => {
@@ -221,7 +228,6 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
     return undefined;
   };
 
-  const hasSelection = selectedIds.size > 0;
 
   return (
     <>
@@ -319,8 +325,8 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
                 <CheckSquare className="h-4 w-4 text-cyan" />
               </div>
               <span className="font-medium text-white">
-                {selectedIds.size}{" "}
-                {selectedIds.size === 1 ? "selecionado" : "selecionados"}
+                {selectedCount}{" "}
+                {selectedCount === 1 ? "selecionado" : "selecionados"}
               </span>
             </div>
 
@@ -331,7 +337,7 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
                 variant="ghost"
                 size="sm"
                 onClick={selectAll}
-                disabled={deleting || selectedIds.size === videos.length}
+                disabled={deleting || selectedCount === videos.length}
                 className="text-muted-foreground hover:text-white hover:bg-white/10"
               >
                 Selecionar todos
@@ -362,7 +368,7 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
                 ) : (
                   <>
                     <Trash2 className="h-4 w-4 mr-1" />
-                    Excluir ({selectedIds.size})
+                    Excluir ({selectedCount})
                   </>
                 )}
               </Button>
@@ -380,11 +386,11 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-white flex items-center gap-2">
               <Trash2 className="h-5 w-5 text-red-400" />
-              Excluir {selectedIds.size} vídeos?
+              Excluir {selectedCount} vídeos?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
-              Tem certeza que deseja excluir {selectedIds.size}{" "}
-              {selectedIds.size === 1 ? "vídeo" : "vídeos"} do Google Drive?
+              Tem certeza que deseja excluir {selectedCount}{" "}
+              {selectedCount === 1 ? "vídeo" : "vídeos"} do Google Drive?
               Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -406,8 +412,8 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
                   Excluindo...
                 </>
               ) : (
-                `Excluir ${selectedIds.size} ${
-                  selectedIds.size === 1 ? "vídeo" : "vídeos"
+                `Excluir ${selectedCount} ${
+                  selectedCount === 1 ? "vídeo" : "vídeos"
                 }`
               )}
             </AlertDialogAction>

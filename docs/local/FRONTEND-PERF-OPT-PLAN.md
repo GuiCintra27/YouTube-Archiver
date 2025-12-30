@@ -61,6 +61,11 @@ Fase 2 - Re-render e memoizacao
 2. Estabilizar handlers (useCallback) e props derivadas.
 3. Evitar recomputes de arrays (useMemo em listas filtradas/sorted).
 
+Status da fase 2
+
+- VideoCard memoizado com comparacao de props relevantes.
+- Selecoes em grids usam arrays derivados com useMemo.
+
 Fase 3 - Acessibilidade e UX
 
 1. Garantir aria-label em botoes icon-only.
