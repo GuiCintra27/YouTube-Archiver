@@ -48,6 +48,10 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ### 🏥 Health Check
 - **GET** `/` - Status da API
+- **GET** `/api/health` - Status detalhado (app, version, worker role)
+
+### 📊 Observabilidade
+- **GET** `/metrics` - Métricas Prometheus (se `METRICS_ENABLED=true`)
 
 ### 📥 Download e Jobs
 - **POST** `/api/download` - Inicia download de vídeo/playlist

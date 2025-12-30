@@ -89,6 +89,12 @@ Implementacao
 - Expor endpoint /metrics (Prometheus) com contadores e histogramas de latencia.
 - Grafana opcional apenas para visualizacao local (documentado).
 
+Status da fase 3
+
+- LOG_FORMAT suportado (text/json).
+- /api/health e /metrics implementados.
+- Middleware de métricas com contadores e histogramas.
+
 Fase 4 - Consistencia de response models
 
 Implementacao

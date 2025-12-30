@@ -56,6 +56,10 @@ class Settings(BaseSettings):
         default="INFO",
         description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)"
     )
+    LOG_FORMAT: str = Field(
+        default="text",
+        description="Log format (text, json)"
+    )
 
     # Blocking IO concurrency (to_thread)
     BLOCKING_DRIVE_CONCURRENCY: int = Field(
@@ -78,6 +82,12 @@ class Settings(BaseSettings):
     ENABLE_GENERIC_EXCEPTION_HANDLER: bool = Field(
         default=True,
         description="Enable catch-all exception handler for standardized 500 responses"
+    )
+
+    # Observability
+    METRICS_ENABLED: bool = Field(
+        default=True,
+        description="Expose Prometheus metrics endpoint"
     )
 
     # Catalog (persistent index)

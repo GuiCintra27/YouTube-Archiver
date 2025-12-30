@@ -625,3 +625,9 @@ Notas (Download):
 ---
 
 **Este documento é uma referência rápida. Para detalhes completos, consulte os arquivos de documentação principais.**
+
+
+## Observabilidade
+
+- /metrics (Prometheus) quando METRICS_ENABLED=true
+- /api/health para status detalhado

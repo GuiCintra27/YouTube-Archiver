@@ -5,6 +5,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -12,6 +13,8 @@ from app.core.logging import setup_logging, logger
 from app.core.errors import register_exception_handlers
 from app.core.rate_limit import setup_rate_limiting
 from app.core.middleware.request_id import RequestIdMiddleware
+from app.core.middleware.metrics import MetricsMiddleware
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
 # Import routers
 from app.downloads.router import router as downloads_router
@@ -30,7 +33,7 @@ from app.drive.cache import (
 )
 
 # Configure logging with settings
-setup_logging(level=settings.LOG_LEVEL)
+setup_logging(level=settings.LOG_LEVEL, log_format=settings.LOG_FORMAT)
 logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
 
 
@@ -97,6 +100,10 @@ app = FastAPI(
 # Request correlation
 app.add_middleware(RequestIdMiddleware)
 
+# Metrics middleware
+if settings.METRICS_ENABLED:
+    app.add_middleware(MetricsMiddleware, exclude_paths={"/metrics"})
+
 # Register exception handlers for standardized error responses
 register_exception_handlers(app)
 
@@ -121,12 +128,33 @@ app.include_router(drive_router)
 app.include_router(catalog_router)
 
 
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    if not settings.METRICS_ENABLED:
+        return {"detail": "Metrics disabled"}
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
 @app.get("/")
 async def root():
     """Health check endpoint"""
     return {
         "message": f"{settings.APP_NAME} is running",
         "version": settings.APP_VERSION
+    }
+
+
+@app.get("/api/health")
+async def health():
+    """Basic health check with runtime details."""
+    return {
+        "status": "ok",
+        "app": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "worker_role": settings.WORKER_ROLE,
+        "catalog_enabled": settings.CATALOG_ENABLED,
+        "metrics_enabled": settings.METRICS_ENABLED,
     }
 
 
