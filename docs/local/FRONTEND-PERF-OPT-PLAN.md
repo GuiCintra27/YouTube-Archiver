@@ -126,6 +126,18 @@ Registro sugerido
 - LCP/TTI/CLS por pagina:
 - Observacoes:
 
+Notas Lighthouse
+
+- Home: 72 Performance com bloqueio de render por Google Fonts.
+- Ajuste aplicado: fontes migradas para next/font (display=swap + self-host).
+- Home (pos-ajuste): Performance 96; bloqueio residual de CSS local (~20 KB, ~80 ms).
+- Record: Performance 93, Acessibilidade 92, Best Practices 96, SEO 100.
+- Record metrics: FCP 0.2s, LCP 0.7s, TBT 170ms, CLS 0.09 (aviso de IndexedDB no Lighthouse).
+- Library: Performance 95, Acessibilidade 94, Best Practices 96, SEO 100.
+- Library metrics: FCP 0.3s, LCP 0.8s, TBT 180ms, CLS 0.00 (aviso de IndexedDB no Lighthouse).
+- Drive: Performance 93, Acessibilidade 89, Best Practices 96, SEO 100.
+- Drive metrics: FCP 0.2s, LCP 0.7s, TBT 190ms, CLS 0.078 (aviso de IndexedDB no Lighthouse).
+
 Riscos e cuidados
 
 - Dynamic import pode quebrar SSR se usado sem ssr:false em componentes client.

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Lato } from "next/font/google";
 import "./globals.css";
 
 // Vidstack CSS
@@ -7,6 +8,13 @@ import "@vidstack/react/player/styles/default/layouts/video.css";
 
 import Navigation from "@/components/common/navigation";
 import Providers from "@/components/common/providers";
+
+const lato = Lato({
+  subsets: ["latin"],
+  weight: ["300", "400", "700", "900"],
+  display: "swap",
+  variable: "--font-lato",
+});
 
 export const metadata: Metadata = {
   title: "YT-Archiver - Download & Archive Videos",
@@ -20,7 +28,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning className="dark">
+    <html
+      lang="pt-BR"
+      suppressHydrationWarning
+      className={`dark ${lato.variable}`}
+    >
       <body className="antialiased" suppressHydrationWarning>
         <Providers>
           <div className="min-h-screen relative overflow-hidden">
