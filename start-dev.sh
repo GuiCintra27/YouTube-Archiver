@@ -12,6 +12,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 BACKEND_PID=""
+WORKER_PID=""
 FRONTEND_PID=""
 
 cleanup() {
@@ -25,6 +26,11 @@ cleanup() {
     if [ -n "${BACKEND_PID}" ] && kill -0 "${BACKEND_PID}" 2>/dev/null; then
         echo -e "${YELLOW}🛑 Encerrando backend (PID ${BACKEND_PID})...${NC}"
         kill "${BACKEND_PID}" 2>/dev/null || true
+    fi
+
+    if [ -n "${WORKER_PID}" ] && kill -0 "${WORKER_PID}" 2>/dev/null; then
+        echo -e "${YELLOW}🛑 Encerrando worker (PID ${WORKER_PID})...${NC}"
+        kill "${WORKER_PID}" 2>/dev/null || true
     fi
 
     # Aguarda término para evitar processos órfãos
@@ -45,6 +51,9 @@ fi
 echo -e "${YELLOW}🧹 Limpando processos existentes...${NC}"
 lsof -ti:8000 | xargs kill -9 2>/dev/null || true
 lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+if [ "${START_WORKER:-false}" = "true" ] && [ "${WORKER_PORT:-8001}" != "8000" ]; then
+    lsof -ti:${WORKER_PORT:-8001} | xargs kill -9 2>/dev/null || true
+fi
 sleep 1
 
 # Iniciar backend
@@ -67,15 +76,27 @@ pip install -q -r requirements.txt
 # Iniciar API em background com hot-reload
 # --reload: reinicia quando arquivos mudam
 # --reload-dir: monitora apenas o diretório app (mais eficiente)
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app &
+API_ROLE="${WORKER_ROLE:-both}"
+if [ "${START_WORKER:-false}" = "true" ]; then
+    API_ROLE="api"
+fi
+WORKER_ROLE="${API_ROLE}" uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app &
 BACKEND_PID=$!
+
+if [ "${START_WORKER:-false}" = "true" ]; then
+    WORKER_ROLE=worker uvicorn app.main:app --host 0.0.0.0 --port ${WORKER_PORT:-8001} --reload --reload-dir app &
+    WORKER_PID=$!
+fi
 
 sleep 2
 if ! kill -0 "${BACKEND_PID}" 2>/dev/null; then
     echo -e "${YELLOW}⚠️  Backend falhou ao iniciar. Verifique logs acima.${NC}"
     exit 1
 fi
-echo -e "${GREEN}✅ Backend iniciado em http://localhost:8000${NC}"
+echo -e "${GREEN}✅ Backend iniciado em http://localhost:8000 (role: ${API_ROLE})${NC}"
+if [ "${START_WORKER:-false}" = "true" ]; then
+    echo -e "${GREEN}✅ Worker iniciado em http://localhost:${WORKER_PORT:-8001} (role: worker)${NC}"
+fi
 
 # Voltar para raiz
 cd ..

@@ -477,6 +477,10 @@ cd backend && ./run.sh
 # Ou manualmente:
 # source .venv/bin/activate && uvicorn app.main:app --reload
 
+# API + worker (recomendado para prod ou simulacao)
+# WORKER_ROLE=api ./run.sh
+# WORKER_ROLE=worker PORT=8001 ./run.sh
+
 # Frontend
 cd frontend && npm run dev
 

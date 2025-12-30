@@ -60,6 +60,11 @@ Isso irá:
 3. Iniciar o backend na porta 8000
 4. Iniciar o frontend na porta 3000
 
+Para iniciar API + worker no dev:
+```bash
+START_WORKER=true WORKER_PORT=8001 ./start-dev.sh
+```
+
 **Acesse:** http://localhost:3000
 
 #### Opção 2: Manual
@@ -68,6 +73,15 @@ Isso irá:
 ```bash
 cd backend
 ./run.sh  # Ou: source .venv/bin/activate && uvicorn app.main:app --reload
+```
+
+**API + worker (prod ou dev):**
+```bash
+# API sem tasks de background
+WORKER_ROLE=api ./run.sh
+
+# Worker com tasks de background
+WORKER_ROLE=worker PORT=8001 ./run.sh
 ```
 
 **Frontend:**

@@ -31,7 +31,10 @@ def get_jobs_to_cleanup(max_age_hours: int) -> List[str]:
     cutoff = datetime.now() - timedelta(hours=max_age_hours)
     jobs_to_remove = []
 
-    for job_id, job in store.jobs_db.items():
+    for job in store.get_all_jobs():
+        job_id = job.get("job_id")
+        if not job_id:
+            continue
         # Only clean up terminal states
         if job.get("status") not in TERMINAL_STATES:
             continue
@@ -48,7 +51,7 @@ def get_jobs_to_cleanup(max_age_hours: int) -> List[str]:
         try:
             completed_at = datetime.fromisoformat(completed_at_str)
             if completed_at < cutoff:
-                jobs_to_remove.append(job_id)
+                jobs_to_remove.append(str(job_id))
         except (ValueError, TypeError):
             # Invalid timestamp, skip
             continue
@@ -131,10 +134,10 @@ def get_cleanup_stats() -> dict:
     Returns:
         Dictionary with job statistics
     """
-    total = len(store.jobs_db)
+    total = store.count_jobs()
     by_status = {}
 
-    for job in store.jobs_db.values():
+    for job in store.get_all_jobs():
         status = job.get("status", "unknown")
         by_status[status] = by_status.get(status, 0) + 1
 

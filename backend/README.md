@@ -16,6 +16,20 @@ API REST para download e gerenciamento de vídeos do YouTube com integração ao
 ```
 Ativa o ambiente virtual automaticamente e inicia o servidor.
 
+### Rodar API + worker (recomendado para prod)
+```bash
+# API (sem loops de background)
+WORKER_ROLE=api ./run.sh
+
+# Worker (com loops de background)
+WORKER_ROLE=worker PORT=8001 ./run.sh
+```
+
+### Rodar API + worker (dev, em um comando)
+```bash
+RUN_WORKER=true WORKER_PORT=8001 ./run.sh
+```
+
 ### Opção 2: Manual
 ```bash
 source .venv/bin/activate
@@ -205,12 +219,18 @@ uvicorn app.main:app --reload
 ### Sistema de Jobs Assíncronos
 - Jobs rodando em threads separadas
 - Progresso reportado via callbacks
-- Estado armazenado em memória (limpar com DELETE)
+- Estado armazenado em memória ou Redis (configurável)
+
+**Redis (opcional):**
+```bash
+JOB_STORE_BACKEND=redis
+REDIS_URL=redis://localhost:6379/0
+```
 
 ### Concorrência (ASGI)
 - Operações bloqueantes (Drive/FS/SQLite) são movidas para threads via `core/blocking.py`.
 - Limites configuráveis: `BLOCKING_DRIVE_CONCURRENCY`, `BLOCKING_FS_CONCURRENCY`, `BLOCKING_CATALOG_CONCURRENCY`.
-- Para múltiplos workers em produção, migre o storage de jobs para Redis/DB.
+- Para múltiplos workers em produção, use Redis (JOB_STORE_BACKEND=redis) e separe API/worker.
 
 ### Streaming de Vídeos
 - Suporte a range requests (HTTP 206 Partial Content)

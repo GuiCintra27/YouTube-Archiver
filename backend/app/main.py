@@ -41,39 +41,50 @@ async def lifespan(app: FastAPI):
     Handles startup and shutdown events.
     """
     # Startup
-    logger.info("Starting background tasks...")
+    cleanup_task = None
+    cache_sync_task = None
 
-    # Initialize Drive cache database
-    await initialize_cache_on_startup()
+    if settings.start_background_tasks:
+        logger.info("Starting background tasks...")
 
-    # Start job cleanup task (runs every 30 minutes)
-    cleanup_task = asyncio.create_task(run_cleanup_loop(interval_minutes=30))
+        # Initialize Drive cache database
+        await initialize_cache_on_startup()
 
-    # Start Drive cache sync task (runs at configured interval)
-    cache_sync_task = asyncio.create_task(
-        run_cache_sync_loop(interval_minutes=settings.DRIVE_CACHE_SYNC_INTERVAL)
-    )
+        # Start job cleanup task (runs every 30 minutes)
+        cleanup_task = asyncio.create_task(run_cleanup_loop(interval_minutes=30))
+
+        # Start Drive cache sync task (runs at configured interval)
+        cache_sync_task = asyncio.create_task(
+            run_cache_sync_loop(interval_minutes=settings.DRIVE_CACHE_SYNC_INTERVAL)
+        )
+    else:
+        logger.info("Background tasks disabled for WORKER_ROLE=api")
 
     yield
 
     # Shutdown
-    logger.info("Shutting down background tasks...")
+    if cleanup_task or cache_sync_task:
+        logger.info("Shutting down background tasks...")
 
-    cleanup_task.cancel()
-    cache_sync_task.cancel()
+        if cleanup_task:
+            cleanup_task.cancel()
+        if cache_sync_task:
+            cache_sync_task.cancel()
 
-    try:
-        await cleanup_task
-    except asyncio.CancelledError:
-        pass
+        try:
+            if cleanup_task:
+                await cleanup_task
+        except asyncio.CancelledError:
+            pass
 
-    try:
-        await cache_sync_task
-    except asyncio.CancelledError:
-        pass
+        try:
+            if cache_sync_task:
+                await cache_sync_task
+        except asyncio.CancelledError:
+            pass
 
-    # Close cache database
-    await shutdown_cache()
+        # Close cache database
+        await shutdown_cache()
 
 # Create FastAPI application
 app = FastAPI(

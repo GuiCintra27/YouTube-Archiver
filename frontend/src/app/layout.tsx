@@ -95,7 +95,7 @@ export default function RootLayout({
                   </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <a
-                      href="https://github.com"
+                      href="https://github.com/GuiCintra27/YouTube-Archiver"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="hover:text-teal transition-colors animated-underline"

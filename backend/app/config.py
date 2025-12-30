@@ -151,6 +151,34 @@ class Settings(BaseSettings):
         description="Hours after which completed jobs are cleaned up"
     )
 
+    # Worker role (api | worker | both)
+    WORKER_ROLE: str = Field(
+        default="both",
+        description="Worker role for background tasks (api, worker, both)"
+    )
+
+    # Jobs store backend
+    JOB_STORE_BACKEND: str = Field(
+        default="memory",
+        description="Jobs store backend (memory, redis)"
+    )
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis URL for jobs store"
+    )
+    REDIS_JOB_KEY_PREFIX: str = Field(
+        default="yt-archiver:job:",
+        description="Key prefix for jobs in Redis"
+    )
+    REDIS_SOCKET_TIMEOUT: float = Field(
+        default=1.0,
+        description="Redis socket timeout (seconds)"
+    )
+    REDIS_CONNECT_TIMEOUT: float = Field(
+        default=1.0,
+        description="Redis connect timeout (seconds)"
+    )
+
     # Drive Cache settings
     DRIVE_CACHE_DB_PATH: str = Field(
         default="./drive_cache.db",
@@ -200,6 +228,11 @@ class Settings(BaseSettings):
         if p.is_absolute():
             return str(p)
         return str((self.BASE_DIR / p).resolve())
+
+    @property
+    def start_background_tasks(self) -> bool:
+        """Whether to start background tasks for this process."""
+        return self.WORKER_ROLE.lower() in {"worker", "both"}
 
     # Static configurations - imported from core.constants for consistency
     # These are duplicated here for backward compatibility with existing code
