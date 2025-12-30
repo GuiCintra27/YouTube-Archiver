@@ -17,6 +17,7 @@ import requests
 
 from app.config import settings
 from app.core.logging import get_module_logger
+from app.core.http import request_with_retry
 from app.core.thumbnail import ensure_thumbnail
 
 logger = get_module_logger("drive")
@@ -165,7 +166,15 @@ class DriveManager:
         token = self._get_access_token()
         headers = {"Authorization": f"Bearer {token}"}
 
-        resp = requests.get(url, headers=headers, params=params, timeout=(10, 60))
+        resp = request_with_retry(
+            "GET",
+            url,
+            headers=headers,
+            params=params,
+            timeout=(settings.DRIVE_HTTP_TIMEOUT_CONNECT, settings.DRIVE_HTTP_TIMEOUT_READ),
+            retries=settings.DRIVE_HTTP_RETRIES,
+            backoff=settings.DRIVE_HTTP_BACKOFF,
+        )
         if resp.status_code >= 400:
             raise Exception(f"Drive API error {resp.status_code}: {resp.text}")
 
@@ -196,7 +205,15 @@ class DriveManager:
 
         downloaded_bytes = 0
         try:
-            with requests.get(url, headers=headers, params=params, stream=True, timeout=(10, 300)) as resp:
+            with request_with_retry(
+                "GET",
+                url,
+                headers=headers,
+                params=params,
+                stream=True,
+                timeout=(settings.DRIVE_HTTP_TIMEOUT_CONNECT, settings.DRIVE_STREAM_TIMEOUT_READ),
+                retries=0,
+            ) as resp:
                 if resp.status_code >= 400:
                     raise Exception(f"Drive download error {resp.status_code}: {resp.text}")
 
@@ -1425,10 +1442,16 @@ class DriveManager:
                 return None
 
             # Download thumbnail
-            import requests
             creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
             headers = {'Authorization': f'Bearer {creds.token}'}
-            response = requests.get(thumbnail_link, headers=headers)
+            response = request_with_retry(
+                "GET",
+                thumbnail_link,
+                headers=headers,
+                timeout=(settings.DRIVE_HTTP_TIMEOUT_CONNECT, settings.DRIVE_HTTP_TIMEOUT_READ),
+                retries=settings.DRIVE_HTTP_RETRIES,
+                backoff=settings.DRIVE_HTTP_BACKOFF,
+            )
 
             if response.status_code == 200:
                 return response.content
@@ -1460,12 +1483,17 @@ class DriveManager:
                 return None
 
             # Download the file
-            import requests
             creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
             headers = {'Authorization': f'Bearer {creds.token}'}
             download_url = f'https://www.googleapis.com/drive/v3/files/{file_id}?alt=media'
-
-            response = requests.get(download_url, headers=headers)
+            response = request_with_retry(
+                "GET",
+                download_url,
+                headers=headers,
+                timeout=(settings.DRIVE_HTTP_TIMEOUT_CONNECT, settings.DRIVE_HTTP_TIMEOUT_READ),
+                retries=settings.DRIVE_HTTP_RETRIES,
+                backoff=settings.DRIVE_HTTP_BACKOFF,
+            )
 
             if response.status_code == 200:
                 return response.content, mime_type

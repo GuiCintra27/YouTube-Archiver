@@ -16,6 +16,7 @@ from app.config import settings
 from app.core.blocking import run_blocking, get_drive_semaphore, get_catalog_semaphore
 from app.core.security import validate_path_within_base, validate_file_exists, sanitize_path
 from app.core.logging import get_module_logger
+from app.core.http import request_with_retry
 from app.catalog.repository import CatalogRepository
 from app.catalog.service import (
     list_drive_videos_paginated,
@@ -888,7 +889,14 @@ def stream_video(
             def iterfile():
                 request_headers = auth_headers.copy()
                 request_headers['Range'] = range_header
-                with requests.get(download_url, headers=request_headers, stream=True) as response:
+                with request_with_retry(
+                    "GET",
+                    download_url,
+                    headers=request_headers,
+                    stream=True,
+                    timeout=(settings.DRIVE_HTTP_TIMEOUT_CONNECT, settings.DRIVE_STREAM_TIMEOUT_READ),
+                    retries=0,
+                ) as response:
                     for chunk in response.iter_content(chunk_size=1024*1024):  # 1MB chunks
                         if chunk:
                             yield chunk
@@ -906,7 +914,14 @@ def stream_video(
 
     # No Range header - full streaming
     def iterfile():
-        with requests.get(download_url, headers=auth_headers, stream=True) as response:
+        with request_with_retry(
+            "GET",
+            download_url,
+            headers=auth_headers,
+            stream=True,
+            timeout=(settings.DRIVE_HTTP_TIMEOUT_CONNECT, settings.DRIVE_STREAM_TIMEOUT_READ),
+            retries=0,
+        ) as response:
             for chunk in response.iter_content(chunk_size=2*1024*1024):  # 2MB chunks
                 if chunk:
                     yield chunk

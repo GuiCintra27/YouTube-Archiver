@@ -199,6 +199,30 @@ class Settings(BaseSettings):
         description="Fall back to direct API if cache unavailable"
     )
 
+    # Drive HTTP settings
+    DRIVE_HTTP_TIMEOUT_CONNECT: float = Field(
+        default=5.0,
+        description="Drive HTTP connect timeout (seconds)"
+    )
+    DRIVE_HTTP_TIMEOUT_READ: float = Field(
+        default=60.0,
+        description="Drive HTTP read timeout (seconds)"
+    )
+    DRIVE_STREAM_TIMEOUT_READ: float = Field(
+        default=300.0,
+        description="Drive stream read timeout (seconds)"
+    )
+    DRIVE_HTTP_RETRIES: int = Field(
+        default=2,
+        ge=0,
+        description="Drive HTTP retries for idempotent GET requests"
+    )
+    DRIVE_HTTP_BACKOFF: float = Field(
+        default=0.2,
+        ge=0,
+        description="Drive HTTP retry backoff (seconds)"
+    )
+
     # Pydantic settings configuration
     model_config = SettingsConfigDict(
         env_file=".env",

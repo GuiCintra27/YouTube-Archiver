@@ -232,6 +232,10 @@ REDIS_URL=redis://localhost:6379/0
 - Limites configuráveis: `BLOCKING_DRIVE_CONCURRENCY`, `BLOCKING_FS_CONCURRENCY`, `BLOCKING_CATALOG_CONCURRENCY`.
 - Para múltiplos workers em produção, use Redis (JOB_STORE_BACKEND=redis) e separe API/worker.
 
+### Timeouts/Retry (Drive)
+- Timeouts configuráveis: `DRIVE_HTTP_TIMEOUT_CONNECT`, `DRIVE_HTTP_TIMEOUT_READ`, `DRIVE_STREAM_TIMEOUT_READ`.
+- Retry para GET idempotente: `DRIVE_HTTP_RETRIES`, `DRIVE_HTTP_BACKOFF`.
+
 ### Streaming de Vídeos
 - Suporte a range requests (HTTP 206 Partial Content)
 - Chunks de 8KB para streaming eficiente

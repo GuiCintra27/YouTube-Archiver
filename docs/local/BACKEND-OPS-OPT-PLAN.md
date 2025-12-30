@@ -73,6 +73,12 @@ Implementacao
   - drive.service stream download
 - Garantir que streaming continue eficiente (timeouts por fase de conexao/leitura).
 
+Status da fase 2
+
+- Helper HTTP com retry/backoff para GET idempotente.
+- Timeouts configuraveis via settings (connect/read/stream).
+- Aplicado em Drive manager/service (listagem, thumbnails, streaming).
+
 Fase 3 - Observabilidade (logs + metrics)
 
 Implementacao
