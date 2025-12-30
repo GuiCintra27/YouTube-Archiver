@@ -119,6 +119,11 @@ Implementacao
   - range streaming (local e drive)
 - Usar fixtures minimas e mocks de Drive quando necessario.
 
+Status da fase 5
+
+- Suite atual cobre bootstrap/rebuild, listagem via catalogo e range streaming.
+- Pytest passando na suite completa.
+
 Entregaveis
 
 - Documento de config prod
