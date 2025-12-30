@@ -2,14 +2,23 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Loader2, VideoOff, LibraryBig, Play } from "lucide-react";
 import VideoCard from "@/components/common/videos/video-card";
-import VideoPlayer from "@/components/common/videos/video-player";
+import VideoPlayerLoading from "@/components/common/videos/video-player-loading";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PATHS } from "@/lib/paths";
 import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
 import { deleteLocalVideo } from "@/lib/client/api";
+
+const VideoPlayer = dynamic(
+  () => import("@/components/common/videos/video-player"),
+  {
+    ssr: false,
+    loading: () => <VideoPlayerLoading />,
+  }
+);
 
 interface Video {
   id: string;
@@ -152,7 +161,7 @@ export default function RecentVideos({
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {videos.map((video) => (
+          {videos.map((video, index) => (
             <VideoCard
               key={video.id}
               id={video.id}
@@ -162,6 +171,7 @@ export default function RecentVideos({
               path={video.path}
               onPlay={() => setSelectedVideo(video)}
               onDelete={() => handleDelete(video)}
+              priority={index === 0}
             />
           ))}
         </div>

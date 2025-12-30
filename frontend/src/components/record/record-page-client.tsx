@@ -1,9 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { MonitorPlay, Video, Mic, HardDrive, Zap } from "lucide-react";
-import ScreenRecorder from "@/components/record/screen-recorder";
 import RecentVideos from "@/components/common/videos/recent-videos";
+import ScreenRecorderLoading from "@/components/record/screen-recorder-loading";
+
+const ScreenRecorder = dynamic(
+  () => import("@/components/record/screen-recorder"),
+  {
+    ssr: false,
+    loading: () => <ScreenRecorderLoading />,
+  }
+);
 
 type RecordPageClientProps = {
   initialRecentVideos?: {

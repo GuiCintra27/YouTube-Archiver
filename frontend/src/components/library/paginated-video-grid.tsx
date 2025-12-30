@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import VideoCard from "@/components/common/videos/video-card";
-import VideoPlayer from "@/components/common/videos/video-player";
+import VideoPlayerLoading from "@/components/common/videos/video-player-loading";
 import { PaginationControls } from "@/components/common/pagination";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,14 @@ import {
   renameLocalVideo,
   updateLocalThumbnail,
 } from "@/lib/client/api";
+
+const VideoPlayer = dynamic(
+  () => import("@/components/common/videos/video-player"),
+  {
+    ssr: false,
+    loading: () => <VideoPlayerLoading />,
+  }
+);
 
 interface Video {
   id: string;
@@ -266,7 +275,7 @@ export default function PaginatedVideoGrid({
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {videos.map((video) => (
+            {videos.map((video, index) => (
               <VideoCard
                 key={video.id}
                 id={video.id}
@@ -286,6 +295,7 @@ export default function PaginatedVideoGrid({
                 onEdit={(newTitle, newThumbnail) =>
                   handleEdit(video, newTitle, newThumbnail)
                 }
+                priority={index === 0}
               />
             ))}
           </div>

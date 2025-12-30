@@ -62,6 +62,7 @@ interface VideoCardProps {
   onEdit?: (newTitle: string, newThumbnail?: File) => Promise<void>;
   // Optional share props
   shareScope?: "drive" | "none";
+  priority?: boolean;
 }
 
 export default function VideoCard({
@@ -83,6 +84,7 @@ export default function VideoCard({
   editable = false,
   onEdit,
   shareScope = "none",
+  priority = false,
 }: VideoCardProps) {
   const apiUrl = useApiUrl();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -278,6 +280,7 @@ export default function VideoCard({
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               className="object-cover transition-transform duration-300 group-hover:scale-105"
+              priority={priority}
               onError={() => setImageError(true)}
             />
           ) : (

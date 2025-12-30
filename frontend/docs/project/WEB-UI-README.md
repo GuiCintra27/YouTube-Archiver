@@ -358,7 +358,7 @@ python -c "import sys; print(sys.path)"
 ### Frontend não conecta ao backend
 
 1. Verificar se o backend está rodando em `http://localhost:8000`
-2. Verificar arquivo `.env.local` na raiz de `web-ui/`
+2. Verificar arquivo `.env.local` na raiz de `frontend/` (use `frontend/.env.example` como base)
 3. Verificar CORS no backend (já configurado para localhost:3000)
 
 ### Erro "Module not found"

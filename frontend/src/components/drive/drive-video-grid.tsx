@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PaginationControls } from "@/components/common/pagination";
 import VideoCard from "@/components/common/videos/video-card";
-import VideoPlayer from "@/components/common/videos/video-player";
+import VideoPlayerLoading from "@/components/common/videos/video-player-loading";
 import { Loader2, VideoOff, Cloud, Trash2, X, CheckSquare } from "lucide-react";
 import {
   AlertDialog,
@@ -25,6 +26,14 @@ import {
   renameDriveVideo,
   updateDriveThumbnail,
 } from "@/lib/client/api";
+
+const VideoPlayer = dynamic(
+  () => import("@/components/common/videos/video-player"),
+  {
+    ssr: false,
+    loading: () => <VideoPlayerLoading />,
+  }
+);
 
 export type DriveVideo = {
   id: string;
@@ -273,7 +282,7 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {videos.map((video) => (
+            {videos.map((video, index) => (
               <VideoCard
                 key={video.id}
                 id={video.id}
@@ -294,6 +303,7 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
                   handleEdit(video, newTitle, newThumbnail)
                 }
                 shareScope="drive"
+                priority={index === 0}
               />
             ))}
           </div>

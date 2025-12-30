@@ -1,37 +1,9 @@
+import { Suspense } from "react";
 import { Library, Film, FolderOpen, Search, Trash2 } from "lucide-react";
-import PaginatedVideoGrid from "@/components/library/paginated-video-grid";
-import { fetchLocalVideosPage } from "@/lib/server/api";
-
-const PAGE_SIZE = 12;
+import LibraryGridSection from "@/components/library/library-grid-section";
+import LibraryGridSkeleton from "@/components/library/library-grid-skeleton";
 
 export default async function LibraryPage() {
-  let initialData: {
-    videos: {
-      id: string;
-      title: string;
-      channel: string;
-      path: string;
-      thumbnail?: string;
-      duration?: string;
-      size: number;
-      created_at: string;
-      modified_at: string;
-    }[];
-    total: number;
-    page: number;
-  } | null = null;
-
-  try {
-    const data = await fetchLocalVideosPage(1, PAGE_SIZE);
-    initialData = {
-      videos: data.videos || [],
-      total: data.total || 0,
-      page: data.page || 1,
-    };
-  } catch (error) {
-    console.error("Erro ao carregar biblioteca:", error);
-  }
-
   return (
     <div className="space-y-10">
       {/* Hero Section */}
@@ -91,7 +63,9 @@ export default async function LibraryPage() {
 
       {/* Video Grid Section */}
       <section className="max-w-[90rem] mx-auto">
-        <PaginatedVideoGrid initialData={initialData || undefined} />
+        <Suspense fallback={<LibraryGridSkeleton />}>
+          <LibraryGridSection />
+        </Suspense>
       </section>
     </div>
   );

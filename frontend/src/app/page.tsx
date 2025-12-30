@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import DownloadForm from "@/components/home/download-form";
-import RecentVideos from "@/components/common/videos/recent-videos";
+import RecentVideosSection from "@/components/home/recent-videos-section";
+import RecentVideosSkeleton from "@/components/common/videos/recent-videos-skeleton";
 import {
   Zap,
   Shield,
@@ -14,7 +16,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { PATHS } from "@/lib/paths";
-import { fetchRecentVideos } from "@/lib/server/api";
 
 // Feature cards data
 const features = [
@@ -75,24 +76,6 @@ const badges = [
 ];
 
 export default async function Home() {
-  let initialRecentVideos: {
-    id: string;
-    title: string;
-    channel: string;
-    path: string;
-    thumbnail?: string;
-    size: number;
-    created_at: string;
-    modified_at: string;
-  }[] = [];
-
-  try {
-    const data = await fetchRecentVideos(4);
-    initialRecentVideos = data.videos || [];
-  } catch (error) {
-    console.error("Erro ao carregar recentes:", error);
-  }
-
   return (
     <div className="relative">
       {/* ============================================
@@ -342,7 +325,9 @@ export default async function Home() {
         </div>
 
         <div className="container mx-auto px-4 lg:px-8">
-      <RecentVideos initialData={initialRecentVideos} />
+          <Suspense fallback={<RecentVideosSkeleton />}>
+            <RecentVideosSection />
+          </Suspense>
         </div>
       </section>
     </div>

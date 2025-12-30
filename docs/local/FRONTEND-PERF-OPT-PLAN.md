@@ -49,6 +49,12 @@ Fase 1 - Code splitting e carga inicial
 3. Ajustar prioridade de imagens:
    - Primeiro card com priority.
 
+Status da fase 1
+
+- VideoPlayer e ScreenRecorder agora carregam via dynamic import com fallback.
+- Suspense aplicado em home (recentes) e library/drive (grids) com skeleton leve.
+- Priority aplicado ao primeiro card dos grids.
+
 Fase 2 - Re-render e memoizacao
 
 1. React.memo em VideoCard e grid items.
