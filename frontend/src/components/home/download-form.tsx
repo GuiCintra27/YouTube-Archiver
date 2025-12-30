@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Progress } from "@/components/ui/progress";
 import {
   Accordion,
   AccordionContent,
@@ -53,7 +52,7 @@ interface JobStatus {
   status: string;
   url: string;
   progress: DownloadProgress;
-  result?: any;
+  result?: unknown;
   error?: string;
 }
 
@@ -288,8 +287,8 @@ export default function DownloadForm({ onDownloadComplete }: DownloadFormProps) 
     pollJobStatus,
   ]);
 
-  const progress: any = jobStatus?.progress || {};
-  const percentage = progress.percentage || 0;
+  const progress: DownloadProgress = jobStatus?.progress ?? { status: "" };
+  const percentage = progress.percentage ?? 0;
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">

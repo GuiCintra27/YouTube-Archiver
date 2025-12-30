@@ -580,10 +580,13 @@ export default function VideoCard({
 
                 {thumbnailPreview ? (
                   <div className="relative aspect-video rounded-lg overflow-hidden">
-                    <img
+                    <Image
                       src={thumbnailPreview}
                       alt="Preview"
-                      className="w-full h-full object-cover"
+                      fill
+                      sizes="100vw"
+                      className="object-cover"
+                      unoptimized
                     />
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                       <p className="text-white text-sm font-medium">Clique para alterar</p>
@@ -591,10 +594,12 @@ export default function VideoCard({
                   </div>
                 ) : thumbnailUrl ? (
                   <div className="relative aspect-video rounded-lg overflow-hidden">
-                    <img
+                    <Image
                       src={thumbnailUrl}
                       alt="Thumbnail atual"
-                      className="w-full h-full object-cover"
+                      fill
+                      sizes="100vw"
+                      className="object-cover"
                     />
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                       <p className="text-white text-sm font-medium">Clique para alterar</p>

@@ -35,8 +35,13 @@ export function revalidateTags(tags: readonly string[]) {
   tags.forEach((tag) => revalidateTag(tag));
 }
 
-export function encodePathParam(segments: string[]): string {
-  const joined = segments.join("/");
+export function encodePathParam(segments: string[] | string | undefined): string {
+  const parts = Array.isArray(segments)
+    ? segments
+    : segments
+      ? [segments]
+      : [];
+  const joined = parts.join("/");
   let decoded = joined;
   try {
     decoded = decodeURIComponent(joined);

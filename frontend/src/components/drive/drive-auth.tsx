@@ -70,7 +70,7 @@ export default function DriveAuth({ onAuthenticated }: DriveAuthProps) {
             setLoading(false);
             onAuthenticated();
           }
-        } catch (_err) {
+        } catch {
           // Continuar checando
         }
       }, 1000);

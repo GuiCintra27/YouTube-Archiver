@@ -2,15 +2,17 @@ import { CACHE_TAG_SETS } from "@/lib/server/tags";
 import { buildBackendUrl, proxyJsonWithRevalidate } from "@/lib/server/route-utils";
 
 type Params = {
-  fileId: string;
+  fileId?: string | string[];
 };
 
 export async function PATCH(
   request: Request,
-  { params }: { params: Params }
+  { params }: { params: Promise<Params> }
 ) {
   const payload = await request.json();
-  const url = buildBackendUrl(`/api/drive/videos/${params.fileId}/rename`);
+  const { fileId } = await params;
+  const resolvedFileId = Array.isArray(fileId) ? fileId[0] : fileId;
+  const url = buildBackendUrl(`/api/drive/videos/${resolvedFileId ?? ""}/rename`);
 
   return proxyJsonWithRevalidate(
     url,
