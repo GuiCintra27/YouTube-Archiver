@@ -220,6 +220,21 @@ Obtém informações sobre um vídeo sem baixar.
   - `frontend/src/lib/api-urls.ts` → `APIURLS` para paths de API (`download`, `jobs`, `drive/auth-status`, etc.).
 - Motivos: evita typos, facilita refactors e mantém URLs coerentes entre chamadas e navegação.
 
+### SSR + Cache (App Router)
+- Páginas principais usam Server Components com dados iniciais:
+  - `/library`, `/drive`, `/record` e `/` (recentes).
+- Fetch server-side com cache nativo do Next:
+  - `frontend/src/lib/server/api.ts`
+  - tags em `frontend/src/lib/server/tags.ts`
+- Mutações passam por Route Handlers do Next (BFF) com invalidacao de tags:
+  - `frontend/src/app/api/*`
+  - helper: `frontend/src/lib/server/route-utils.ts`
+
+### Client API Unificado
+- Operacoes de mutacao no client usam um wrapper unico:
+  - `frontend/src/lib/client/api.ts`
+- Evita repeticao de fetch e padroniza erros.
+
 ### Estrutura de Componentes
 
 ```

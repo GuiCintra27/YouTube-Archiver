@@ -330,7 +330,7 @@ return StreamingResponse(
 
 ### Frontend (TypeScript/React)
 
-#### Component Pattern
+#### Component Pattern (Client)
 ```typescript
 "use client";
 
@@ -361,19 +361,35 @@ export default function ComponentName() {
 }
 ```
 
-#### API Call Pattern
+#### Component Pattern (Server)
 ```typescript
-const response = await fetch("http://localhost:8000/api/endpoint", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(data),
-});
+import { fetchLocalVideosPage } from "@/lib/server/api";
 
-if (!response.ok) {
-  throw new Error(`HTTP ${response.status}`);
+export default async function LibraryPage() {
+  const data = await fetchLocalVideosPage(1, 12);
+  return <ClientGrid initialData={data.videos} />;
 }
+```
 
-const result = await response.json();
+#### API Call Pattern (Client via Next BFF)
+```typescript
+import { deleteLocalVideo } from "@/lib/client/api";
+
+await deleteLocalVideo("Channel/Video.mp4");
+```
+
+#### API Call Pattern (Route Handler + Revalidate)
+```typescript
+import { proxyJsonWithRevalidate } from "@/lib/server/route-utils";
+import { CACHE_TAG_SETS } from "@/lib/server/tags";
+
+export async function POST(request: Request) {
+  return proxyJsonWithRevalidate(
+    "http://localhost:8000/api/endpoint",
+    { method: "POST", body: await request.text() },
+    CACHE_TAG_SETS.LOCAL_MUTATION
+  );
+}
 ```
 
 ---

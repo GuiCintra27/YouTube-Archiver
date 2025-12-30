@@ -8,6 +8,7 @@ O YT-Archiver combina uma API REST robusta com uma interface web moderna para fa
 
 - **API REST** (`backend/`): FastAPI com arquitetura modular, sistema de jobs assíncronos e integração com Google Drive
 - **Interface Web** (`frontend/`): Next.js 15 + shadcn/ui para uma experiência visual intuitiva
+- **SSR + Cache nativo**: Server Components com revalidate e invalidação por tags via Route Handlers
 - **Motor de Download**: yt-dlp para downloads de YouTube, playlists e streams HLS
 
 ### Principais Funcionalidades
@@ -28,6 +29,7 @@ O YT-Archiver combina uma API REST robusta com uma interface web moderna para fa
 - ✅ Download de legendas, miniaturas e metadados
 - ✅ Nomes de arquivo e caminhos customizados
 - ✅ **Global Player com PiP** - Reproduza vídeos em background enquanto navega
+- ✅ **SSR e cache inteligente** - Renderização inicial com dados e invalidação por tags
 - ✅ API REST completa para integração
 
 ---
@@ -94,6 +96,7 @@ npm run dev
 - 🗑️ Exclusão individual ou em lote de vídeos
 - ℹ️ Modal de informações detalhadas do vídeo
 - ⚙️ Opções avançadas: headers, cookies, rate limiting, nomenclatura customizada
+- ⚡ SSR + cache para vídeos recentes
 
 **Página Google Drive (`/drive`):**
 - ☁️ Autenticação OAuth2 com Google Drive
@@ -105,6 +108,7 @@ npm run dev
 - 🗑️ Exclusão individual ou em lote de vídeos do Drive
 - 🔗 Compartilhamento público com link (ativar/desativar por vídeo)
 - ℹ️ Modal de informações detalhadas do vídeo
+- ⚡ SSR + cache com invalidação por tags
 
 **Global Player (Background Playback):**
 - 🎵 Minimize vídeos para reproduzir em background
