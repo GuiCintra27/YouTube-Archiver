@@ -105,6 +105,27 @@ Status da fase 5
 - Documentacao atualizada conforme fases 0-3.
 - Métricas quantitativas (Lighthouse/Profiler) pendentes de execução manual.
 
+Como medir (manual)
+
+1. Build de producao:
+   - cd frontend
+   - npm run build
+   - npm run start
+2. Lighthouse (Chrome DevTools):
+   - Abra http://localhost:3000
+   - DevTools > Lighthouse > Performance + Best Practices + SEO
+   - Rodar em /, /library e /drive
+3. React Profiler:
+   - Ativar "Profiler" em React DevTools
+   - Medir interacao de selecao e abertura do player nos grids
+
+Registro sugerido
+
+- Data:
+- Ambiente (dev/prod, maquina):
+- LCP/TTI/CLS por pagina:
+- Observacoes:
+
 Riscos e cuidados
 
 - Dynamic import pode quebrar SSR se usado sem ssr:false em componentes client.
