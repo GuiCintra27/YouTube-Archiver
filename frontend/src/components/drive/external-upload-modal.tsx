@@ -368,6 +368,7 @@ export default function ExternalUploadModal({
                     size="sm"
                     className="h-6 w-6 p-0 text-muted-foreground hover:text-white"
                     onClick={() => setVideoFile(null)}
+                    aria-label="Remover vídeo selecionado"
                   >
                     <X className="h-3 w-3" />
                   </Button>
@@ -407,6 +408,7 @@ export default function ExternalUploadModal({
                       size="sm"
                       className="h-6 w-6 p-0 text-muted-foreground hover:text-white"
                       onClick={() => setThumbnail(null)}
+                      aria-label="Remover thumbnail selecionada"
                     >
                       <X className="h-3 w-3" />
                     </Button>
@@ -470,6 +472,7 @@ export default function ExternalUploadModal({
                           size="sm"
                           className="h-6 w-6 p-0 text-muted-foreground hover:text-white"
                           onClick={() => removeSubtitle(index)}
+                          aria-label={`Remover legenda ${file.name}`}
                         >
                           <X className="h-3 w-3" />
                         </Button>
@@ -507,6 +510,7 @@ export default function ExternalUploadModal({
                       size="sm"
                       className="h-6 w-6 p-0 text-muted-foreground hover:text-white"
                       onClick={() => setTranscription(null)}
+                      aria-label="Remover transcrição selecionada"
                     >
                       <X className="h-3 w-3" />
                     </Button>

@@ -331,6 +331,7 @@ function VideoCardComponent({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 -mt-1 text-muted-foreground hover:text-white hover:bg-white/10"
+                  aria-label="Abrir menu de opções"
                 >
                   <MoreVertical className="h-4 w-4" />
                 </Button>
@@ -377,9 +378,15 @@ function VideoCardComponent({
 
       {/* Dialog de informações */}
       <Dialog open={showInfoDialog} onOpenChange={setShowInfoDialog}>
-        <DialogContent className="sm:max-w-md glass border-white/10">
+        <DialogContent
+          className="sm:max-w-md glass border-white/10"
+          aria-describedby="video-info-description"
+        >
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-white">
+            <DialogTitle
+              id="video-info-title"
+              className="flex items-center gap-2 text-white"
+            >
               <FileVideo className="h-5 w-5 text-teal" />
               Informacoes do Video
             </DialogTitle>
@@ -395,6 +402,12 @@ function VideoCardComponent({
                 {title}
               </p>
             </div>
+            <p
+              id="video-info-description"
+              className="text-xs text-muted-foreground"
+            >
+              Consulte detalhes como tamanho, data de criação e duração do vídeo.
+            </p>
 
             {/* Grid de informações */}
             <div className="grid grid-cols-2 gap-4">
@@ -445,9 +458,15 @@ function VideoCardComponent({
 
       {/* Dialog de compartilhamento */}
       <Dialog open={showShareDialog} onOpenChange={handleShareDialogChange}>
-        <DialogContent className="sm:max-w-md glass border-white/10">
+        <DialogContent
+          className="sm:max-w-md glass border-white/10"
+          aria-describedby="video-share-description"
+        >
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-white">
+            <DialogTitle
+              id="video-share-title"
+              className="flex items-center gap-2 text-white"
+            >
               <Share2 className="h-5 w-5 text-cyan" />
               Opções de compartilhamento
             </DialogTitle>
@@ -513,6 +532,9 @@ function VideoCardComponent({
             <p className="text-xs text-muted-foreground">
               O link é público e não expira automaticamente. Você pode revogar o
               acesso quando quiser.
+            </p>
+            <p id="video-share-description" className="sr-only">
+              Gerencie se o vídeo fica público e copie o link de compartilhamento.
             </p>
           </div>
         </DialogContent>

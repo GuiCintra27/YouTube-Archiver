@@ -171,6 +171,7 @@ export default function GlobalPlayer() {
                 onClick={handleMuteToggle}
                 title={isMuted ? "Ativar som" : "Silenciar"}
                 className="h-9 w-9"
+                aria-label={isMuted ? "Ativar som" : "Silenciar"}
               >
                 {isMuted || volume === 0 ? (
                   <VolumeX className="h-4 w-4" />
@@ -199,6 +200,7 @@ export default function GlobalPlayer() {
                 disabled={!isReady}
                 title="Picture-in-Picture"
                 className="h-9 w-9"
+                aria-label="Abrir Picture-in-Picture"
               >
                 <PictureInPicture2 className="h-4 w-4" />
               </Button>
@@ -212,6 +214,7 @@ export default function GlobalPlayer() {
               disabled={!isReady}
               title={!isReady ? "Carregando..." : isPlaying ? "Pausar" : "Reproduzir"}
               className="h-9 w-9"
+              aria-label={!isReady ? "Carregando" : isPlaying ? "Pausar" : "Reproduzir"}
             >
               {!isReady ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -229,6 +232,7 @@ export default function GlobalPlayer() {
               onClick={handleClose}
               title="Fechar"
               className="h-9 w-9 text-muted-foreground hover:text-foreground"
+              aria-label="Fechar player"
             >
               <X className="h-4 w-4" />
             </Button>

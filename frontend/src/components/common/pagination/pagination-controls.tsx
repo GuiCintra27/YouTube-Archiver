@@ -103,16 +103,16 @@ export default function PaginationControls({
             placeholder="Pág"
             disabled={loading || totalPages === 0}
           />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-0.5 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground hover:text-teal"
-            onClick={handlePageJump}
-            disabled={loading || totalPages === 0}
-            aria-label="Confirmar página"
-          >
-            <Search className="h-3 w-3" />
-          </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute right-0.5 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground hover:text-teal"
+          onClick={handlePageJump}
+          disabled={loading || totalPages === 0}
+          aria-label="Confirmar página"
+        >
+          <Search className="h-3 w-3" />
+        </Button>
         </div>
       </div>
 
@@ -126,6 +126,7 @@ export default function PaginationControls({
           className="h-8 w-8 text-muted-foreground hover:text-white hover:bg-white/10"
           onClick={handlePrevious}
           disabled={!canPrev || loading}
+          aria-label="Página anterior"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -142,6 +143,7 @@ export default function PaginationControls({
           className="h-8 w-8 text-muted-foreground hover:text-white hover:bg-white/10"
           onClick={handleNext}
           disabled={!canNext || loading}
+          aria-label="Próxima página"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>

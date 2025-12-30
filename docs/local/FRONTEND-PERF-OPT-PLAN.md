@@ -72,6 +72,11 @@ Fase 3 - Acessibilidade e UX
 2. Focus visible consistente (keyboard).
 3. Validar modais (aria-describedby/aria-labelledby).
 
+Status da fase 3
+
+- Adicionados aria-labels em botoes icon-only (menu, paginacao, player, sync e modais).
+- Dialogs com descricoes para leitores de tela em informacoes/compartilhamento.
+
 Fase 4 - Virtualizacao (somente se necessario)
 Critério para aplicar:
 

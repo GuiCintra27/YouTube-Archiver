@@ -924,6 +924,7 @@ export default function SyncPanel() {
                             onClick={() => handleUploadSingle(item.path)}
                             disabled={uploadingVideo !== null || syncing}
                             className="text-muted-foreground hover:text-cyan hover:bg-cyan/10"
+                            aria-label={`Enviar ${item.path} para o Drive`}
                           >
                             {uploadingVideo === item.path ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -946,6 +947,7 @@ export default function SyncPanel() {
                           variant="ghost"
                           onClick={loadMoreLocalOnly}
                           className="text-muted-foreground hover:text-teal hover:bg-teal/10"
+                          aria-label="Carregar mais vídeos locais"
                         >
                           Carregar mais ({localOnlyItems.length}/{syncStatus.local_only_count})
                         </Button>
@@ -984,6 +986,7 @@ export default function SyncPanel() {
                             onClick={() => handleDownloadSingle(item)}
                             disabled={downloadingVideo !== null || downloading || syncing || uploadingVideo !== null}
                             className="text-muted-foreground hover:text-purple hover:bg-purple/10"
+                            aria-label={`Baixar ${item.path}`}
                           >
                             {downloadingVideo === item.path ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -1006,6 +1009,7 @@ export default function SyncPanel() {
                           variant="ghost"
                           onClick={loadMoreDriveOnly}
                           className="text-muted-foreground hover:text-cyan hover:bg-cyan/10"
+                          aria-label="Carregar mais vídeos do Drive"
                         >
                           Carregar mais ({driveOnlyItems.length}/{syncStatus.drive_only_count})
                         </Button>
@@ -1052,6 +1056,7 @@ export default function SyncPanel() {
                           variant="ghost"
                           onClick={loadMoreSynced}
                           className="text-muted-foreground hover:text-teal hover:bg-teal/10"
+                          aria-label="Carregar mais vídeos sincronizados"
                         >
                           Carregar mais ({syncedItems.length}/{syncStatus.synced_count})
                         </Button>

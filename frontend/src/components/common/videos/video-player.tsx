@@ -166,6 +166,7 @@ export default function VideoPlayer({
                       onClick={handleMinimize}
                       className="text-muted-foreground hover:text-foreground -mt-1"
                       title="Minimizar (PiP)"
+                      aria-label="Minimizar player"
                     >
                       <Minimize2 className="h-4 w-4" />
                     </Button>
@@ -176,6 +177,7 @@ export default function VideoPlayer({
                       onClick={() => setDeleteDialogOpen(true)}
                       className="text-destructive hover:text-destructive -mt-1"
                       title="Excluir"
+                      aria-label="Excluir vídeo"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
