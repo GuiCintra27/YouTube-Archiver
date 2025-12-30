@@ -90,10 +90,20 @@ Se aplicado:
 - Confirmar compatibilidade com layout responsivo.
 - Testar com 1k itens em dev.
 
+Status da fase 4
+
+- Não aplicada. As listas atuais renderizam 12-16 itens por página, sem indicação de gargalo.
+- Reavaliar caso o grid passe de 200+ itens simultâneos ou o FPS caia no scroll.
+
 Fase 5 - Documentacao e boas praticas
 
 1. Atualizar docs com arquitetura e decisoes.
 2. Registrar resultados das metricas (antes/depois).
+
+Status da fase 5
+
+- Documentacao atualizada conforme fases 0-3.
+- Métricas quantitativas (Lighthouse/Profiler) pendentes de execução manual.
 
 Riscos e cuidados
 
