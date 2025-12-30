@@ -46,6 +46,7 @@ def _update_job_progress(job_id: str, progress: Dict) -> None:
         job["progress"] = progress
         if progress.get("status") == "uploading":
             job["status"] = "uploading"
+        store.set_job(job_id, job)
 
 
 def _complete_job(job_id: str, result: Dict) -> None:
@@ -57,6 +58,7 @@ def _complete_job(job_id: str, result: Dict) -> None:
         job["progress"]["status"] = "completed"
         job["progress"]["percent"] = 100
         job["completed_at"] = datetime.now().isoformat()
+        store.set_job(job_id, job)
 
 
 def _fail_job(job_id: str, error: str) -> None:
@@ -66,6 +68,7 @@ def _fail_job(job_id: str, error: str) -> None:
         job["status"] = "error"
         job["error"] = error
         job["completed_at"] = datetime.now().isoformat()
+        store.set_job(job_id, job)
 
 
 async def _run_drive_cleanup_job(job_id: str, folder_ids: List[str]) -> None:
@@ -74,6 +77,7 @@ async def _run_drive_cleanup_job(job_id: str, folder_ids: List[str]) -> None:
         if job:
             job["status"] = "running"
             job["progress"]["status"] = "running"
+            store.set_job(job_id, job)
 
         result = await run_blocking(
             drive_manager.cleanup_empty_folders,
@@ -89,12 +93,14 @@ async def _run_drive_cleanup_job(job_id: str, folder_ids: List[str]) -> None:
             job["progress"]["status"] = "completed"
             job["progress"]["folders_deleted"] = len(result.get("deleted", []))
             job["completed_at"] = datetime.now().isoformat()
+            store.set_job(job_id, job)
     except Exception as e:
         job = store.get_job(job_id)
         if job:
             job["status"] = "error"
             job["error"] = str(e)
             job["completed_at"] = datetime.now().isoformat()
+            store.set_job(job_id, job)
 
 
 def _enqueue_drive_cleanup(folder_ids: List[str]) -> Optional[str]:

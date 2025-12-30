@@ -93,5 +93,5 @@ Status atual
 - Fase A concluida: paths core, security wrappers, request context, rate limit helpers,
   error helpers, snapshot codec, validators extra, HTTP retry e jobs store/service cobertos.
 - Fase B concluida: SSE de jobs, cache do Drive (enabled/disabled), publish do catalogo,
-  status/bootstrap do catalogo, sync status/items e delete batch da library cobertos.
+  status/bootstrap do catalogo, sync status/items, upload job completion e delete batch da library cobertos.
 - Fase C concluida: e2e com servidor local (health/root/catalog status) validado.
