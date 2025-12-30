@@ -33,8 +33,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useApiUrl } from "@/hooks/use-api-url";
-import { APIURLS } from "@/lib/api-urls";
 import { formatBytes } from "@/lib/utils";
+import {
+  getDriveShareStatus,
+  shareDriveVideo,
+  unshareDriveVideo,
+} from "@/lib/client/api";
 
 interface VideoCardProps {
   id: string;
@@ -107,10 +111,6 @@ export default function VideoCard({
       : null;
 
   const canShare = shareScope === "drive";
-  const shareEndpoint = canShare && apiUrl
-    ? `${apiUrl}/api/${APIURLS.DRIVE_VIDEOS}/${id}/${APIURLS.DRIVE_SHARE}`
-    : null;
-
   const handleDelete = useCallback(() => {
     setShowDeleteDialog(false);
     onDelete();
@@ -174,21 +174,10 @@ export default function VideoCard({
   };
 
   const fetchShareStatus = useCallback(async () => {
-    if (!shareEndpoint) {
-      setShareError("API indisponível.");
-      return;
-    }
-
     try {
       setShareLoading(true);
       setShareError(null);
-      const response = await fetch(shareEndpoint);
-
-      if (!response.ok) {
-        throw new Error("Falha ao carregar compartilhamento");
-      }
-
-      const data = await response.json();
+      const data = await getDriveShareStatus(id);
       const shared = Boolean(data.shared);
       const link = typeof data.link === "string" ? data.link : null;
 
@@ -202,7 +191,7 @@ export default function VideoCard({
     } finally {
       setShareLoading(false);
     }
-  }, [shareEndpoint]);
+  }, [id]);
 
   const handleOpenShareDialog = useCallback(() => {
     setShowShareDialog(true);
@@ -221,28 +210,12 @@ export default function VideoCard({
 
   const handleShareToggle = useCallback(
     async (nextEnabled: boolean) => {
-      if (!shareEndpoint) {
-        setShareError("API indisponível.");
-        return;
-      }
-
       try {
         setShareLoading(true);
         setShareError(null);
-
-        const response = await fetch(shareEndpoint, {
-          method: nextEnabled ? "POST" : "DELETE",
-        });
-
-        if (!response.ok) {
-          throw new Error(
-            nextEnabled
-              ? "Falha ao habilitar compartilhamento"
-              : "Falha ao revogar compartilhamento"
-          );
-        }
-
-        const data = await response.json();
+        const data = nextEnabled
+          ? await shareDriveVideo(id)
+          : await unshareDriveVideo(id);
         const shared = Boolean(data.shared);
         const link = typeof data.link === "string" ? data.link : null;
 
@@ -255,7 +228,7 @@ export default function VideoCard({
         setShareLoading(false);
       }
     },
-    [shareEndpoint]
+    [id]
   );
 
   const handleCopyLink = useCallback(async () => {

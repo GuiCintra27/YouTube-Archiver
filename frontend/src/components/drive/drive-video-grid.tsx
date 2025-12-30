@@ -1,19 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PaginationControls } from "@/components/common/pagination";
 import VideoCard from "@/components/common/videos/video-card";
 import VideoPlayer from "@/components/common/videos/video-player";
-import {
-  Loader2,
-  VideoOff,
-  Cloud,
-  Trash2,
-  X,
-  CheckSquare,
-} from "lucide-react";
+import { Loader2, VideoOff, Cloud, Trash2, X, CheckSquare } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,8 +19,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
+import {
+  deleteDriveVideo,
+  deleteDriveVideosBatch,
+  renameDriveVideo,
+  updateDriveThumbnail,
+} from "@/lib/client/api";
 
-interface DriveVideo {
+export type DriveVideo = {
   id: string;
   name: string;
   path: string;
@@ -36,18 +35,27 @@ interface DriveVideo {
   modified_at: string;
   thumbnail?: string;
   custom_thumbnail_id?: string;
-}
+};
 
 const PAGE_SIZE = 12;
 
-export default function DriveVideoGrid() {
+type DriveVideoGridProps = {
+  initialData?: {
+    videos: DriveVideo[];
+    total: number;
+    page: number;
+  };
+};
+
+export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
   const apiUrl = useApiUrl();
-  const [videos, setVideos] = useState<DriveVideo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [videos, setVideos] = useState<DriveVideo[]>(initialData?.videos || []);
+  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<DriveVideo | null>(null);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(initialData?.page || 1);
+  const [total, setTotal] = useState(initialData?.total || 0);
+  const skipInitialFetch = useRef(Boolean(initialData));
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -95,26 +103,22 @@ export default function DriveVideoGrid() {
   );
 
   useEffect(() => {
+    if (!apiUrl) return;
+    if (skipInitialFetch.current && page === (initialData?.page || 1)) {
+      skipInitialFetch.current = false;
+      return;
+    }
     fetchVideos(page);
-  }, [page, fetchVideos]);
+  }, [page, fetchVideos, apiUrl, initialData?.page, skipInitialFetch]);
 
   const handleDelete = useCallback(
     async (video: DriveVideo) => {
-      if (!apiUrl) return;
-
-      const response = await fetch(
-        `${apiUrl}/api/${APIURLS.DRIVE_VIDEOS}/${video.id}`,
-        { method: "DELETE" }
-      );
-
-      if (!response.ok) {
-        throw new Error("Falha ao excluir vídeo");
-      }
+      await deleteDriveVideo(video.id);
 
       await fetchVideos(page);
       setSelectedVideo(null);
     },
-    [apiUrl, page, fetchVideos]
+    [page, fetchVideos]
   );
 
   // Selection handlers
@@ -139,26 +143,13 @@ export default function DriveVideoGrid() {
   }, []);
 
   const handleBatchDeleteConfirm = useCallback(async () => {
-    if (deleting || selectedIds.size === 0 || !apiUrl) return;
+    if (deleting || selectedIds.size === 0) return;
 
     try {
       setDeleting(true);
-      const response = await fetch(
-        `${apiUrl}/api/${APIURLS.DRIVE_DELETE_BATCH}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(Array.from(selectedIds)),
-        }
-      );
+      const result = await deleteDriveVideosBatch(Array.from(selectedIds));
 
-      if (!response.ok) {
-        throw new Error("Falha ao excluir vídeos");
-      }
-
-      const result = await response.json();
-
-      if (result.total_failed > 0) {
+      if (!!result.total_failed && result.total_failed > 0) {
         setError(
           `${result.total_deleted} excluídos, ${result.total_failed} falhas`
         );
@@ -173,7 +164,7 @@ export default function DriveVideoGrid() {
     } finally {
       setDeleting(false);
     }
-  }, [selectedIds, apiUrl, page, fetchVideos, deleting]);
+  }, [selectedIds, page, fetchVideos, deleting]);
 
   const handleBatchDialogChange = useCallback(
     (open: boolean) => {
@@ -185,44 +176,18 @@ export default function DriveVideoGrid() {
 
   const handleEdit = useCallback(
     async (video: DriveVideo, newTitle: string, newThumbnail?: File) => {
-      if (!apiUrl) return;
-
       try {
         // Get current name without extension for comparison
         const currentBaseName = video.name.replace(/\.[^/.]+$/, "");
 
         // Rename if title changed
         if (newTitle !== currentBaseName) {
-          const renameResponse = await fetch(
-            `${apiUrl}/api/${APIURLS.DRIVE_VIDEOS}/${video.id}/rename`,
-            {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ new_name: newTitle }),
-            }
-          );
-
-          if (!renameResponse.ok) {
-            throw new Error("Falha ao renomear vídeo");
-          }
+          await renameDriveVideo(video.id, newTitle);
         }
 
         // Update thumbnail if provided
         if (newThumbnail) {
-          const formData = new FormData();
-          formData.append("thumbnail", newThumbnail);
-
-          const thumbnailResponse = await fetch(
-            `${apiUrl}/api/${APIURLS.DRIVE_VIDEOS}/${video.id}/thumbnail`,
-            {
-              method: "POST",
-              body: formData,
-            }
-          );
-
-          if (!thumbnailResponse.ok) {
-            throw new Error("Falha ao atualizar thumbnail");
-          }
+          await updateDriveThumbnail(video.id, newThumbnail);
         }
 
         // Refresh the video list
@@ -233,7 +198,7 @@ export default function DriveVideoGrid() {
         throw err;
       }
     },
-    [apiUrl, page, fetchVideos]
+    [page, fetchVideos]
   );
 
   // Helper to get thumbnail URL for Drive videos
@@ -282,7 +247,9 @@ export default function DriveVideoGrid() {
               <div className="w-12 h-12 rounded-full bg-cyan/10 flex items-center justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-cyan" />
               </div>
-              <p className="text-sm text-muted-foreground">Carregando vídeos do Drive...</p>
+              <p className="text-sm text-muted-foreground">
+                Carregando vídeos do Drive...
+              </p>
             </div>
           </div>
         ) : error ? (
@@ -323,7 +290,9 @@ export default function DriveVideoGrid() {
                 selected={selectedIds.has(video.id)}
                 onSelectionChange={() => toggleSelection(video.id)}
                 editable={true}
-                onEdit={(newTitle, newThumbnail) => handleEdit(video, newTitle, newThumbnail)}
+                onEdit={(newTitle, newThumbnail) =>
+                  handleEdit(video, newTitle, newThumbnail)
+                }
                 shareScope="drive"
               />
             ))}

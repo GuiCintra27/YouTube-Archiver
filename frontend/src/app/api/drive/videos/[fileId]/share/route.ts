@@ -1,0 +1,30 @@
+import { CACHE_TAG_SETS } from "@/lib/server/tags";
+import { buildBackendUrl, proxyJson, proxyJsonWithRevalidate } from "@/lib/server/route-utils";
+
+type Params = {
+  fileId: string;
+};
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Params }
+) {
+  const url = buildBackendUrl(`/api/drive/videos/${params.fileId}/share`);
+  return proxyJson(url, { method: "GET" });
+}
+
+export async function POST(
+  _request: Request,
+  { params }: { params: Params }
+) {
+  const url = buildBackendUrl(`/api/drive/videos/${params.fileId}/share`);
+  return proxyJsonWithRevalidate(url, { method: "POST" }, CACHE_TAG_SETS.DRIVE_MUTATION);
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Params }
+) {
+  const url = buildBackendUrl(`/api/drive/videos/${params.fileId}/share`);
+  return proxyJsonWithRevalidate(url, { method: "DELETE" }, CACHE_TAG_SETS.DRIVE_MUTATION);
+}

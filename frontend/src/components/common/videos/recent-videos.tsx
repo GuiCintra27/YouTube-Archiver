@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Loader2, VideoOff, LibraryBig, Play } from "lucide-react";
 import VideoCard from "@/components/common/videos/video-card";
@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PATHS } from "@/lib/paths";
 import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
+import { deleteLocalVideo } from "@/lib/client/api";
 
 interface Video {
   id: string;
@@ -27,6 +28,7 @@ interface RecentVideosProps {
   refreshToken?: number;
   ctaLabel?: string;
   ctaHref?: string;
+  initialData?: Video[];
 }
 
 export default function RecentVideos({
@@ -35,12 +37,14 @@ export default function RecentVideos({
   refreshToken,
   ctaLabel = "Ver biblioteca completa",
   ctaHref = PATHS.LIBRARY,
+  initialData,
 }: RecentVideosProps) {
   const apiUrl = useApiUrl();
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [videos, setVideos] = useState<Video[]>(initialData || []);
+  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  const skipInitialFetch = useRef(Boolean(initialData));
 
   const fetchVideos = useCallback(async () => {
     if (!apiUrl) return;
@@ -62,8 +66,13 @@ export default function RecentVideos({
   }, [apiUrl, limit]);
 
   useEffect(() => {
+    if (!apiUrl) return;
+    if (skipInitialFetch.current && !refreshToken) {
+      skipInitialFetch.current = false;
+      return;
+    }
     fetchVideos();
-  }, [fetchVideos, refreshToken]);
+  }, [fetchVideos, refreshToken, apiUrl, skipInitialFetch]);
 
   useEffect(() => {
     const handleRefresh = () => {
@@ -77,20 +86,15 @@ export default function RecentVideos({
 
   const handleDelete = useCallback(
     async (video: Video) => {
-      if (!apiUrl) return;
       try {
-        const response = await fetch(
-          `${apiUrl}/api/${APIURLS.VIDEOS}/${encodeURIComponent(video.path)}`,
-          { method: "DELETE" }
-        );
-        if (!response.ok) throw new Error("Falha ao excluir vídeo");
+        await deleteLocalVideo(video.path);
         setVideos((prev) => prev.filter((v) => v.id !== video.id));
         setSelectedVideo((prev) => (prev?.id === video.id ? null : prev));
       } catch (err) {
         console.error("Erro ao excluir vídeo:", err);
       }
     },
-    [apiUrl]
+    []
   );
 
   return (

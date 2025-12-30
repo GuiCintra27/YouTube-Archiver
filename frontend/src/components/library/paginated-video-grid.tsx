@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import VideoCard from "@/components/common/videos/video-card";
 import VideoPlayer from "@/components/common/videos/video-player";
 import { PaginationControls } from "@/components/common/pagination";
@@ -27,6 +27,12 @@ import {
 } from "lucide-react";
 import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
+import {
+  deleteLocalVideo,
+  deleteLocalVideosBatch,
+  renameLocalVideo,
+  updateLocalThumbnail,
+} from "@/lib/client/api";
 
 interface Video {
   id: string;
@@ -42,14 +48,25 @@ interface Video {
 
 const PAGE_SIZE = 12;
 
-export default function PaginatedVideoGrid() {
+type PaginatedVideoGridProps = {
+  initialData?: {
+    videos: Video[];
+    total: number;
+    page: number;
+  };
+};
+
+export default function PaginatedVideoGrid({
+  initialData,
+}: PaginatedVideoGridProps) {
   const apiUrl = useApiUrl();
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [videos, setVideos] = useState<Video[]>(initialData?.videos || []);
+  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(initialData?.page || 1);
+  const [total, setTotal] = useState(initialData?.total || 0);
+  const skipInitialFetch = useRef(Boolean(initialData));
 
   // Selection state
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
@@ -87,21 +104,18 @@ export default function PaginatedVideoGrid() {
   );
 
   useEffect(() => {
+    if (!apiUrl) return;
+    if (skipInitialFetch.current && page === (initialData?.page || 1)) {
+      skipInitialFetch.current = false;
+      return;
+    }
     fetchVideos(page);
-  }, [fetchVideos, page]);
+  }, [fetchVideos, page, apiUrl, initialData?.page]);
 
   const handleDelete = useCallback(
     async (video: Video) => {
-      if (!apiUrl) return;
       try {
-        const response = await fetch(
-          `${apiUrl}/api/${APIURLS.VIDEOS}/${encodeURIComponent(video.path)}`,
-          { method: "DELETE" }
-        );
-
-        if (!response.ok) {
-          throw new Error("Falha ao excluir vídeo");
-        }
+        await deleteLocalVideo(video.path);
 
         // Recarregar página atual
         fetchVideos(page);
@@ -112,7 +126,7 @@ export default function PaginatedVideoGrid() {
         setError(err instanceof Error ? err.message : "Erro ao excluir vídeo");
       }
     },
-    [apiUrl, page, fetchVideos]
+    [page, fetchVideos]
   );
 
   // Selection handlers
@@ -137,26 +151,13 @@ export default function PaginatedVideoGrid() {
   }, []);
 
   const handleBatchDeleteConfirm = useCallback(async () => {
-    if (deleting || selectedPaths.size === 0 || !apiUrl) return;
+    if (deleting || selectedPaths.size === 0) return;
 
     try {
       setDeleting(true);
-      const response = await fetch(
-        `${apiUrl}/api/${APIURLS.VIDEOS_DELETE_BATCH}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(Array.from(selectedPaths)),
-        }
-      );
+      const result = await deleteLocalVideosBatch(Array.from(selectedPaths));
 
-      if (!response.ok) {
-        throw new Error("Falha ao excluir vídeos");
-      }
-
-      const result = await response.json();
-
-      if (result.total_failed > 0) {
+      if (!!result.total_failed && result.total_failed > 0) {
         setError(
           `${result.total_deleted} excluídos, ${result.total_failed} falhas`
         );
@@ -171,7 +172,7 @@ export default function PaginatedVideoGrid() {
     } finally {
       setDeleting(false);
     }
-  }, [selectedPaths, apiUrl, page, fetchVideos, deleting]);
+  }, [selectedPaths, page, fetchVideos, deleting]);
 
   const handleBatchDialogChange = useCallback(
     (open: boolean) => {
@@ -183,45 +184,16 @@ export default function PaginatedVideoGrid() {
 
   const handleEdit = useCallback(
     async (video: Video, newTitle: string, newThumbnail?: File) => {
-      if (!apiUrl) return;
-
       try {
         // Rename if title changed
         if (newTitle !== video.title) {
-          const renameResponse = await fetch(
-            `${apiUrl}/api/${APIURLS.VIDEOS_RENAME}/${encodeURIComponent(video.path)}`,
-            {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ new_name: newTitle }),
-            }
-          );
-
-          if (!renameResponse.ok) {
-            throw new Error("Falha ao renomear vídeo");
-          }
-
-          // Get the new path from the response
-          const renameResult = await renameResponse.json();
+          const renameResult = await renameLocalVideo(video.path, newTitle);
           video.path = renameResult.new_path || video.path;
         }
 
         // Update thumbnail if provided
         if (newThumbnail) {
-          const formData = new FormData();
-          formData.append("thumbnail", newThumbnail);
-
-          const thumbnailResponse = await fetch(
-            `${apiUrl}/api/${APIURLS.VIDEOS_UPDATE_THUMBNAIL}/${encodeURIComponent(video.path)}`,
-            {
-              method: "POST",
-              body: formData,
-            }
-          );
-
-          if (!thumbnailResponse.ok) {
-            throw new Error("Falha ao atualizar thumbnail");
-          }
+          await updateLocalThumbnail(video.path, newThumbnail);
         }
 
         // Refresh the video list
@@ -232,7 +204,7 @@ export default function PaginatedVideoGrid() {
         throw err;
       }
     },
-    [apiUrl, page, fetchVideos]
+    [page, fetchVideos]
   );
 
   const hasSelection = selectedPaths.size > 0;
@@ -270,7 +242,9 @@ export default function PaginatedVideoGrid() {
               <div className="w-12 h-12 rounded-full bg-teal/10 flex items-center justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-teal" />
               </div>
-              <p className="text-sm text-muted-foreground">Carregando vídeos...</p>
+              <p className="text-sm text-muted-foreground">
+                Carregando vídeos...
+              </p>
             </div>
           </div>
         ) : error ? (
