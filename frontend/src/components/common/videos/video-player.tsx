@@ -83,7 +83,15 @@ export default function VideoPlayer({
   const [error, setError] = useState<string | null>(null);
 
   // Global player context (volume é sincronizado via props do MediaPlayer)
-  const { playVideo, stopVideo, isActive, volume, isMuted, setVolume, setMuted } = useGlobalPlayer();
+  const {
+    playVideo,
+    stopVideo,
+    isActive,
+    volume,
+    isMuted,
+    setVolume,
+    setMuted,
+  } = useGlobalPlayer();
   const playerRef = useRef<MediaPlayerInstance>(null);
 
   // Parar o player global quando o modal é aberto (evita dois vídeos tocando)
@@ -128,13 +136,12 @@ export default function VideoPlayer({
     setError(null);
     try {
       await onDelete();
-      setDeleteDialogOpen(false);
       onClose();
     } catch (err) {
       console.error("Error deleting video:", err);
       setError("Erro ao excluir vídeo. Tente novamente.");
-      setDeleteDialogOpen(false);
     } finally {
+      setDeleteDialogOpen(false);
       setDeleting(false);
     }
   };
@@ -251,7 +258,9 @@ export default function VideoPlayer({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {source === "drive" ? "Excluir vídeo do Drive?" : "Excluir vídeo?"}
+              {source === "drive"
+                ? "Excluir vídeo do Drive?"
+                : "Excluir vídeo?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {deleteDialogDescription}
@@ -260,7 +269,10 @@ export default function VideoPlayer({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={(event) => {
+                event.preventDefault();
+                handleDelete();
+              }}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

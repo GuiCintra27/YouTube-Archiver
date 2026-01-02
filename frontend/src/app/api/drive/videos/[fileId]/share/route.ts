@@ -1,4 +1,4 @@
-import { CACHE_TAG_SETS } from "@/lib/server/tags";
+import { CACHE_TAGS } from "@/lib/server/tags";
 import { buildBackendUrl, proxyJson, proxyJsonWithRevalidate } from "@/lib/server/route-utils";
 
 type Params = {
@@ -22,7 +22,7 @@ export async function POST(
   const { fileId } = await params;
   const resolvedFileId = Array.isArray(fileId) ? fileId[0] : fileId;
   const url = buildBackendUrl(`/api/drive/videos/${resolvedFileId ?? ""}/share`);
-  return proxyJsonWithRevalidate(url, { method: "POST" }, CACHE_TAG_SETS.DRIVE_MUTATION);
+  return proxyJsonWithRevalidate(url, { method: "POST" }, [CACHE_TAGS.DRIVE_VIDEOS]);
 }
 
 export async function DELETE(
@@ -32,5 +32,5 @@ export async function DELETE(
   const { fileId } = await params;
   const resolvedFileId = Array.isArray(fileId) ? fileId[0] : fileId;
   const url = buildBackendUrl(`/api/drive/videos/${resolvedFileId ?? ""}/share`);
-  return proxyJsonWithRevalidate(url, { method: "DELETE" }, CACHE_TAG_SETS.DRIVE_MUTATION);
+  return proxyJsonWithRevalidate(url, { method: "DELETE" }, [CACHE_TAGS.DRIVE_VIDEOS]);
 }

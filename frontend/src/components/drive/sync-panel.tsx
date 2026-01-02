@@ -395,6 +395,7 @@ export default function SyncPanel() {
         if (job.status === "completed" && job.result) {
           const { uploaded, failed } = job.result;
           await fetchSyncStatus();
+          await fetch("/api/revalidate/drive-videos", { method: "POST" });
 
           if (failed.length > 0) {
             setSuccessMessage(
@@ -461,6 +462,7 @@ export default function SyncPanel() {
 
           if (job.status === "completed") {
             await fetchSyncStatus();
+            await fetch("/api/revalidate/drive-videos", { method: "POST" });
             setSuccessMessage("Upload concluído com sucesso!");
           } else if (job.status === "error") {
             setError(job.error || "Erro no upload");
@@ -568,6 +570,8 @@ export default function SyncPanel() {
           const downloaded = job.result.downloaded || 0;
           const failed = job.result.failed || [];
           await fetchSyncStatus();
+          await fetch("/api/revalidate/local-videos", { method: "POST" });
+          await fetch("/api/revalidate/drive-videos", { method: "POST" });
 
           if (failed.length > 0) {
             setSuccessMessage(
@@ -644,6 +648,8 @@ export default function SyncPanel() {
 
           if (job.status === "completed") {
             await fetchSyncStatus();
+            await fetch("/api/revalidate/local-videos", { method: "POST" });
+            await fetch("/api/revalidate/drive-videos", { method: "POST" });
             setSuccessMessage("Download concluído com sucesso!");
           } else if (job.status === "error") {
             setError(job.error || "Erro no download");

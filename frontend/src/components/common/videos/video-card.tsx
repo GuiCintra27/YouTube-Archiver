@@ -1,7 +1,22 @@
 "use client";
 
 import { useState, useCallback, useRef, memo } from "react";
-import { Trash2, Play, MoreVertical, Info, Clock, HardDrive, Calendar, FileVideo, Pencil, Loader2, ImageIcon, Share2, Copy, Check } from "lucide-react";
+import {
+  Trash2,
+  Play,
+  MoreVertical,
+  Info,
+  Clock,
+  HardDrive,
+  Calendar,
+  FileVideo,
+  Pencil,
+  Loader2,
+  ImageIcon,
+  Share2,
+  Copy,
+  Check,
+} from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -51,7 +66,7 @@ interface VideoCardProps {
   size?: number;
   createdAt?: string;
   onPlay: () => void;
-  onDelete: () => void;
+  onDelete: () => void | Promise<void>;
   deleteScope?: "local" | "drive";
   // Optional selection props
   selectable?: boolean;
@@ -97,6 +112,7 @@ function VideoCardComponent({
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Edit form state
   const [editTitle, setEditTitle] = useState(title);
@@ -109,13 +125,21 @@ function VideoCardComponent({
   const thumbnailUrl = externalThumbnailUrl
     ? externalThumbnailUrl
     : thumbnail && apiUrl
-      ? `${apiUrl}/api/videos/thumbnail/${encodeURIComponent(thumbnail)}`
-      : null;
+    ? `${apiUrl}/api/videos/thumbnail/${encodeURIComponent(thumbnail)}`
+    : null;
 
   const canShare = shareScope === "drive";
-  const handleDelete = useCallback(() => {
-    setShowDeleteDialog(false);
-    onDelete();
+  const handleDelete = useCallback(async () => {
+    try {
+      const result = onDelete();
+      if (result && typeof (result as Promise<void>).then === "function") {
+        setIsDeleting(true);
+        await result;
+      }
+    } finally {
+      setShowDeleteDialog(false);
+      setIsDeleting(false);
+    }
   }, [onDelete]);
 
   const handleOpenEditDialog = useCallback(() => {
@@ -125,15 +149,18 @@ function VideoCardComponent({
     setShowEditDialog(true);
   }, [title]);
 
-  const handleThumbnailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setEditThumbnail(file);
-      // Create preview URL
-      const previewUrl = URL.createObjectURL(file);
-      setThumbnailPreview(previewUrl);
-    }
-  }, []);
+  const handleThumbnailChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        setEditThumbnail(file);
+        // Create preview URL
+        const previewUrl = URL.createObjectURL(file);
+        setThumbnailPreview(previewUrl);
+      }
+    },
+    []
+  );
 
   const handleSaveEdit = useCallback(async () => {
     if (!onEdit) return;
@@ -248,9 +275,7 @@ function VideoCardComponent({
     <>
       <div
         className={`group relative flex flex-col cursor-pointer glass-card rounded-xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:border-white/20 ${
-          selected
-            ? "ring-2 ring-teal/50 border-teal/30"
-            : ""
+          selected ? "ring-2 ring-teal/50 border-teal/30" : ""
         }`}
         onClick={handleCardClick}
       >
@@ -336,7 +361,10 @@ function VideoCardComponent({
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="glass border-white/10">
+              <DropdownMenuContent
+                align="end"
+                className="glass border-white/10"
+              >
                 {editable && (
                   <DropdownMenuItem
                     onClick={handleOpenEditDialog}
@@ -406,7 +434,8 @@ function VideoCardComponent({
               id="video-info-description"
               className="text-xs text-muted-foreground"
             >
-              Consulte detalhes como tamanho, data de criação e duração do vídeo.
+              Consulte detalhes como tamanho, data de criação e duração do
+              vídeo.
             </p>
 
             {/* Grid de informações */}
@@ -428,7 +457,9 @@ function VideoCardComponent({
                   <HardDrive className="h-4 w-4 text-purple mt-0.5" />
                   <div>
                     <p className="text-xs text-muted-foreground">Tamanho</p>
-                    <p className="text-sm font-medium text-white">{formatBytes(size)}</p>
+                    <p className="text-sm font-medium text-white">
+                      {formatBytes(size)}
+                    </p>
                   </div>
                 </div>
               )}
@@ -439,8 +470,12 @@ function VideoCardComponent({
               <div className="flex items-start gap-3 p-3 rounded-lg bg-white/5">
                 <Calendar className="h-4 w-4 text-yellow mt-0.5" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Data de download</p>
-                  <p className="text-sm font-medium text-white">{formatDate(createdAt)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Data de download
+                  </p>
+                  <p className="text-sm font-medium text-white">
+                    {formatDate(createdAt)}
+                  </p>
                 </div>
               </div>
             )}
@@ -462,20 +497,20 @@ function VideoCardComponent({
           className="sm:max-w-md glass border-white/10"
           aria-describedby="video-share-description"
         >
-          <DialogHeader>
-            <DialogTitle
-              id="video-share-title"
-              className="flex items-center gap-2 text-white"
-            >
-              <Share2 className="h-5 w-5 text-cyan" />
-              Opções de compartilhamento
-            </DialogTitle>
-          </DialogHeader>
+          <DialogTitle
+            id="video-share-title"
+            className="flex items-center gap-2 text-white"
+          >
+            <Share2 className="h-5 w-5 text-cyan" />
+            Opções de compartilhamento
+          </DialogTitle>
 
           <div className="space-y-4 pt-2">
             <div className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/5 p-4">
               <div className="space-y-1">
-                <p className="text-sm font-medium text-white">Compartilhável publicamente</p>
+                <p className="text-sm font-medium text-white">
+                  Compartilhável publicamente
+                </p>
                 <p className="text-xs text-muted-foreground">
                   Qualquer pessoa com o link poderá visualizar.
                 </p>
@@ -518,9 +553,7 @@ function VideoCardComponent({
               </div>
             </div>
 
-            {shareError && (
-              <p className="text-xs text-red-400">{shareError}</p>
-            )}
+            {shareError && <p className="text-xs text-red-400">{shareError}</p>}
 
             {shareLoading && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -534,7 +567,8 @@ function VideoCardComponent({
               acesso quando quiser.
             </p>
             <p id="video-share-description" className="sr-only">
-              Gerencie se o vídeo fica público e copie o link de compartilhamento.
+              Gerencie se o vídeo fica público e copie o link de
+              compartilhamento.
             </p>
           </div>
         </DialogContent>
@@ -544,7 +578,9 @@ function VideoCardComponent({
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="glass border-white/10">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Excluir vídeo?</AlertDialogTitle>
+            <AlertDialogTitle className="text-white">
+              Excluir vídeo?
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
               {deleteScope === "drive"
                 ? `Esta ação não poderá ser desfeita. O vídeo "${title}" será permanentemente excluído do Google Drive.`
@@ -552,14 +588,28 @@ function VideoCardComponent({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white">
+            <AlertDialogCancel
+              disabled={isDeleting}
+              className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white"
+            >
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={(event) => {
+                event.preventDefault();
+                handleDelete();
+              }}
+              disabled={isDeleting}
               className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
             >
-              Excluir
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                "Excluir"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -578,7 +628,9 @@ function VideoCardComponent({
           <div className="space-y-6 pt-2">
             {/* Nome do vídeo */}
             <div className="space-y-2">
-              <Label htmlFor="video-title" className="text-white">Nome do video</Label>
+              <Label htmlFor="video-title" className="text-white">
+                Nome do video
+              </Label>
               <Input
                 id="video-title"
                 value={editTitle}
@@ -614,7 +666,9 @@ function VideoCardComponent({
                       unoptimized
                     />
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                      <p className="text-white text-sm font-medium">Clique para alterar</p>
+                      <p className="text-white text-sm font-medium">
+                        Clique para alterar
+                      </p>
                     </div>
                   </div>
                 ) : thumbnailUrl ? (
@@ -627,13 +681,17 @@ function VideoCardComponent({
                       className="object-cover"
                     />
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                      <p className="text-white text-sm font-medium">Clique para alterar</p>
+                      <p className="text-white text-sm font-medium">
+                        Clique para alterar
+                      </p>
                     </div>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
                     <ImageIcon className="h-10 w-10 mb-2" />
-                    <p className="text-sm font-medium">Clique para selecionar uma imagem</p>
+                    <p className="text-sm font-medium">
+                      Clique para selecionar uma imagem
+                    </p>
                     <p className="text-xs">JPG, PNG ou WebP</p>
                   </div>
                 )}

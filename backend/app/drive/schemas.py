@@ -124,7 +124,7 @@ class DriveRenameResponse(BaseModel):
     message: Optional[str] = None
     file_id: str
     new_name: str
-    renamed_related: List[Dict[str, Any]]
+    renamed_related: List[str]
 
 
 class DriveThumbnailUpdateResponse(BaseModel):

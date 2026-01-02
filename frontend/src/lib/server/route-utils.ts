@@ -1,6 +1,15 @@
 import { revalidateTag } from "next/cache";
 
 const DEFAULT_API_URL = "http://localhost:8000";
+const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+function getRequestMethod(init?: RequestInit): string {
+  return (init?.method ?? "GET").toUpperCase();
+}
+
+function isMutationMethod(method: string): boolean {
+  return MUTATION_METHODS.has(method);
+}
 
 export function getBackendBaseUrl(): string {
   return process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL;
@@ -12,7 +21,7 @@ export function buildBackendUrl(path: string): string {
   return `${base}${suffix}`;
 }
 
-export async function proxyJson(url: string, init: RequestInit): Promise<Response> {
+async function proxyJsonInternal(url: string, init: RequestInit): Promise<Response> {
   const response = await fetch(url, {
     ...init,
     cache: "no-store",
@@ -29,6 +38,14 @@ export async function proxyJson(url: string, init: RequestInit): Promise<Respons
     status: response.status,
     headers,
   });
+}
+
+export async function proxyJson(url: string, init: RequestInit): Promise<Response> {
+  const method = getRequestMethod(init);
+  if (isMutationMethod(method)) {
+    throw new Error(`Use proxyJsonWithRevalidate for ${method} requests`);
+  }
+  return proxyJsonInternal(url, init);
 }
 
 export function revalidateTags(tags: readonly string[]) {
@@ -56,7 +73,11 @@ export async function proxyJsonWithRevalidate(
   init: RequestInit,
   tags: readonly string[]
 ): Promise<Response> {
-  const response = await proxyJson(url, init);
+  const method = getRequestMethod(init);
+  if (isMutationMethod(method) && (!tags || tags.length === 0)) {
+    throw new Error(`Missing cache tags for ${method} request`);
+  }
+  const response = await proxyJsonInternal(url, init);
   if (response.ok) {
     revalidateTags(tags);
   }

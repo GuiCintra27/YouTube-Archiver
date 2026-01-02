@@ -1,4 +1,4 @@
-import { CACHE_TAG_SETS } from "@/lib/server/tags";
+import { CACHE_TAGS } from "@/lib/server/tags";
 import { buildBackendUrl, proxyJsonWithRevalidate } from "@/lib/server/route-utils";
 
 export async function POST(request: Request) {
@@ -12,6 +12,6 @@ export async function POST(request: Request) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     },
-    CACHE_TAG_SETS.DRIVE_MUTATION
+    [CACHE_TAGS.DRIVE_VIDEOS]
   );
 }

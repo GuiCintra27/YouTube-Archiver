@@ -126,7 +126,7 @@ export default function PaginatedVideoGrid({
         await deleteLocalVideo(video.path);
 
         // Recarregar página atual
-        fetchVideos(page);
+        await fetchVideos(page);
 
         setSelectedVideo((prev) => (prev?.id === video.id ? null : prev));
       } catch (err) {
@@ -178,6 +178,9 @@ export default function PaginatedVideoGrid({
         );
       }
 
+      const selectedSet = new Set(selectedPathsArray);
+      setVideos((prev) => prev.filter((item) => !selectedSet.has(item.path)));
+      setTotal((prev) => Math.max(0, prev - selectedPathsArray.length));
       await fetchVideos(page);
       setBatchDeleteDialogOpen(false);
       setSelectedPaths(new Set());
@@ -221,7 +224,6 @@ export default function PaginatedVideoGrid({
     },
     [page, fetchVideos]
   );
-
 
   return (
     <>
@@ -382,8 +384,8 @@ export default function PaginatedVideoGrid({
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
               Tem certeza que deseja excluir {selectedCount}{" "}
-              {selectedCount === 1 ? "vídeo" : "vídeos"} da biblioteca?
-              Esta ação não pode ser desfeita.
+              {selectedCount === 1 ? "vídeo" : "vídeos"} da biblioteca? Esta
+              ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

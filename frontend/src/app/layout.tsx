@@ -79,7 +79,7 @@ export default function RootLayout({
             </header>
 
             {/* Main Content */}
-            <main className="relative pt-20 md:pt-24">
+            <main className="relative pt-20 md:pt-24 pb-4 md:pb-6">
               {children}
             </main>
 
@@ -88,10 +88,14 @@ export default function RootLayout({
               <div className="container mx-auto px-4 py-8">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span className="gradient-teal-text font-semibold">YT-Archiver</span>
+                    <span className="gradient-teal-text font-semibold">
+                      YT-Archiver
+                    </span>
                     <span>v2.4</span>
                     <span className="hidden sm:inline">|</span>
-                    <span className="hidden sm:inline">Arquivamento local de conteudo publico</span>
+                    <span className="hidden sm:inline">
+                      Arquivamento local de conteudo publico
+                    </span>
                   </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <a

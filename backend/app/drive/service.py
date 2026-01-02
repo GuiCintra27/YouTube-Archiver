@@ -586,6 +586,8 @@ async def _run_batch_upload_job(job_id: str, base_dir: str) -> None:
                     if current_job:
                         current_job["progress"]["current_file"] = video_path
                         current_job["progress"]["files_in_progress"] = files_in_progress.copy()
+                        store.set_job(job_id, current_job)
+                        store.set_job(job_id, current_job)
 
                 try:
                     # Upload usando thread para não bloquear event loop
@@ -1592,6 +1594,7 @@ def _update_download_progress(job_id: str, progress: Dict) -> None:
         job["progress"] = progress
         if progress.get("status") == "downloading":
             job["status"] = "downloading"
+        store.set_job(job_id, job)
 
 
 def _complete_download_job(job_id: str, result: Dict) -> None:
@@ -1603,3 +1606,4 @@ def _complete_download_job(job_id: str, result: Dict) -> None:
         job["progress"]["status"] = "completed"
         job["progress"]["percent"] = 100
         job["completed_at"] = datetime.now().isoformat()
+        store.set_job(job_id, job)

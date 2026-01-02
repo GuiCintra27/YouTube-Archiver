@@ -261,6 +261,7 @@ export default function ExternalUploadModal({
         setUploadProgress(null);
 
         if (job.status === "completed") {
+          await fetch("/api/revalidate/drive-videos", { method: "POST" });
           setSuccess(true);
           setVideoFile(null);
           setThumbnail(null);

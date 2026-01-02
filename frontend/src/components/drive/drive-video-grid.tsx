@@ -70,6 +70,7 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -122,12 +123,23 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
 
   const handleDelete = useCallback(
     async (video: DriveVideo) => {
-      await deleteDriveVideo(video.id);
+      if (deletingId) return;
 
-      await fetchVideos(page);
-      setSelectedVideo(null);
+      setDeletingId(video.id);
+
+      try {
+        await deleteDriveVideo(video.id);
+        await fetchVideos(page);
+        setSelectedIds(new Set());
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Erro ao excluir vídeo");
+        throw err;
+      } finally {
+        setDeletingId(null);
+        setSelectedVideo(null);
+      }
     },
-    [page, fetchVideos]
+    [deletingId, page, fetchVideos]
   );
 
   // Selection handlers
@@ -227,7 +239,6 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
     }
     return undefined;
   };
-
 
   return (
     <>
@@ -390,8 +401,8 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
               Tem certeza que deseja excluir {selectedCount}{" "}
-              {selectedCount === 1 ? "vídeo" : "vídeos"} do Google Drive?
-              Esta ação não pode ser desfeita.
+              {selectedCount === 1 ? "vídeo" : "vídeos"} do Google Drive? Esta
+              ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
