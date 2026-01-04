@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -65,6 +66,8 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
   const [page, setPage] = useState(initialData?.page || 1);
   const [total, setTotal] = useState(initialData?.total || 0);
   const skipInitialFetch = useRef(Boolean(initialData));
+  const [thumbnailBusters, setThumbnailBusters] = useState<Record<string, string>>({});
+  const router = useRouter();
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -81,7 +84,8 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
         setLoading(true);
         setError(null);
         const response = await fetch(
-          `${apiUrl}/api/${APIURLS.DRIVE_VIDEOS}?page=${pageNumber}&limit=${PAGE_SIZE}`
+          `${apiUrl}/api/${APIURLS.DRIVE_VIDEOS}?page=${pageNumber}&limit=${PAGE_SIZE}`,
+          { cache: "no-store" }
         );
 
         if (!response.ok) {
@@ -120,6 +124,15 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
     }
     fetchVideos(page);
   }, [page, fetchVideos, apiUrl, initialData?.page, skipInitialFetch]);
+
+  useEffect(() => {
+    if (!initialData) return;
+    const initialPage = initialData.page || 1;
+    if (page !== initialPage) return;
+    setVideos(initialData.videos || []);
+    setTotal(initialData.total || 0);
+    setLoading(false);
+  }, [initialData, page]);
 
   const handleDelete = useCallback(
     async (video: DriveVideo) => {
@@ -216,17 +229,22 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
         // Update thumbnail if provided
         if (newThumbnail) {
           await updateDriveThumbnail(video.id, newThumbnail);
+          setThumbnailBusters((prev) => ({
+            ...prev,
+            [video.id]: Date.now().toString(),
+          }));
         }
 
-        // Refresh the video list
+        // Refresh the video list + SSR data
         await fetchVideos(page);
+        router.refresh();
       } catch (err) {
         console.error("Erro ao editar vídeo:", err);
         setError(err instanceof Error ? err.message : "Erro ao editar vídeo");
         throw err;
       }
     },
-    [page, fetchVideos]
+    [page, fetchVideos, router]
   );
 
   // Helper to get thumbnail URL for Drive videos
@@ -307,6 +325,7 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
                 channel={video.path}
                 path={video.path}
                 thumbnailUrl={getThumbnailUrl(video)}
+                thumbnailCacheKey={thumbnailBusters[video.id]}
                 size={video.size}
                 createdAt={video.created_at}
                 onPlay={() => setSelectedVideo(video)}

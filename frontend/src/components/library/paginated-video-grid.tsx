@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import VideoCard from "@/components/common/videos/video-card";
 import VideoPlayerLoading from "@/components/common/videos/video-player-loading";
@@ -75,6 +76,8 @@ export default function PaginatedVideoGrid({
   const [page, setPage] = useState(initialData?.page || 1);
   const [total, setTotal] = useState(initialData?.total || 0);
   const skipInitialFetch = useRef(Boolean(initialData));
+  const [thumbnailBusters, setThumbnailBusters] = useState<Record<string, string>>({});
+  const router = useRouter();
 
   // Selection state
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
@@ -90,7 +93,8 @@ export default function PaginatedVideoGrid({
         setLoading(true);
         setError(null);
         const response = await fetch(
-          `${apiUrl}/api/${APIURLS.VIDEOS}?page=${pageNumber}&limit=${PAGE_SIZE}`
+          `${apiUrl}/api/${APIURLS.VIDEOS}?page=${pageNumber}&limit=${PAGE_SIZE}`,
+          { cache: "no-store" }
         );
 
         if (!response.ok) {
@@ -120,10 +124,22 @@ export default function PaginatedVideoGrid({
     fetchVideos(page);
   }, [fetchVideos, page, apiUrl, initialData?.page]);
 
+  useEffect(() => {
+    if (!initialData) return;
+    const initialPage = initialData.page || 1;
+    if (page !== initialPage) return;
+    setVideos(initialData.videos || []);
+    setTotal(initialData.total || 0);
+    setLoading(false);
+  }, [initialData, page]);
+
   const handleDelete = useCallback(
     async (video: Video) => {
       try {
         await deleteLocalVideo(video.path);
+
+        setVideos((prev) => prev.filter((item) => item.id !== video.id));
+        setTotal((prev) => Math.max(0, prev - 1));
 
         // Recarregar página atual
         await fetchVideos(page);
@@ -134,7 +150,7 @@ export default function PaginatedVideoGrid({
         setError(err instanceof Error ? err.message : "Erro ao excluir vídeo");
       }
     },
-    [page, fetchVideos]
+    [page, fetchVideos, router]
   );
 
   // Selection handlers
@@ -204,18 +220,25 @@ export default function PaginatedVideoGrid({
     async (video: Video, newTitle: string, newThumbnail?: File) => {
       try {
         // Rename if title changed
+        let updatedPath = video.path;
         if (newTitle !== video.title) {
           const renameResult = await renameLocalVideo(video.path, newTitle);
-          video.path = renameResult.new_path || video.path;
+          updatedPath = renameResult.new_path || video.path;
+          video.path = updatedPath;
         }
 
         // Update thumbnail if provided
         if (newThumbnail) {
-          await updateLocalThumbnail(video.path, newThumbnail);
+          await updateLocalThumbnail(updatedPath, newThumbnail);
+          setThumbnailBusters((prev) => ({
+            ...prev,
+            [updatedPath]: Date.now().toString(),
+          }));
         }
 
-        // Refresh the video list
+        // Refresh the video list + SSR data
         await fetchVideos(page);
+        router.refresh();
       } catch (err) {
         console.error("Erro ao editar vídeo:", err);
         setError(err instanceof Error ? err.message : "Erro ao editar vídeo");
@@ -290,6 +313,7 @@ export default function PaginatedVideoGrid({
                 title={video.title}
                 channel={video.channel}
                 thumbnail={video.thumbnail}
+                thumbnailCacheKey={thumbnailBusters[video.path] ?? video.modified_at}
                 path={video.path}
                 duration={video.duration}
                 size={video.size}

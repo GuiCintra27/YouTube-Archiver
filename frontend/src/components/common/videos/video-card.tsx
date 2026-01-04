@@ -61,6 +61,7 @@ interface VideoCardProps {
   channel: string;
   thumbnail?: string;
   thumbnailUrl?: string; // Direct URL for thumbnail (used by Drive)
+  thumbnailCacheKey?: string;
   path: string;
   duration?: string;
   size?: number;
@@ -86,6 +87,7 @@ function VideoCardComponent({
   channel,
   thumbnail,
   thumbnailUrl: externalThumbnailUrl,
+  thumbnailCacheKey,
   path: _path,
   duration,
   size,
@@ -121,12 +123,19 @@ function VideoCardComponent({
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const appendCacheKey = useCallback((url: string) => {
+    if (!thumbnailCacheKey) return url;
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}v=${encodeURIComponent(thumbnailCacheKey)}`;
+  }, [thumbnailCacheKey]);
+
   // Use external URL if provided, otherwise construct from thumbnail path
-  const thumbnailUrl = externalThumbnailUrl
+  const baseThumbnailUrl = externalThumbnailUrl
     ? externalThumbnailUrl
     : thumbnail && apiUrl
     ? `${apiUrl}/api/videos/thumbnail/${encodeURIComponent(thumbnail)}`
     : null;
+  const thumbnailUrl = baseThumbnailUrl ? appendCacheKey(baseThumbnailUrl) : null;
 
   const canShare = shareScope === "drive";
   const handleDelete = useCallback(async () => {
@@ -741,6 +750,7 @@ function arePropsEqual(prev: VideoCardProps, next: VideoCardProps) {
     prev.channel === next.channel &&
     prev.thumbnail === next.thumbnail &&
     prev.thumbnailUrl === next.thumbnailUrl &&
+    prev.thumbnailCacheKey === next.thumbnailCacheKey &&
     prev.path === next.path &&
     prev.duration === next.duration &&
     prev.size === next.size &&

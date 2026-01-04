@@ -61,7 +61,8 @@ export default function RecentVideos({
       setLoading(true);
       setError(null);
       const response = await fetch(
-        `${apiUrl}/api/${APIURLS.VIDEOS}?page=1&limit=${limit}`
+        `${apiUrl}/api/${APIURLS.VIDEOS}?page=1&limit=${limit}`,
+        { cache: "no-store" }
       );
       if (!response.ok) throw new Error("Falha ao carregar vídeos");
       const data = await response.json();
@@ -82,6 +83,12 @@ export default function RecentVideos({
     }
     fetchVideos();
   }, [fetchVideos, refreshToken, apiUrl, skipInitialFetch]);
+
+  useEffect(() => {
+    if (!initialData) return;
+    setVideos(initialData);
+    setLoading(false);
+  }, [initialData]);
 
   useEffect(() => {
     const handleRefresh = () => {
@@ -162,17 +169,18 @@ export default function RecentVideos({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {videos.map((video, index) => (
-            <VideoCard
-              key={video.id}
-              id={video.id}
-              title={video.title}
-              channel={video.channel}
-              thumbnail={video.thumbnail}
-              path={video.path}
-              onPlay={() => setSelectedVideo(video)}
-              onDelete={() => handleDelete(video)}
-              priority={index === 0}
-            />
+              <VideoCard
+                key={video.id}
+                id={video.id}
+                title={video.title}
+                channel={video.channel}
+                thumbnail={video.thumbnail}
+                thumbnailCacheKey={video.modified_at}
+                path={video.path}
+                onPlay={() => setSelectedVideo(video)}
+                onDelete={() => handleDelete(video)}
+                priority={index === 0}
+              />
           ))}
         </div>
       )}
