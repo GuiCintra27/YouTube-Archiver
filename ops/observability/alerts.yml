@@ -1,0 +1,50 @@
+groups:
+  - name: yt-archiver.backend
+    rules:
+      - alert: BackendDown
+        expr: up{job="yt-archiver-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend is down"
+          description: "Prometheus cannot scrape yt-archiver backend."
+
+      - alert: High5xxRate
+        expr: |
+          sum(rate(yt_archiver_http_requests_total{status=~"5.."}[5m]))
+          /
+          sum(rate(yt_archiver_http_requests_total[5m]))
+          > 0.02
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High 5xx rate"
+          description: "5xx error rate is above 2% for 5 minutes."
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(yt_archiver_http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency p95"
+          description: "p95 latency is above 1s for 5 minutes."
+
+      - alert: HighLatencyP99
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(yt_archiver_http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency p99"
+          description: "p99 latency is above 2s for 5 minutes."

@@ -1,0 +1,157 @@
+{
+  "uid": "yt-archiver-jobs",
+  "title": "YT-Archiver - Jobs",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 2,
+  "refresh": "10s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "RPS (Jobs)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(yt_archiver_http_requests_total{path=~\"^/api/jobs.*\"}[$__rate_interval]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "req/s" }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Error Rate (5xx)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "100 * sum(rate(yt_archiver_http_requests_total{path=~\"^/api/jobs.*\",status=~\"5..\"}[$__rate_interval])) / sum(rate(yt_archiver_http_requests_total{path=~\"^/api/jobs.*\"}[$__rate_interval]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent" }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Latency p95",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(yt_archiver_http_request_duration_seconds_bucket{path=~\"^/api/jobs.*\"}[$__rate_interval])) by (le))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Success %",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "100 * (1 - (sum(rate(yt_archiver_http_requests_total{path=~\"^/api/jobs.*\",status=~\"5..\"}[$__rate_interval])) / sum(rate(yt_archiver_http_requests_total{path=~\"^/api/jobs.*\"}[$__rate_interval]))))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent" }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Requests by Endpoint",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(yt_archiver_http_requests_total{path=\"/api/jobs\",method=\"GET\"}[$__rate_interval]))",
+          "legendFormat": "list",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(yt_archiver_http_requests_total{path=~\"^/api/jobs/[^/]+$\",method=\"GET\"}[$__rate_interval]))",
+          "legendFormat": "detail",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(yt_archiver_http_requests_total{path=~\"^/api/jobs/[^/]+/stream$\",method=\"GET\"}[$__rate_interval]))",
+          "legendFormat": "stream",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(rate(yt_archiver_http_requests_total{path=~\"^/api/jobs/[^/]+/cancel$\",method=\"POST\"}[$__rate_interval]))",
+          "legendFormat": "cancel",
+          "refId": "D"
+        },
+        {
+          "expr": "sum(rate(yt_archiver_http_requests_total{path=~\"^/api/jobs/[^/]+$\",method=\"DELETE\"}[$__rate_interval]))",
+          "legendFormat": "delete",
+          "refId": "E"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "req/s" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table" }, "stacking": { "mode": "normal" } },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Latency p95 by Endpoint",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(yt_archiver_http_request_duration_seconds_bucket{path=\"/api/jobs\",method=\"GET\"}[$__rate_interval])) by (le))",
+          "legendFormat": "list",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(yt_archiver_http_request_duration_seconds_bucket{path=~\"^/api/jobs/[^/]+$\",method=\"GET\"}[$__rate_interval])) by (le))",
+          "legendFormat": "detail",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(yt_archiver_http_request_duration_seconds_bucket{path=~\"^/api/jobs/[^/]+/stream$\",method=\"GET\"}[$__rate_interval])) by (le))",
+          "legendFormat": "stream",
+          "refId": "C"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(yt_archiver_http_request_duration_seconds_bucket{path=~\"^/api/jobs/[^/]+/cancel$\",method=\"POST\"}[$__rate_interval])) by (le))",
+          "legendFormat": "cancel",
+          "refId": "D"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(yt_archiver_http_request_duration_seconds_bucket{path=~\"^/api/jobs/[^/]+$\",method=\"DELETE\"}[$__rate_interval])) by (le))",
+          "legendFormat": "delete",
+          "refId": "E"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Job HTTP Status Codes",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(yt_archiver_http_requests_total{path=~\"^/api/jobs.*\"}[5m]))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "req/s" }, "overrides": [] },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 12 }
+    }
+  ]
+}

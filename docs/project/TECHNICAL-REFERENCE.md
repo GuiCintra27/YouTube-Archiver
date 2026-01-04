@@ -631,3 +631,9 @@ Notas (Download):
 
 - /metrics (Prometheus) quando METRICS_ENABLED=true
 - /api/health para status detalhado
+- Stack local (Prometheus + Grafana): `docker compose -f docker-compose.observability.yml up -d`
+  - Prometheus: `http://localhost:9090`
+  - Grafana: `http://localhost:3001`
+  - Dashboards: `ops/observability/grafana/dashboards/`
+  - Alertas: `ops/observability/alerts.yml`
+  - Guia completo: `docs/local/OBSERVABILITY.md`

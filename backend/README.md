@@ -52,6 +52,12 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ### 📊 Observabilidade
 - **GET** `/metrics` - Métricas Prometheus (se `METRICS_ENABLED=true`)
+- Stack local (Prometheus + Grafana): `docker compose -f docker-compose.observability.yml up -d`
+  - Prometheus: `http://localhost:9090`
+  - Grafana: `http://localhost:3001`
+  - Dashboards provisionados em `ops/observability/grafana/dashboards/`
+  - Alertas em `ops/observability/alerts.yml`
+  - Guia completo: `docs/local/OBSERVABILITY.md`
 
 ### 📥 Download e Jobs
 - **POST** `/api/download` - Inicia download de vídeo/playlist
