@@ -109,6 +109,76 @@ class CatalogRepository:
 
         return recovered
 
+    def list_local_video_refs(self) -> List[Dict[str, Any]]:
+        """
+        Return local video references with path and extra metadata.
+        """
+        with self.db.connection() as con:
+            rows = con.execute(
+                """
+                SELECT
+                    v.video_uid,
+                    v.extra_json,
+                    av.local_path
+                FROM videos v
+                JOIN assets av
+                    ON av.video_uid = v.video_uid AND av.location = v.location AND av.kind = 'video'
+                WHERE v.location = 'local' AND av.local_path IS NOT NULL
+                """,
+            ).fetchall()
+
+        refs: List[Dict[str, Any]] = []
+        for row in rows:
+            refs.append(
+                {
+                    "video_uid": row["video_uid"],
+                    "path": row["local_path"],
+                    "extra_json": row["extra_json"],
+                }
+            )
+        return refs
+
+    def list_drive_video_refs(self) -> List[Dict[str, Any]]:
+        """
+        Return drive video references with file_id, path and extra metadata.
+        """
+        with self.db.connection() as con:
+            rows = con.execute(
+                """
+                SELECT
+                    v.video_uid,
+                    v.extra_json,
+                    av.local_path,
+                    av.drive_file_id
+                FROM videos v
+                JOIN assets av
+                    ON av.video_uid = v.video_uid AND av.location = v.location AND av.kind = 'video'
+                WHERE v.location = 'drive' AND av.drive_file_id IS NOT NULL
+                """,
+            ).fetchall()
+
+        refs: List[Dict[str, Any]] = []
+        for row in rows:
+            refs.append(
+                {
+                    "video_uid": row["video_uid"],
+                    "path": row["local_path"],
+                    "drive_file_id": row["drive_file_id"],
+                    "extra_json": row["extra_json"],
+                }
+            )
+        return refs
+
+    def update_video_extra(self, *, video_uid: str, extra: Optional[Dict[str, Any]]) -> bool:
+        extra_json = json.dumps(extra) if extra else None
+        with self.db.connection() as con:
+            cursor = con.execute(
+                "UPDATE videos SET extra_json = ? WHERE video_uid = ?",
+                (extra_json, video_uid),
+            )
+            con.commit()
+            return cursor.rowcount > 0
+
     def find_drive_file_id_by_path(self, path: str) -> Optional[str]:
         with self.db.connection() as con:
             row = con.execute(
@@ -121,6 +191,19 @@ class CatalogRepository:
                 (path,),
             ).fetchone()
         return str(row["drive_file_id"]) if row and row["drive_file_id"] else None
+
+    def update_drive_video_asset_path(self, *, drive_file_id: str, new_path: str) -> bool:
+        with self.db.connection() as con:
+            cursor = con.execute(
+                """
+                UPDATE assets
+                SET local_path = ?
+                WHERE location = 'drive' AND kind = 'video' AND drive_file_id = ?
+                """,
+                (new_path, drive_file_id),
+            )
+            con.commit()
+            return cursor.rowcount > 0
 
     def get_video(self, video_uid: str) -> Dict[str, Any]:
         with self.db.connection() as con:
@@ -446,6 +529,7 @@ class CatalogRepository:
                     "created_at": row["created_at"],
                     "modified_at": row["modified_at"],
                     "path": extra.get("drive_path"),
+                    "catalog_id": extra.get("catalog_id"),
                     "assets": [],
                 }
                 by_uid[uid] = item

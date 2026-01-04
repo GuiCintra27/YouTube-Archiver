@@ -34,7 +34,11 @@ from app.drive.cache import (
 )
 
 # Configure logging with settings
-setup_logging(level=settings.LOG_LEVEL, log_format=settings.LOG_FORMAT)
+setup_logging(
+    level=settings.LOG_LEVEL,
+    log_format=settings.LOG_FORMAT,
+    use_color=settings.LOG_COLOR,
+)
 logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
 
 

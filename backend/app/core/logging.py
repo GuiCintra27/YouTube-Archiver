@@ -41,6 +41,7 @@ def setup_logging(
     level: str = "INFO",
     format_string: Optional[str] = None,
     log_format: str = "text",
+    use_color: Optional[bool] = None,
 ) -> logging.Logger:
     """
     Configure and return the application logger.
@@ -48,7 +49,8 @@ def setup_logging(
     Args:
         level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         format_string: Custom format string for log messages
-        log_format: text or json
+        log_format: pretty, text, or json
+        use_color: Force enable/disable ANSI colors (pretty/text)
 
     Returns:
         Configured logger instance
@@ -60,8 +62,12 @@ def setup_logging(
             "%(asctime)s | %(levelname)-8s | %(request_id)s | %(name)s:%(funcName)s:%(lineno)d | %(message)s"
         )
 
+    color_enabled = sys.stdout.isatty() if use_color is None else bool(use_color)
+
     if log_format == "json":
         formatter: logging.Formatter = _JsonFormatter(datefmt="%Y-%m-%d %H:%M:%S")
+    elif log_format == "pretty":
+        formatter = _PrettyFormatter(datefmt="%Y-%m-%d %H:%M:%S", use_color=color_enabled)
     else:
         formatter = logging.Formatter(format_string, datefmt="%Y-%m-%d %H:%M:%S")
 
@@ -108,3 +114,45 @@ def get_module_logger(module: str) -> logging.Logger:
         Logger instance for the module
     """
     return get_logger(module)
+
+
+class _PrettyFormatter(logging.Formatter):
+    _LEVEL_COLORS = {
+        logging.DEBUG: "\033[36m",
+        logging.INFO: "\033[32m",
+        logging.WARNING: "\033[33m",
+        logging.ERROR: "\033[31m",
+        logging.CRITICAL: "\033[41m",
+    }
+    _DIM = "\033[2m"
+    _RESET = "\033[0m"
+
+    def __init__(self, datefmt: Optional[str] = None, use_color: bool = True):
+        super().__init__(datefmt=datefmt)
+        self.use_color = use_color
+
+    def format(self, record: logging.LogRecord) -> str:
+        timestamp = self.formatTime(record, self.datefmt)
+        level_name = record.levelname
+        location = f"{record.name}:{record.funcName}:{record.lineno}"
+        request_id = getattr(record, "request_id", "-")
+        message = record.getMessage()
+
+        if self.use_color:
+            level_color = self._LEVEL_COLORS.get(record.levelno, "")
+            level_text = f"{level_color}{level_name:<8}{self._RESET}"
+            time_text = f"{self._DIM}{timestamp}{self._RESET}"
+            location_text = f"{self._DIM}{location}{self._RESET}"
+            request_text = f"{self._DIM}req:{request_id}{self._RESET}"
+        else:
+            level_text = f"{level_name:<8}"
+            time_text = timestamp
+            location_text = location
+            request_text = f"req:{request_id}"
+
+        output = f"{time_text} | {level_text} | {request_text:<12} | {location_text} | {message}"
+
+        if record.exc_info:
+            output = f"{output}\n{self.formatException(record.exc_info)}"
+
+        return output

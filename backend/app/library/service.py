@@ -1,6 +1,7 @@
 """
 Library service - business logic for local video library
 """
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -8,6 +9,7 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 
 from app.config import settings
+from app.catalog.identity import read_catalog_id_for_video
 from app.core.logging import get_module_logger
 from app.core.security import validate_path_within_base, validate_file_exists, sanitize_path
 from .cache import video_cache
@@ -118,6 +120,8 @@ def scan_videos_directory(base_dir: str = "./downloads", use_cache: bool = True)
                     thumbnail = str(thumb_path.relative_to(base_path))
                     break
 
+            catalog_id = read_catalog_id_for_video(video_file)
+
             # File info
             stat = video_file.stat()
 
@@ -131,6 +135,7 @@ def scan_videos_directory(base_dir: str = "./downloads", use_cache: bool = True)
                 "channel": channel,
                 "path": str(rel_path),
                 "thumbnail": thumbnail,
+                "catalog_id": catalog_id,
                 "size": stat.st_size,
                 "duration": duration_formatted,
                 "duration_seconds": duration_seconds,
@@ -216,11 +221,23 @@ def delete_video_with_related(
             if file.name.startswith(base_name + "."):
                 related_files.append(file)
 
-    # Extract video ID from filename for archive removal
+    # Extract video ID for archive removal
     video_id = None
-    match = re.search(r'\[([^\]]+)\]', base_name)
-    if match:
-        video_id = match.group(1)
+    info_file = next(
+        (f for f in related_files if f.name.endswith(".info.json")),
+        None,
+    )
+    if info_file:
+        try:
+            payload = json.loads(info_file.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                video_id = payload.get("id")
+        except Exception as e:
+            logger.debug(f"Failed to read info.json for archive removal: {e}")
+    if not video_id:
+        match = re.search(r'\[([^\]]+)\]', base_name)
+        if match:
+            video_id = match.group(1)
 
     # Delete all related files
     deleted_files = []

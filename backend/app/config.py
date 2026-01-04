@@ -57,8 +57,12 @@ class Settings(BaseSettings):
         description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)"
     )
     LOG_FORMAT: str = Field(
-        default="text",
-        description="Log format (text, json)"
+        default="pretty",
+        description="Log format (pretty, text, json)"
+    )
+    LOG_COLOR: bool = Field(
+        default=True,
+        description="Enable colored log output (pretty/text formats)"
     )
 
     # Blocking IO concurrency (to_thread)
@@ -218,6 +222,10 @@ class Settings(BaseSettings):
         default=60.0,
         description="Drive HTTP read timeout (seconds)"
     )
+    DRIVE_API_TIMEOUT: float = Field(
+        default=120.0,
+        description="Timeout (seconds) for Google API client uploads/downloads"
+    )
     DRIVE_STREAM_TIMEOUT_READ: float = Field(
         default=300.0,
         description="Drive stream read timeout (seconds)"
@@ -231,6 +239,31 @@ class Settings(BaseSettings):
         default=0.2,
         ge=0,
         description="Drive HTTP retry backoff (seconds)"
+    )
+    DRIVE_UPLOAD_CHUNK_SIZE: int = Field(
+        default=8 * 1024 * 1024,
+        ge=256 * 1024,
+        description="Drive resumable upload chunk size (bytes)"
+    )
+    DRIVE_UPLOAD_RETRIES: int = Field(
+        default=3,
+        ge=0,
+        description="Drive upload retries for Google API calls (list/create/next_chunk)"
+    )
+    DRIVE_UPLOAD_BACKOFF: float = Field(
+        default=0.5,
+        ge=0,
+        description="Drive upload retry backoff base (seconds)"
+    )
+    DRIVE_UPLOAD_RETRY_STATUSES: List[int] = Field(
+        default_factory=lambda: [429, 500, 502, 503, 504],
+        description="HTTP statuses to retry for Drive uploads"
+    )
+    DRIVE_LIST_PAGE_SIZE: int = Field(
+        default=1000,
+        ge=1,
+        le=1000,
+        description="Page size for Drive list queries"
     )
 
     # Pydantic settings configuration

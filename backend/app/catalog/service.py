@@ -7,9 +7,10 @@ from __future__ import annotations
 import json
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from app.catalog.repository import CatalogRepository
+from app.catalog.identity import ensure_catalog_id_for_video
 from app.config import settings
 from app.core.blocking import (
     run_blocking,
@@ -18,6 +19,7 @@ from app.core.blocking import (
     get_drive_semaphore,
 )
 from app.core.logging import get_module_logger
+from app.catalog.identity import ensure_catalog_id_for_video
 from app.library.service import scan_videos_directory, format_duration
 from datetime import datetime
 from pathlib import Path
@@ -96,6 +98,16 @@ async def bootstrap_local_catalog(
             else:
                 duration_seconds_int = None
 
+            catalog_id = v.get("catalog_id")
+            if not catalog_id:
+                try:
+                    full_path = Path(base_dir) / rel_path
+                    catalog_id = ensure_catalog_id_for_video(full_path)
+                except Exception:
+                    catalog_id = None
+
+            extra = {"catalog_id": catalog_id} if catalog_id else None
+
             repo.upsert_video(
                 video_uid=video_uid,
                 location="local",
@@ -106,6 +118,7 @@ async def bootstrap_local_catalog(
                 created_at=v.get("created_at"),
                 modified_at=v.get("modified_at"),
                 status="available",
+                extra=extra,
             )
 
             assets = [
@@ -199,7 +212,12 @@ async def delete_local_video_from_catalog(
 
 
 async def upsert_local_video_from_fs(
-    *, video_path: str, base_dir: str, thumbnail_path: Optional[str] = None, repo: Optional[CatalogRepository] = None
+    *,
+    video_path: str,
+    base_dir: str,
+    thumbnail_path: Optional[str] = None,
+    extra: Optional[Dict[str, Any]] = None,
+    repo: Optional[CatalogRepository] = None,
 ) -> None:
     """
     Upsert a single local video record from the filesystem.
@@ -212,6 +230,7 @@ async def upsert_local_video_from_fs(
     def _run() -> None:
         full_path = Path(base_dir) / video_path
         stat = full_path.stat()
+        modified_ts = stat.st_mtime
 
         title = full_path.stem
         parts = Path(video_path).parts
@@ -221,6 +240,29 @@ async def upsert_local_video_from_fs(
 
         existing = repo.get_video(video_uid)
         duration_seconds = existing.get("duration_seconds") if existing else None
+        existing_extra: Dict[str, Any] = {}
+        if existing and existing.get("extra_json"):
+            try:
+                existing_extra = json.loads(existing["extra_json"])
+            except Exception:
+                existing_extra = {}
+        try:
+            catalog_id = ensure_catalog_id_for_video(full_path)
+        except Exception:
+            catalog_id = None
+        if catalog_id:
+            existing_extra.setdefault("catalog_id", catalog_id)
+        if extra:
+            existing_extra.update(extra)
+        extra_payload = existing_extra or None
+
+        if thumbnail_path:
+            thumb_path = Path(base_dir) / thumbnail_path
+            if thumb_path.exists():
+                try:
+                    modified_ts = max(modified_ts, thumb_path.stat().st_mtime)
+                except Exception:
+                    pass
 
         repo.upsert_video(
             video_uid=video_uid,
@@ -230,8 +272,9 @@ async def upsert_local_video_from_fs(
             channel=channel,
             duration_seconds=duration_seconds,
             created_at=existing.get("created_at") if existing else _stat_iso(stat.st_ctime),
-            modified_at=_stat_iso(stat.st_mtime),
+            modified_at=_stat_iso(modified_ts),
             status="available",
+            extra=extra_payload,
         )
 
         assets = [
@@ -268,6 +311,13 @@ async def rename_local_video_in_catalog(
     repo = repo or CatalogRepository()
 
     old_uid = _local_video_uid(old_video_path)
+    old_extra: Optional[Dict[str, Any]] = None
+    old_row = repo.get_video(old_uid)
+    if old_row and old_row.get("extra_json"):
+        try:
+            old_extra = json.loads(old_row["extra_json"])
+        except Exception:
+            old_extra = None
     # Remove old record (uid changes in our current local scheme)
     await run_blocking(
         repo.delete_video,
@@ -280,7 +330,88 @@ async def rename_local_video_in_catalog(
         video_path=new_video_path,
         base_dir=base_dir,
         thumbnail_path=new_thumbnail_path,
+        extra=old_extra,
         repo=repo,
+    )
+
+
+async def set_local_catalog_id(
+    *,
+    video_path: str,
+    catalog_id: str,
+    repo: Optional[CatalogRepository] = None,
+) -> bool:
+    """
+    Persist catalog_id for a local video in extra_json.
+    """
+    if not settings.CATALOG_ENABLED:
+        return False
+
+    repo = repo or CatalogRepository()
+
+    def _run() -> bool:
+        video_uid = _local_video_uid(video_path)
+        row = repo.get_video(video_uid)
+        if not row:
+            return False
+
+        extra: Dict[str, Any] = {}
+        if row.get("extra_json"):
+            try:
+                extra = json.loads(row["extra_json"])
+            except Exception:
+                extra = {}
+
+        if extra.get("catalog_id") == catalog_id:
+            return True
+
+        extra["catalog_id"] = catalog_id
+        return repo.update_video_extra(video_uid=video_uid, extra=extra)
+
+    return await run_blocking(
+        _run,
+        semaphore=get_catalog_semaphore(),
+        label="catalog.link_local_catalog_id",
+    )
+
+
+async def set_local_drive_file_id(
+    *,
+    video_path: str,
+    drive_file_id: str,
+    repo: Optional[CatalogRepository] = None,
+) -> bool:
+    """
+    Link a local video to a Drive file ID for sync comparisons.
+    """
+    if not settings.CATALOG_ENABLED:
+        return False
+
+    repo = repo or CatalogRepository()
+
+    def _run() -> bool:
+        video_uid = _local_video_uid(video_path)
+        row = repo.get_video(video_uid)
+        if not row:
+            return False
+
+        extra: Dict[str, Any] = {}
+        if row.get("extra_json"):
+            try:
+                extra = json.loads(row["extra_json"])
+            except Exception:
+                extra = {}
+
+        if extra.get("drive_file_id") == drive_file_id:
+            return True
+
+        extra["drive_file_id"] = drive_file_id
+        return repo.update_video_extra(video_uid=video_uid, extra=extra)
+
+    return await run_blocking(
+        _run,
+        semaphore=get_catalog_semaphore(),
+        label="catalog.link_local_drive_id",
     )
 
 def _asset_kind_for_name(file_name: str) -> Optional[str]:
@@ -306,6 +437,8 @@ async def upsert_drive_video_from_upload(
     drive_path: str,
     size_bytes: Optional[int] = None,
     related_files: Optional[list[dict]] = None,
+    catalog_id: Optional[str] = None,
+    preserve_assets: bool = False,
     repo: Optional[CatalogRepository] = None,
 ) -> None:
     """
@@ -327,6 +460,16 @@ async def upsert_drive_video_from_upload(
         video_uid = _drive_video_uid(video_file_id)
         existing = repo.get_video(video_uid)
         created_at = existing.get("created_at") if existing else _iso_now()
+        extra: Dict[str, Any] = {}
+        if existing and existing.get("extra_json"):
+            try:
+                extra = json.loads(existing["extra_json"])
+            except Exception:
+                extra = {}
+        if drive_path:
+            extra["drive_path"] = drive_path
+        if catalog_id:
+            extra["catalog_id"] = catalog_id
 
         repo.upsert_video(
             video_uid=video_uid,
@@ -338,8 +481,34 @@ async def upsert_drive_video_from_upload(
             created_at=created_at,
             modified_at=_iso_now(),
             status="available",
-            extra={"drive_path": drive_path} if drive_path else None,
+            extra=extra or None,
         )
+
+        if preserve_assets:
+            existing_assets = repo.get_assets(video_uid=video_uid, location="drive")
+            if existing_assets:
+                updated_assets: List[Dict[str, Any]] = []
+                video_asset_found = False
+                for asset in existing_assets:
+                    if asset.get("kind") == "video":
+                        asset["drive_file_id"] = video_file_id
+                        if drive_path:
+                            asset["local_path"] = drive_path
+                        if size_bytes is not None:
+                            asset["size_bytes"] = size_bytes
+                        video_asset_found = True
+                    updated_assets.append(asset)
+                if not video_asset_found:
+                    updated_assets.append(
+                        {
+                            "kind": "video",
+                            "local_path": drive_path,
+                            "drive_file_id": video_file_id,
+                            "size_bytes": size_bytes,
+                        }
+                    )
+                repo.replace_assets(video_uid=video_uid, location="drive", assets=updated_assets)
+                return
 
         assets = [
             {
@@ -424,6 +593,7 @@ async def rename_drive_video_in_catalog(
         parts = Path(drive_path).parts
         channel = parts[0] if len(parts) > 1 else row.get("channel") or "Sem categoria"
 
+        extra["drive_path"] = drive_path
         repo.upsert_video(
             video_uid=video_uid,
             location="drive",
@@ -434,8 +604,25 @@ async def rename_drive_video_in_catalog(
             created_at=row.get("created_at"),
             modified_at=_iso_now(),
             status=row.get("status") or "available",
-            extra={"drive_path": drive_path},
+            extra=extra or None,
         )
+        repo.update_drive_video_asset_path(
+            drive_file_id=video_file_id,
+            new_path=drive_path,
+        )
+        if isinstance(old_path, str) and old_path:
+            local_uid = _local_video_uid(old_path)
+            local_row = repo.get_video(local_uid)
+            if local_row:
+                local_extra: Dict[str, Any] = {}
+                if local_row.get("extra_json"):
+                    try:
+                        local_extra = json.loads(local_row["extra_json"])
+                    except Exception:
+                        local_extra = {}
+                if local_extra.get("drive_file_id") != video_file_id:
+                    local_extra["drive_file_id"] = video_file_id
+                    repo.update_video_extra(video_uid=local_uid, extra=local_extra)
         return True
 
     return await run_blocking(
@@ -610,6 +797,14 @@ async def import_drive_snapshot_bytes(
             if not video_uid or not isinstance(video_uid, str):
                 continue
 
+            extra_payload = None
+            if item.get("path") or item.get("catalog_id"):
+                extra_payload = {
+                    "drive_path": item.get("path"),
+                }
+                if item.get("catalog_id"):
+                    extra_payload["catalog_id"] = item.get("catalog_id")
+
             repo.upsert_video(
                 video_uid=video_uid,
                 location="drive",
@@ -620,11 +815,7 @@ async def import_drive_snapshot_bytes(
                 created_at=item.get("created_at"),
                 modified_at=item.get("modified_at"),
                 status="available",
-                extra={
-                    "drive_path": item.get("path"),
-                }
-                if item.get("path")
-                else None,
+                extra=extra_payload,
             )
 
             drive_path = item.get("path") if isinstance(item.get("path"), str) else None

@@ -9,6 +9,7 @@ Provides endpoints for:
 """
 import asyncio
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
@@ -285,13 +286,33 @@ async def get_thumbnail(request: Request, thumbnail_path: str, base_dir: str = "
         validate_path_within_base(full_path, base_path)
 
         media_type = settings.IMAGE_MIME_TYPES.get(full_path.suffix.lower(), 'image/jpeg')
+        stat = full_path.stat()
+        etag = f'W/"{int(stat.st_mtime)}-{stat.st_size}"'
+        if request.headers.get("if-none-match") == etag:
+            return Response(
+                status_code=304,
+                headers={
+                    "Cache-Control": "no-cache, max-age=0, must-revalidate",
+                    "ETag": etag,
+                },
+            )
 
         content = await run_blocking(
             full_path.read_bytes,
             semaphore=get_fs_semaphore(),
             label="library.thumbnail",
         )
-        return Response(content=content, media_type=media_type)
+        return Response(
+            content=content,
+            media_type=media_type,
+            headers={
+                "Cache-Control": "no-cache, max-age=0, must-revalidate",
+                "ETag": etag,
+                "Last-Modified": datetime.fromtimestamp(
+                    stat.st_mtime, tz=timezone.utc
+                ).strftime("%a, %d %b %Y %H:%M:%S GMT"),
+            },
+        )
 
     except ThumbnailNotFoundException:
         raise

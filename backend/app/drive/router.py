@@ -35,6 +35,7 @@ from .service import (
     resolve_drive_file_id_by_path,
 )
 from .manager import drive_manager
+from app.catalog.identity import ensure_catalog_id_for_video, sidecar_path_for
 from .schemas import (
     DriveAuthStatus,
     DriveAuthUrl,
@@ -506,6 +507,15 @@ async def upload_external_to_drive(
             with open(video_path, "wb") as f:
                 shutil.copyfileobj(video.file, f)
             temp_files.append(str(video_path))
+
+            # Garantir catalog_id e criar sidecar
+            try:
+                ensure_catalog_id_for_video(video_path)
+                sidecar_path = sidecar_path_for(video_path)
+                if sidecar_path.exists():
+                    temp_files.append(str(sidecar_path))
+            except Exception:
+                pass
 
             # Salvar thumbnail (se fornecida)
             if thumbnail and thumbnail.filename:

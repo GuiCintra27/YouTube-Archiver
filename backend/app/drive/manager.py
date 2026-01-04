@@ -3,10 +3,15 @@ Google Drive Manager - handles OAuth, uploads, downloads, and sync.
 """
 from __future__ import annotations
 import os
+import random
+import socket
 import threading
+import time
 from pathlib import Path
 from typing import Optional, List, Dict, Callable
 
+import httplib2
+import google_auth_httplib2
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
@@ -40,6 +45,8 @@ class DriveManager:
         self._service_local = threading.local()
         self._lock = threading.Lock()
         self._root_folder_id = None
+        self._folder_cache: Dict[tuple[str, str], str] = {}
+        self._folder_lock = threading.Lock()
 
     def get_auth_url(self) -> str:
         """Generate OAuth authentication URL"""
@@ -136,7 +143,17 @@ class DriveManager:
                 else:
                     raise Exception("Not authenticated. Please authenticate first.")
 
-            service = build('drive', 'v3', credentials=creds, cache_discovery=False)
+            http = httplib2.Http(timeout=settings.DRIVE_API_TIMEOUT)
+            try:
+                # Prevent 308 "Resume Incomplete" from being treated as redirect.
+                redirect_codes = set(getattr(http, "redirect_codes", []))
+                if 308 in redirect_codes:
+                    redirect_codes.discard(308)
+                    http.redirect_codes = redirect_codes
+            except Exception:
+                pass
+            authed_http = google_auth_httplib2.AuthorizedHttp(creds, http=http)
+            service = build('drive', 'v3', http=authed_http, cache_discovery=False)
             self._service_local.service = service
             if threading.current_thread().name == "MainThread":
                 self._service = service
@@ -162,6 +179,139 @@ class DriveManager:
 
             return str(creds.token)
 
+    def get_access_token(self) -> str:
+        """Public wrapper to return a valid OAuth access token."""
+        return self._get_access_token()
+
+    def _reset_service_cache(self) -> None:
+        try:
+            if hasattr(self._service_local, "service"):
+                delattr(self._service_local, "service")
+        except Exception:
+            self._service_local.service = None
+        if threading.current_thread().name == "MainThread":
+            self._service = None
+
+    def _should_retry_exception(self, exc: Exception) -> bool:
+        if isinstance(exc, HttpError):
+            status = getattr(exc, "resp", None)
+            status_code = status.status if status else None
+            return bool(status_code in set(settings.DRIVE_UPLOAD_RETRY_STATUSES))
+        if isinstance(
+            exc,
+            (
+                socket.gaierror,
+                TimeoutError,
+                ConnectionError,
+                OSError,
+                httplib2.error.RedirectMissingLocation,
+                httplib2.error.RedirectLimit,
+                httplib2.ServerNotFoundError,
+                httplib2.HttpLib2Error,
+                requests.RequestException,
+            ),
+        ):
+            return True
+        return False
+
+    def _retry_sleep(self, attempt: int, backoff: float) -> None:
+        sleep_for = backoff * (2 ** max(attempt - 1, 0))
+        jitter = random.uniform(0.9, 1.1)
+        time.sleep(sleep_for * jitter)
+
+    def _execute_request_with_retry(
+        self,
+        request_factory: Callable[[], object],
+        *,
+        retries: Optional[int] = None,
+        backoff: Optional[float] = None,
+        label: Optional[str] = None,
+    ) -> Dict:
+        max_retries = settings.DRIVE_UPLOAD_RETRIES if retries is None else retries
+        backoff = settings.DRIVE_UPLOAD_BACKOFF if backoff is None else backoff
+        attempt = 0
+        while True:
+            try:
+                request = request_factory()
+                return request.execute()
+            except Exception as exc:
+                if attempt >= max_retries or not self._should_retry_exception(exc):
+                    raise
+                attempt += 1
+                self._reset_service_cache()
+                logger.warning(
+                    "Drive API retry %s/%s (%s): %s",
+                    attempt,
+                    max_retries,
+                    label or "request",
+                    exc,
+                )
+                self._retry_sleep(attempt, backoff)
+
+    def _run_resumable_upload(
+        self,
+        request_factory: Callable[[], object],
+        *,
+        on_status: Optional[Callable[[object], None]] = None,
+        label: Optional[str] = None,
+    ) -> Dict:
+        max_retries = settings.DRIVE_UPLOAD_RETRIES
+        backoff = settings.DRIVE_UPLOAD_BACKOFF
+        attempt = 0
+        request = request_factory()
+        response = None
+        while response is None:
+            try:
+                status, response = request.next_chunk()
+                if status and on_status:
+                    on_status(status)
+            except Exception as exc:
+                if attempt >= max_retries or not self._should_retry_exception(exc):
+                    raise
+                attempt += 1
+                self._reset_service_cache()
+                if isinstance(exc, httplib2.error.RedirectMissingLocation):
+                    request = request_factory()
+                logger.warning(
+                    "Drive upload retry %s/%s (%s): %s",
+                    attempt,
+                    max_retries,
+                    label or "resumable_upload",
+                    exc,
+                )
+                self._retry_sleep(attempt, backoff)
+        return response
+
+    def _list_files_with_pagination(
+        self,
+        *,
+        query: str,
+        fields: str,
+        page_size: Optional[int] = None,
+        label: Optional[str] = None,
+    ) -> List[Dict]:
+        service = self.get_service()
+        page_size = page_size or settings.DRIVE_LIST_PAGE_SIZE
+        page_token = None
+        items: List[Dict] = []
+        while True:
+            def _request():
+                return service.files().list(
+                    q=query,
+                    fields=f"nextPageToken, {fields}",
+                    pageSize=page_size,
+                    pageToken=page_token,
+                )
+
+            results = self._execute_request_with_retry(
+                _request,
+                label=label or "drive.list",
+            )
+            items.extend(results.get("files", []))
+            page_token = results.get("nextPageToken")
+            if not page_token:
+                break
+        return items
     def _drive_api_get_json(self, url: str, params: Dict[str, str]) -> Dict:
         token = self._get_access_token()
         headers = {"Authorization": f"Bearer {token}"}
@@ -251,50 +401,77 @@ class DriveManager:
 
     def get_or_create_root_folder(self) -> str:
         """Get or create the root 'YouTube Archiver' folder"""
-        if self._root_folder_id:
+        with self._folder_lock:
+            if self._root_folder_id:
+                return self._root_folder_id
+
+            service = self.get_service()
+
+            # Search for existing folder
+            query = f"name='{DRIVE_ROOT_FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+            results = self._execute_request_with_retry(
+                lambda: service.files().list(q=query, fields='files(id, name)'),
+                label="drive.root.list",
+            )
+            files = results.get('files', [])
+
+            if files:
+                self._root_folder_id = files[0]['id']
+                return self._root_folder_id
+
+            # Create folder
+            folder_metadata = {
+                'name': DRIVE_ROOT_FOLDER,
+                'mimeType': 'application/vnd.google-apps.folder'
+            }
+            folder = self._execute_request_with_retry(
+                lambda: service.files().create(body=folder_metadata, fields='id'),
+                label="drive.root.create",
+            )
+            self._root_folder_id = folder['id']
             return self._root_folder_id
-
-        service = self.get_service()
-
-        # Search for existing folder
-        query = f"name='{DRIVE_ROOT_FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-        results = service.files().list(q=query, fields='files(id, name)').execute()
-        files = results.get('files', [])
-
-        if files:
-            self._root_folder_id = files[0]['id']
-            return self._root_folder_id
-
-        # Create folder
-        folder_metadata = {
-            'name': DRIVE_ROOT_FOLDER,
-            'mimeType': 'application/vnd.google-apps.folder'
-        }
-        folder = service.files().create(body=folder_metadata, fields='id').execute()
-        self._root_folder_id = folder['id']
-        return self._root_folder_id
 
     def ensure_folder(self, name: str, parent_id: str) -> str:
         """Ensure a folder exists, creating if necessary"""
-        service = self.get_service()
+        cache_key = (parent_id, name)
+        cached_id = self._folder_cache.get(cache_key)
+        if cached_id:
+            return cached_id
 
-        # Escape single quotes in folder name for query
-        escaped_name = name.replace("'", "\\'")
-        query = f"name='{escaped_name}' and mimeType='application/vnd.google-apps.folder' and '{parent_id}' in parents and trashed=false"
-        results = service.files().list(q=query, fields='files(id)').execute()
-        files = results.get('files', [])
+        with self._folder_lock:
+            cached_id = self._folder_cache.get(cache_key)
+            if cached_id:
+                return cached_id
 
-        if files:
-            return files[0]['id']
+            service = self.get_service()
 
-        # Create folder
-        folder_metadata = {
-            'name': name,
-            'mimeType': 'application/vnd.google-apps.folder',
-            'parents': [parent_id]
-        }
-        folder = service.files().create(body=folder_metadata, fields='id').execute()
-        return folder['id']
+            # Escape single quotes in folder name for query
+            escaped_name = name.replace("'", "\\'")
+            query = f"name='{escaped_name}' and mimeType='application/vnd.google-apps.folder' and '{parent_id}' in parents and trashed=false"
+            results = self._execute_request_with_retry(
+                lambda: service.files().list(q=query, fields='files(id)'),
+                label="drive.folder.list",
+            )
+            files = results.get('files', [])
+
+            if files:
+                folder_id = files[0]['id']
+                self._folder_cache[cache_key] = folder_id
+                return folder_id
+
+            # Create folder
+            folder_metadata = {
+                'name': name,
+                'mimeType': 'application/vnd.google-apps.folder',
+                'parents': [parent_id]
+            }
+            folder = self._execute_request_with_retry(
+                lambda: service.files().create(body=folder_metadata, fields='id'),
+                label="drive.folder.create",
+            )
+            folder_id = folder['id']
+            self._folder_cache[cache_key] = folder_id
+            return folder_id
 
     def upload_video(
         self,
@@ -331,16 +508,21 @@ class DriveManager:
             query = f"name='{escaped_file_name}' and '{current_parent}' in parents and trashed=false"
             logger.debug(f"Query: {query}")
 
-            results = service.files().list(q=query, fields='files(id, name, size)').execute()
+            results = self._execute_request_with_retry(
+                lambda: service.files().list(q=query, fields='files(id, name, size)'),
+                label="drive.upload.check_exists",
+            )
             existing_files = results.get('files', [])
 
             if existing_files:
                 logger.debug(f"File already exists in Drive: {file_name}")
+                existing = existing_files[0]
                 return {
                     "status": "skipped",
                     "message": "File already exists in Drive",
-                    "file_id": existing_files[0]['id'],
+                    "file_id": existing.get('id'),
                     "file_name": file_name,
+                    "size": int(existing.get('size') or 0),
                 }
 
             # Ensure thumbnail exists (generate if missing)
@@ -358,6 +540,7 @@ class DriveManager:
                 '.info.json',  # Metadata
                 '.vtt', '.srt', '.ass',  # Subtitles
                 '.description',  # Description
+                '.ytarchiver.json',  # Catalog ID sidecar
             ]
 
             for file in parent_dir.iterdir():
@@ -373,38 +556,48 @@ class DriveManager:
             }
 
             logger.debug(f"Starting upload for {file_name}...")
-            media = MediaFileUpload(
-                local_path,
-                resumable=True,
-                chunksize=8 * 1024 * 1024  # 8MB chunks
-            )
 
-            request = service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields='id, name, size'
-            )
+            def request_factory():
+                current_service = self.get_service()
+                media = MediaFileUpload(
+                    local_path,
+                    resumable=True,
+                    chunksize=settings.DRIVE_UPLOAD_CHUNK_SIZE,
+                )
+                return current_service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id, name, size'
+                )
 
-            response = None
-            while response is None:
-                status, response = request.next_chunk()
+            def on_status(status):
                 if status and progress_callback:
                     progress_callback({
                         "file_name": file_name,
                         "progress": int(status.progress() * 100)
                     })
 
+            response = self._run_resumable_upload(
+                request_factory,
+                on_status=on_status,
+                label="drive.upload.next_chunk",
+            )
+
             logger.info(f"Upload completed: {file_name} (ID: {response['id']})")
 
             uploaded_related = []
             related_files_detailed: List[Dict] = []
+            related_files_failed: List[Dict] = []
             # Upload related files
             for related_file in related_files:
                 try:
                     # Check if already exists
                     escaped_related_name = related_file.name.replace("'", "\\'")
                     query = f"name='{escaped_related_name}' and '{current_parent}' in parents and trashed=false"
-                    results = service.files().list(q=query, fields='files(id)').execute()
+                    results = self._execute_request_with_retry(
+                        lambda: service.files().list(q=query, fields='files(id)'),
+                        label="drive.upload.related.check",
+                    )
                     if results.get('files', []):
                         existing_id = results["files"][0].get("id")
                         related_files_detailed.append(
@@ -422,11 +615,14 @@ class DriveManager:
                         'parents': [current_parent]
                     }
                     related_media = MediaFileUpload(str(related_file))
-                    related_resp = service.files().create(
-                        body=related_metadata,
-                        media_body=related_media,
-                        fields='id, name'
-                    ).execute()
+                    related_resp = self._execute_request_with_retry(
+                        lambda: service.files().create(
+                            body=related_metadata,
+                            media_body=related_media,
+                            fields='id, name'
+                        ),
+                        label="drive.upload.related.create",
+                    )
                     uploaded_related.append(related_file.name)
                     related_files_detailed.append(
                         {
@@ -437,6 +633,12 @@ class DriveManager:
                     )
                 except Exception as e:
                     logger.warning(f"Failed to upload related file {related_file.name}: {e}")
+                    related_files_failed.append(
+                        {
+                            "name": related_file.name,
+                            "error": str(e),
+                        }
+                    )
 
             return {
                 "status": "success",
@@ -445,6 +647,7 @@ class DriveManager:
                 "size": response.get('size', 0),
                 "related_files": uploaded_related,
                 "related_files_detailed": related_files_detailed,
+                "related_files_failed": related_files_failed,
                 "thumbnail_generated": thumbnail_generated,
             }
 
@@ -454,7 +657,6 @@ class DriveManager:
 
     def list_videos(self) -> List[Dict]:
         """List all videos in the Drive folder"""
-        service = self.get_service()
         root_id = self.get_or_create_root_folder()
 
         videos = []
@@ -464,13 +666,11 @@ class DriveManager:
         def scan_folder(folder_id: str, path_prefix: str = ""):
             """Recursively scan a folder"""
             query = f"'{folder_id}' in parents and trashed=false"
-            results = service.files().list(
-                q=query,
+            items = self._list_files_with_pagination(
+                query=query,
                 fields='files(id, name, mimeType, size, createdTime, modifiedTime, thumbnailLink)',
-                pageSize=1000
-            ).execute()
-
-            items = results.get('files', [])
+                label="drive.list_folder",
+            )
 
             # First pass: collect thumbnails
             for item in items:
@@ -613,7 +813,10 @@ class DriveManager:
                     # Check if file already exists
                     escaped_name = file_name.replace("'", "\\'")
                     query = f"name='{escaped_name}' and '{target_folder_id}' in parents and trashed=false"
-                    results = service.files().list(q=query, fields='files(id)').execute()
+                    results = self._execute_request_with_retry(
+                        lambda: service.files().list(q=query, fields='files(id, size)'),
+                        label="drive.external.check_exists",
+                    )
 
                     if results.get('files', []):
                         logger.debug(f"File already exists, skipping: {file_name}")
@@ -621,6 +824,7 @@ class DriveManager:
                         uploaded_files.append({
                             "name": file_name,
                             "file_id": existing_id,
+                            "size": int(results["files"][0].get("size") or 0),
                             "status": "skipped",
                             "message": "Already exists"
                         })
@@ -635,21 +839,20 @@ class DriveManager:
                     # Use resumable upload for larger files
                     file_size = file_path.stat().st_size
                     if file_size > 5 * 1024 * 1024:  # > 5MB
-                        media = MediaFileUpload(
-                            str(file_path),
-                            resumable=True,
-                            chunksize=8 * 1024 * 1024
-                        )
+                        def request_factory():
+                            current_service = self.get_service()
+                            media = MediaFileUpload(
+                                str(file_path),
+                                resumable=True,
+                                chunksize=settings.DRIVE_UPLOAD_CHUNK_SIZE
+                            )
+                            return current_service.files().create(
+                                body=file_metadata,
+                                media_body=media,
+                                fields='id, name, size'
+                            )
 
-                        request = service.files().create(
-                            body=file_metadata,
-                            media_body=media,
-                            fields='id, name, size'
-                        )
-
-                        response = None
-                        while response is None:
-                            status, response = request.next_chunk()
+                        def on_status(status):
                             if status and progress_callback:
                                 file_progress = int(status.progress() * 100)
                                 overall_progress = int(((index + status.progress()) / total_files) * 100)
@@ -660,13 +863,22 @@ class DriveManager:
                                     "files_uploaded": index,
                                     "total_files": total_files
                                 })
+
+                        response = self._run_resumable_upload(
+                            request_factory,
+                            on_status=on_status,
+                            label="drive.external.next_chunk",
+                        )
                     else:
                         media = MediaFileUpload(str(file_path))
-                        response = service.files().create(
-                            body=file_metadata,
-                            media_body=media,
-                            fields='id, name, size'
-                        ).execute()
+                        response = self._execute_request_with_retry(
+                            lambda: service.files().create(
+                                body=file_metadata,
+                                media_body=media,
+                                fields='id, name, size'
+                            ),
+                            label="drive.external.create",
+                        )
 
                     uploaded_files.append({
                         "name": file_name,
@@ -819,6 +1031,7 @@ class DriveManager:
                 '.info.json',  # Metadata
                 '.vtt', '.srt', '.ass',  # Subtitles
                 '.description',  # Description
+                '.ytarchiver.json',  # Catalog ID sidecar
             ]
 
             # Search for related files in same folder
@@ -1179,6 +1392,7 @@ class DriveManager:
                 '.info.json',  # Metadata
                 '.vtt', '.srt', '.ass',  # Subtitles
                 '.description',  # Description
+                '.ytarchiver.json',  # Catalog ID sidecar
             ]
 
             # Search for related files in same folder
@@ -1442,8 +1656,8 @@ class DriveManager:
                 return None
 
             # Download thumbnail
-            creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
-            headers = {'Authorization': f'Bearer {creds.token}'}
+            token = self._get_access_token()
+            headers = {'Authorization': f'Bearer {token}'}
             response = request_with_retry(
                 "GET",
                 thumbnail_link,
@@ -1483,8 +1697,8 @@ class DriveManager:
                 return None
 
             # Download the file
-            creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
-            headers = {'Authorization': f'Bearer {creds.token}'}
+            token = self._get_access_token()
+            headers = {'Authorization': f'Bearer {token}'}
             download_url = f'https://www.googleapis.com/drive/v3/files/{file_id}?alt=media'
             response = request_with_retry(
                 "GET",
