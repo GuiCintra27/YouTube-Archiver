@@ -517,9 +517,14 @@ async def upload_external_to_drive(
             except Exception:
                 pass
 
+            video_name = Path(video.filename or "video").name
+            video_base = Path(video_name).stem
+
             # Salvar thumbnail (se fornecida)
             if thumbnail and thumbnail.filename:
-                thumb_path = temp_dir / thumbnail.filename
+                thumb_ext = Path(thumbnail.filename).suffix or ".jpg"
+                thumb_name = f"{video_base}{thumb_ext.lower()}"
+                thumb_path = temp_dir / thumb_name
                 with open(thumb_path, "wb") as f:
                     shutil.copyfileobj(thumbnail.file, f)
                 temp_files.append(str(thumb_path))

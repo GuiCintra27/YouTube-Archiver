@@ -249,11 +249,11 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
 
   // Helper to get thumbnail URL for Drive videos
   const getThumbnailUrl = (video: DriveVideo): string | undefined => {
-    if (video.thumbnail) {
-      return video.thumbnail;
-    }
     if (video.custom_thumbnail_id && apiUrl) {
       return `${apiUrl}/api/drive/custom-thumbnail/${video.custom_thumbnail_id}`;
+    }
+    if (video.thumbnail) {
+      return video.thumbnail;
     }
     return undefined;
   };

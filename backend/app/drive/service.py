@@ -1303,11 +1303,32 @@ async def _run_external_upload_job(
             progress_callback
         )
 
+        def base_key(name: str) -> str:
+            lower = name.lower()
+            if lower.endswith(".info.json"):
+                return name[:-len(".info.json")]
+            if lower.endswith(".description"):
+                return name[:-len(".description")]
+            if lower.endswith(CATALOG_ID_SUFFIX):
+                return name[:-len(CATALOG_ID_SUFFIX)]
+            return Path(name).stem
+
         # Get generated thumbnails for cleanup
         generated_thumbnails = result.get("generated_thumbnails", [])
 
         # Sync uploaded videos to cache
         uploaded_files = result.get("uploaded", [])
+        thumbnail_by_base: Dict[str, str] = {}
+        for uploaded_file in uploaded_files:
+            if uploaded_file.get("status") not in {"success", "skipped"}:
+                continue
+            file_name = uploaded_file.get("name")
+            file_id = uploaded_file.get("file_id")
+            if not file_name or not file_id:
+                continue
+            if any(str(file_name).lower().endswith(ext) for ext in settings.THUMBNAIL_EXTENSIONS):
+                thumbnail_by_base[base_key(str(file_name))] = str(file_id)
+
         for uploaded_file in uploaded_files:
             if uploaded_file.get("status") == "success":
                 file_name = uploaded_file.get("name", "")
@@ -1316,6 +1337,7 @@ async def _run_external_upload_job(
                     try:
                         from .cache import sync_video_added
                         video_path = f"{folder_name}/{file_name}"
+                        custom_thumbnail_id = thumbnail_by_base.get(base_key(file_name))
                         await sync_video_added(
                             drive_id=uploaded_file.get("file_id"),
                             name=file_name,
@@ -1323,6 +1345,7 @@ async def _run_external_upload_job(
                             size=uploaded_file.get("size", 0),
                             created_at=datetime.now().isoformat(),
                             modified_at=datetime.now().isoformat(),
+                            custom_thumbnail_id=custom_thumbnail_id,
                         )
                         logger.info(f"Synced video to cache: {video_path}")
                     except Exception as cache_err:
@@ -1332,16 +1355,6 @@ async def _run_external_upload_job(
         if settings.CATALOG_ENABLED:
             try:
                 by_base: Dict[str, List[Dict]] = {}
-
-                def base_key(name: str) -> str:
-                    lower = name.lower()
-                    if lower.endswith(".info.json"):
-                        return name[:-len(".info.json")]
-                    if lower.endswith(".description"):
-                        return name[:-len(".description")]
-                    if lower.endswith(CATALOG_ID_SUFFIX):
-                        return name[:-len(CATALOG_ID_SUFFIX)]
-                    return Path(name).stem
 
                 for item in uploaded_files:
                     if item.get("status") not in {"success", "skipped"}:

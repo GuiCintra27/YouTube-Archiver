@@ -701,8 +701,8 @@ class DriveManager:
                         drive_thumbnail = item.get('thumbnailLink')
                         custom_thumbnail_id = None
 
-                        # If no Drive thumbnail, look for custom thumbnail
-                        if not drive_thumbnail and folder_id in thumbnails_by_folder:
+                        # Look for a custom thumbnail file with the same base name
+                        if folder_id in thumbnails_by_folder:
                             custom_thumb = thumbnails_by_folder[folder_id].get(video_base_name)
                             if custom_thumb:
                                 custom_thumbnail_id = custom_thumb['id']
