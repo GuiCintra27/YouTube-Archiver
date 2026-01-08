@@ -9,6 +9,7 @@ import random
 import pathlib
 import threading
 import urllib.parse as urlparse
+import re
 from dataclasses import dataclass
 from typing import Optional, Callable
 from yt_dlp import YoutubeDL
@@ -33,6 +34,9 @@ MEDIA_EXTS = {
     ".mp3",
     ".m4a",
 }
+
+FORMAT_SUFFIX_RE = re.compile(r"^\.f\d+$", re.IGNORECASE)
+TEMP_SUFFIXES = {".part", ".ytdl", ".temp"}
 
 
 @dataclass
@@ -143,16 +147,46 @@ def _base_opts(s: Settings) -> dict:
     return ydl_opts
 
 
-def _find_existing_media(path: pathlib.Path) -> Optional[pathlib.Path]:
-    if path.exists():
-        return path
+def _strip_suffix(path: pathlib.Path) -> pathlib.Path:
+    if path.suffix:
+        return path.with_suffix("")
+    return path
 
-    stem = path.stem
-    parent = path.parent
-    for ext in MEDIA_EXTS:
-        candidate = parent / f"{stem}{ext}"
-        if candidate.exists():
+
+def _candidate_variants(path: pathlib.Path) -> list[pathlib.Path]:
+    variants = [path]
+    if path.suffix.lower() in TEMP_SUFFIXES:
+        variants.append(path.with_suffix(""))
+
+    for variant in list(variants):
+        if len(variant.suffixes) >= 2:
+            base = _strip_suffix(variant)
+            if FORMAT_SUFFIX_RE.match(base.suffix):
+                variants.append(base.with_suffix(variant.suffix))
+                variants.append(_strip_suffix(base))
+
+    seen: set[str] = set()
+    unique: list[pathlib.Path] = []
+    for item in variants:
+        key = str(item)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(item)
+    return unique
+
+
+def _find_existing_media(path: pathlib.Path) -> Optional[pathlib.Path]:
+    for candidate in _candidate_variants(path):
+        if candidate.exists() and candidate.suffix.lower() in MEDIA_EXTS:
             return candidate
+
+    for candidate in _candidate_variants(path):
+        base = _strip_suffix(candidate)
+        for ext in MEDIA_EXTS:
+            alt = pathlib.Path(f"{base}{ext}")
+            if alt.exists():
+                return alt
     return None
 
 
@@ -183,6 +217,37 @@ def _resolve_output_path(ydl: YoutubeDL, info: dict) -> Optional[str]:
         return ydl.prepare_filename(info)
     except Exception:
         return None
+
+
+def _resolve_existing_media_path(ydl: YoutubeDL, info: dict) -> Optional[str]:
+    candidates: list[str] = []
+    for key in ("_filename", "filepath", "filename"):
+        value = info.get(key)
+        if isinstance(value, str) and value:
+            candidates.append(value)
+
+    for entry in info.get("requested_downloads") or []:
+        for key in ("_filename", "filepath", "filename"):
+            value = entry.get(key)
+            if isinstance(value, str) and value:
+                candidates.append(value)
+
+    for entry in info.get("requested_formats") or []:
+        for key in ("_filename", "filepath", "filename"):
+            value = entry.get(key)
+            if isinstance(value, str) and value:
+                candidates.append(value)
+
+    try:
+        candidates.append(ydl.prepare_filename(info))
+    except Exception:
+        pass
+
+    for candidate in candidates:
+        existing = _find_existing_media(pathlib.Path(candidate))
+        if existing:
+            return str(existing)
+    return None
 
 
 def _extract_entries(url: str, limit: Optional[int]) -> list[str]:
@@ -362,7 +427,7 @@ def download_video(
                 info = ydl.extract_info(video_url, download=True)
 
                 if info:
-                    output_path = _resolve_output_path(ydl, info)
+                    output_path = _resolve_existing_media_path(ydl, info) or _resolve_output_path(ydl, info)
                     results.append({
                         "url": video_url,
                         "status": "success",

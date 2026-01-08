@@ -9,6 +9,7 @@ Provides functions for:
 import os
 import uuid
 import asyncio
+import re
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional, Dict, Any
 from pathlib import Path
@@ -25,18 +26,69 @@ if TYPE_CHECKING:
 
 logger = get_module_logger("jobs.service")
 
+FORMAT_SUFFIX_RE = re.compile(r"^\.f\d+$", re.IGNORECASE)
+TEMP_SUFFIXES = {".part", ".ytdl", ".temp"}
+
+
+def _strip_suffix(path: Path) -> Path:
+    if path.suffix:
+        return path.with_suffix("")
+    return path
+
+
+def _candidate_variants(path: Path) -> list[Path]:
+    variants = [path]
+    if path.suffix.lower() in TEMP_SUFFIXES:
+        variants.append(path.with_suffix(""))
+
+    for variant in list(variants):
+        if len(variant.suffixes) >= 2:
+            base = _strip_suffix(variant)
+            if FORMAT_SUFFIX_RE.match(base.suffix):
+                variants.append(base.with_suffix(variant.suffix))
+                variants.append(_strip_suffix(base))
+
+    seen: set[str] = set()
+    unique: list[Path] = []
+    for item in variants:
+        key = str(item)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(item)
+    return unique
+
 
 def _resolve_video_path(candidate: Path) -> Optional[Path]:
-    if candidate.exists() and candidate.suffix.lower() in settings.VIDEO_EXTENSIONS:
-        return candidate
+    for variant in _candidate_variants(candidate):
+        if variant.exists() and variant.suffix.lower() in settings.VIDEO_EXTENSIONS:
+            return variant
 
-    stem = candidate.stem
-    parent = candidate.parent
-    for ext in settings.VIDEO_EXTENSIONS:
-        alt = parent / f"{stem}{ext}"
-        if alt.exists():
-            return alt
+    for variant in _candidate_variants(candidate):
+        base = _strip_suffix(variant)
+        for ext in settings.VIDEO_EXTENSIONS:
+            alt = Path(f"{base}{ext}")
+            if alt.exists():
+                return alt
     return None
+
+
+def _scan_recent_videos(base_dir: Path, since_ts: float) -> list[Path]:
+    if not base_dir.exists():
+        return []
+
+    recent: list[Path] = []
+    for root, _, files in os.walk(base_dir):
+        for name in files:
+            candidate = Path(root) / name
+            if candidate.suffix.lower() not in settings.VIDEO_EXTENSIONS:
+                continue
+            try:
+                if candidate.stat().st_mtime >= since_ts:
+                    recent.append(candidate)
+            except Exception:
+                continue
+    return recent
 
 
 def create_job(url: str, request: "DownloadRequest") -> str:
@@ -139,6 +191,8 @@ async def run_download_job(job_id: str, url: str, request: "DownloadRequest") ->
         request: Download request parameters
     """
     try:
+        job_started_ts = datetime.now().timestamp()
+
         # Create settings from request
         download_settings = create_download_settings(
             out_dir=settings.DOWNLOADS_DIR,
@@ -191,15 +245,22 @@ async def run_download_job(job_id: str, url: str, request: "DownloadRequest") ->
                 if isinstance(fp, str) and fp:
                     file_candidates.add(fp)
 
+            catalog_updates = 0
+            resolved_paths: set[str] = set()
+            out_dir = Path(settings.DOWNLOADS_DIR).resolve()
             if settings.CATALOG_ENABLED and file_candidates:
                 try:
-                    out_dir = Path(settings.DOWNLOADS_DIR).resolve()
                     for fp in sorted(file_candidates):
                         try:
                             abs_path = Path(fp).resolve()
                             resolved = _resolve_video_path(abs_path)
                             if not resolved:
                                 continue
+
+                            resolved_key = str(resolved)
+                            if resolved_key in resolved_paths:
+                                continue
+                            resolved_paths.add(resolved_key)
 
                             rel_path = resolved.relative_to(out_dir).as_posix()
                             thumb_rel = None
@@ -214,10 +275,43 @@ async def run_download_job(job_id: str, url: str, request: "DownloadRequest") ->
                                 base_dir=str(out_dir),
                                 thumbnail_path=thumb_rel,
                             )
+                            catalog_updates += 1
                         except Exception as e:
                             logger.warning(f"Catalog update skipped for {fp}: {e}")
                 except Exception as e:
                     logger.warning(f"Catalog write-through failed (download_complete): {e}")
+            if settings.CATALOG_ENABLED and catalog_updates == 0:
+                try:
+                    fallback_dir = Path(target_dir).resolve()
+                    fallback_paths = _scan_recent_videos(fallback_dir, job_started_ts)
+                    if fallback_paths:
+                        logger.info(
+                            f"Catalog fallback scan found {len(fallback_paths)} new file(s) in {fallback_dir}"
+                        )
+                    for resolved in fallback_paths:
+                        try:
+                            resolved_key = str(resolved)
+                            if resolved_key in resolved_paths:
+                                continue
+                            resolved_paths.add(resolved_key)
+
+                            rel_path = resolved.relative_to(out_dir).as_posix()
+                            thumb_rel = None
+                            for ext in settings.THUMBNAIL_EXTENSIONS:
+                                candidate = resolved.with_suffix(ext)
+                                if candidate.exists():
+                                    thumb_rel = candidate.relative_to(out_dir).as_posix()
+                                    break
+                            await upsert_local_video_from_fs(
+                                video_path=rel_path,
+                                base_dir=str(out_dir),
+                                thumbnail_path=thumb_rel,
+                            )
+                            catalog_updates += 1
+                        except Exception as e:
+                            logger.warning(f"Catalog fallback update skipped for {resolved}: {e}")
+                except Exception as e:
+                    logger.warning(f"Catalog fallback scan failed (download_complete): {e}")
             complete_job(job_id, result)
 
     except Exception as e:

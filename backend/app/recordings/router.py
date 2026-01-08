@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 from app.core.logging import get_module_logger
 from app.core.rate_limit import limiter, RateLimits
 from app.core.blocking import run_blocking, get_fs_semaphore
+from app.config import settings
+from app.catalog.service import upsert_local_video_from_fs
 from .service import save_recording
 from .schemas import RecordingUploadResponse
 
@@ -20,7 +22,7 @@ async def upload_recording(
     request: Request,
     file: UploadFile = File(...),
     target_path: str = Form(default=""),
-    base_dir: str = "./downloads",
+    base_dir: str = settings.DOWNLOADS_DIR,
 ):
     """
     Recebe uma gravação enviada pelo frontend e salva na pasta de downloads.
@@ -35,6 +37,16 @@ async def upload_recording(
             semaphore=get_fs_semaphore(),
             label="recordings.save",
         )
+        if settings.CATALOG_ENABLED:
+            try:
+                await upsert_local_video_from_fs(
+                    video_path=result["path"],
+                    base_dir=base_dir,
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Catalog update skipped for recording {result.get('path')}: {e}"
+                )
         return result
     except HTTPException:
         raise

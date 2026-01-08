@@ -305,6 +305,12 @@ export default function ScreenRecorder({
 
       const data = await response.json();
       setUploadMessage(`Cópia salva em ${data.path}`);
+      try {
+        await fetch("/api/revalidate/local-videos", { method: "POST" });
+      } catch (revalidateError) {
+        console.warn("Falha ao revalidar cache de vídeos locais", revalidateError);
+      }
+      window.dispatchEvent(new Event("yt-archiver:videos-updated"));
       onSaveToLibrary?.();
     } catch (err) {
       console.error("Erro ao salvar gravação", err);
