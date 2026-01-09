@@ -2,23 +2,16 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PaginationControls } from "@/components/common/pagination";
 import VideoCard from "@/components/common/videos/video-card";
-import VideoPlayerLoading from "@/components/common/videos/video-player-loading";
-import { Loader2, VideoOff, Cloud, Trash2, X, CheckSquare } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import VideoGridHeader from "@/components/common/videos/video-grid-header";
+import VideoGridLoadingState from "@/components/common/videos/video-grid-loading-state";
+import VideoGridErrorState from "@/components/common/videos/video-grid-error-state";
+import VideoGridEmptyState from "@/components/common/videos/video-grid-empty-state";
+import SelectionActionBar from "@/components/common/videos/selection-action-bar";
+import BatchDeleteDialog from "@/components/common/videos/batch-delete-dialog";
+import VideoPlayerModal from "@/components/common/videos/video-player-modal";
+import { Cloud } from "lucide-react";
 import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
 import {
@@ -27,14 +20,6 @@ import {
   renameDriveVideo,
   updateDriveThumbnail,
 } from "@/lib/client/api";
-
-const VideoPlayer = dynamic(
-  () => import("@/components/common/videos/video-player"),
-  {
-    ssr: false,
-    loading: () => <VideoPlayerLoading />,
-  }
-);
 
 export type DriveVideo = {
   id: string;
@@ -181,7 +166,6 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
     [selectedIds]
   );
   const selectedCount = selectedIdsArray.length;
-  const hasSelection = selectedCount > 0;
 
   const handleBatchDeleteConfirm = useCallback(async () => {
     if (deleting || selectedCount === 0) return;
@@ -262,59 +246,35 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
     <>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="icon-glow p-2">
-              <Cloud className="h-5 w-5 text-cyan" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-white">Vídeos no Drive</h2>
-              <p className="text-sm text-muted-foreground">
-                {total} {total === 1 ? "vídeo" : "vídeos"} encontrados
-              </p>
-            </div>
-          </div>
-
-          <PaginationControls
-            page={page}
-            totalPages={totalPages}
-            loading={loading}
-            onPageChange={setPage}
-            onRefresh={() => fetchVideos(page)}
-          />
-        </div>
+        <VideoGridHeader
+          icon={<Cloud className="h-5 w-5 text-cyan" />}
+          title="Vídeos no Drive"
+          subtitle={`${total} ${total === 1 ? "vídeo" : "vídeos"} encontrados`}
+          rightSlot={
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              loading={loading}
+              onPageChange={setPage}
+              onRefresh={() => fetchVideos(page)}
+            />
+          }
+        />
 
         {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-cyan/10 flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-cyan" />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Carregando vídeos do Drive...
-              </p>
-            </div>
-          </div>
+          <VideoGridLoadingState
+            label="Carregando vídeos do Drive..."
+            iconWrapperClassName="bg-cyan/10"
+            iconClassName="text-cyan"
+          />
         ) : error ? (
-          <Alert className="bg-red-500/10 border-red-500/20">
-            <AlertDescription className="text-red-400">
-              Erro ao carregar vídeos: {error}
-            </AlertDescription>
-          </Alert>
+          <VideoGridErrorState message={`Erro ao carregar vídeos: ${error}`} />
         ) : videos.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center glass-card rounded-2xl">
-            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
-              <VideoOff className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-medium text-white mb-2">
-              Nenhum vídeo no Drive
-            </h3>
-            <p className="text-sm text-muted-foreground max-w-md">
-              Faça upload de vídeos locais para o Drive usando o painel de
-              sincronização acima.
-            </p>
-          </div>
+          <VideoGridEmptyState
+            title="Nenhum vídeo no Drive"
+            description="Faça upload de vídeos locais para o Drive usando o painel de sincronização acima."
+          />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {videos.map((video, index) => (
@@ -347,113 +307,30 @@ export default function DriveVideoGrid({ initialData }: DriveVideoGridProps) {
       </div>
 
       {/* Selection Action Bar */}
-      {hasSelection && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70]">
-          <div className="glass-card rounded-xl px-4 py-3 flex items-center gap-4 shadow-lg shadow-black/20">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-cyan/10 flex items-center justify-center">
-                <CheckSquare className="h-4 w-4 text-cyan" />
-              </div>
-              <span className="font-medium text-white">
-                {selectedCount}{" "}
-                {selectedCount === 1 ? "selecionado" : "selecionados"}
-              </span>
-            </div>
-
-            <div className="h-6 w-px bg-white/10" />
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={selectAll}
-                disabled={deleting || selectedCount === videos.length}
-                className="text-muted-foreground hover:text-white hover:bg-white/10"
-              >
-                Selecionar todos
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearSelection}
-                disabled={deleting}
-                className="text-muted-foreground hover:text-white hover:bg-white/10"
-              >
-                <X className="h-4 w-4 mr-1" />
-                Limpar
-              </Button>
-
-              <Button
-                size="sm"
-                onClick={() => setBatchDeleteDialogOpen(true)}
-                disabled={deleting}
-                className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
-              >
-                {deleting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Excluindo...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Excluir ({selectedCount})
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SelectionActionBar
+        selectedCount={selectedCount}
+        totalCount={videos.length}
+        deleting={deleting}
+        onSelectAll={selectAll}
+        onClear={clearSelection}
+        onDelete={() => setBatchDeleteDialogOpen(true)}
+        iconWrapperClassName="bg-cyan/10"
+        iconClassName="text-cyan"
+      />
 
       {/* Batch Delete Confirmation Dialog */}
-      <AlertDialog
+      <BatchDeleteDialog
         open={batchDeleteDialogOpen}
         onOpenChange={handleBatchDialogChange}
-      >
-        <AlertDialogContent className="glass border-white/10">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-white flex items-center gap-2">
-              <Trash2 className="h-5 w-5 text-red-400" />
-              Excluir {selectedCount} vídeos?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-muted-foreground">
-              Tem certeza que deseja excluir {selectedCount}{" "}
-              {selectedCount === 1 ? "vídeo" : "vídeos"} do Google Drive? Esta
-              ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={deleting}
-              className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white"
-            >
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleBatchDeleteConfirm}
-              disabled={deleting}
-              className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
-            >
-              {deleting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Excluindo...
-                </>
-              ) : (
-                `Excluir ${selectedCount} ${
-                  selectedCount === 1 ? "vídeo" : "vídeos"
-                }`
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        deleting={deleting}
+        selectedCount={selectedCount}
+        scopeLabel="do Google Drive"
+        onConfirm={handleBatchDeleteConfirm}
+      />
 
       {/* Video Player Modal */}
       {selectedVideo && (
-        <VideoPlayer
+        <VideoPlayerModal
           video={selectedVideo}
           source="drive"
           onClose={() => setSelectedVideo(null)}

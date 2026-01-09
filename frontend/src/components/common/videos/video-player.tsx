@@ -57,7 +57,8 @@ interface DriveVideo {
 }
 
 // Tipo unificado
-type Video = LocalVideo | DriveVideo;
+export type VideoPlayerVideo = LocalVideo | DriveVideo;
+type Video = VideoPlayerVideo;
 
 // Type guard para verificar se é vídeo local
 function isLocalVideo(video: Video): video is LocalVideo {
@@ -65,7 +66,7 @@ function isLocalVideo(video: Video): video is LocalVideo {
 }
 
 interface VideoPlayerProps {
-  video: Video;
+  video: VideoPlayerVideo;
   source?: "local" | "drive";
   onClose: () => void;
   onDelete: () => void;

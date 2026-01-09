@@ -2,23 +2,17 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
-import { Loader2, VideoOff, LibraryBig, Play } from "lucide-react";
+import { LibraryBig, Play } from "lucide-react";
 import VideoCard from "@/components/common/videos/video-card";
-import VideoPlayerLoading from "@/components/common/videos/video-player-loading";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import VideoGridHeader from "@/components/common/videos/video-grid-header";
+import VideoGridLoadingState from "@/components/common/videos/video-grid-loading-state";
+import VideoGridErrorState from "@/components/common/videos/video-grid-error-state";
+import VideoGridEmptyState from "@/components/common/videos/video-grid-empty-state";
+import VideoPlayerModal from "@/components/common/videos/video-player-modal";
 import { PATHS } from "@/lib/paths";
 import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
 import { deleteLocalVideo } from "@/lib/client/api";
-
-const VideoPlayer = dynamic(
-  () => import("@/components/common/videos/video-player"),
-  {
-    ssr: false,
-    loading: () => <VideoPlayerLoading />,
-  }
-);
 
 interface Video {
   id: string;
@@ -116,56 +110,35 @@ export default function RecentVideos({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="icon-glow">
-            <LibraryBig className="h-5 w-5 text-teal" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-white">{title}</h2>
-            <p className="text-sm text-muted-foreground">
-              Videos baixados recentemente
-            </p>
-          </div>
-        </div>
-        <Link
-          href={ctaHref}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 text-muted-foreground hover:text-white hover:border-teal/30 hover:bg-white/5 transition-all duration-300"
-        >
-          <Play className="h-4 w-4" />
-          <span className="hidden sm:inline">{ctaLabel}</span>
-        </Link>
-      </div>
+      <VideoGridHeader
+        icon={<LibraryBig className="h-5 w-5 text-teal" />}
+        title={title}
+        subtitle="Videos baixados recentemente"
+        rightSlot={
+          <Link
+            href={ctaHref}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 text-muted-foreground hover:text-white hover:border-teal/30 hover:bg-white/5 transition-all duration-300"
+          >
+            <Play className="h-4 w-4" />
+            <span className="hidden sm:inline">{ctaLabel}</span>
+          </Link>
+        }
+      />
 
       {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-teal/10 flex items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-teal" />
-            </div>
-            <p className="text-sm text-muted-foreground">Carregando videos...</p>
-          </div>
-        </div>
+        <VideoGridLoadingState
+          label="Carregando videos..."
+          iconWrapperClassName="bg-teal/10"
+          iconClassName="text-teal"
+        />
       ) : error ? (
-        <Alert
-          variant="destructive"
-          className="bg-red-500/10 border-red-500/20"
-        >
-          <AlertDescription>Erro ao carregar videos: {error}</AlertDescription>
-        </Alert>
+        <VideoGridErrorState message={`Erro ao carregar videos: ${error}`} />
       ) : videos.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center glass-card rounded-2xl">
-          <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
-            <VideoOff className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-medium text-white mb-2">
-            Nenhum video encontrado
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-md">
-            Baixe seu primeiro video usando o formulario acima. Seus videos aparecera aqui.
-          </p>
-        </div>
+        <VideoGridEmptyState
+          title="Nenhum video encontrado"
+          description="Baixe seu primeiro video usando o formulario acima. Seus videos aparecera aqui."
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {videos.map((video, index) => (
@@ -186,7 +159,7 @@ export default function RecentVideos({
       )}
 
       {selectedVideo && (
-        <VideoPlayer
+        <VideoPlayerModal
           video={selectedVideo}
           source="local"
           onClose={() => setSelectedVideo(null)}

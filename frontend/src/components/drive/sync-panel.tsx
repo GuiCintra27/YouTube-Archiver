@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -35,6 +36,7 @@ import {
 } from "@/components/ui/accordion";
 import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
+import { cn } from "@/lib/utils";
 
 interface SyncStatus {
   total_local: number;
@@ -91,6 +93,151 @@ interface JobResponse {
     failed: Array<{ file: string; error: string }>;
   };
   error?: string;
+}
+
+type SyncStatCardProps = {
+  icon: ReactNode;
+  value: number;
+  label: string;
+  className?: string;
+};
+
+function SyncStatCard({ icon, value, label, className }: SyncStatCardProps) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-center gap-2 p-4 rounded-xl bg-white/5 border border-white/10",
+        className
+      )}
+    >
+      {icon}
+      <div className="text-center">
+        <div className="text-2xl font-bold text-white">{value}</div>
+        <div className="text-xs text-muted-foreground">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+type TransferProgressCardProps = {
+  title: string;
+  label: string;
+  percent: number;
+  currentFile?: string | null;
+  failed?: number;
+  wrapperClassName: string;
+  titleClassName: string;
+  labelClassName: string;
+  currentFileClassName: string;
+};
+
+function TransferProgressCard({
+  title,
+  label,
+  percent,
+  currentFile,
+  failed,
+  wrapperClassName,
+  titleClassName,
+  labelClassName,
+  currentFileClassName,
+}: TransferProgressCardProps) {
+  return (
+    <div className={cn("space-y-3 p-4 rounded-xl", wrapperClassName)}>
+      <div className="flex items-center justify-between text-sm">
+        <span className={cn("font-medium", titleClassName)}>{title}</span>
+        <span className={cn("text-sm", labelClassName)}>{label}</span>
+      </div>
+      <Progress value={percent} className="h-2" />
+      {currentFile && (
+        <p className={cn("text-xs truncate", currentFileClassName)}>
+          Arquivo atual: {currentFile}
+        </p>
+      )}
+      {!!failed && failed > 0 && (
+        <p className="text-xs text-red-400">
+          {failed} arquivo(s) com falha
+        </p>
+      )}
+    </div>
+  );
+}
+
+type SyncListSectionProps<TItem> = {
+  value: string;
+  title: string;
+  count: number;
+  icon: ReactNode;
+  items: TItem[];
+  loading: boolean;
+  totalCount: number;
+  loadMoreLabel: string;
+  loadMoreClassName: string;
+  onLoadMore: () => void;
+  renderItem: (item: TItem) => ReactNode;
+};
+
+function SyncListSection<TItem>({
+  value,
+  title,
+  count,
+  icon,
+  items,
+  loading,
+  totalCount,
+  loadMoreLabel,
+  loadMoreClassName,
+  onLoadMore,
+  renderItem,
+}: SyncListSectionProps<TItem>) {
+  if (count <= 0) {
+    return null;
+  }
+
+  const canLoadMore = items.length < totalCount;
+
+  return (
+    <AccordionItem
+      value={value}
+      className="border-white/10 rounded-xl overflow-hidden"
+    >
+      <AccordionTrigger className="px-4 py-3 hover:bg-white/5 hover:no-underline">
+        <div className="flex items-center gap-2">
+          {icon}
+          <span className="text-white">
+            {title} ({count})
+          </span>
+        </div>
+      </AccordionTrigger>
+      <AccordionContent className="px-4 pb-3">
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {items.map(renderItem)}
+        </div>
+        <div className="pt-3">
+          {loading ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Carregando...
+            </div>
+          ) : canLoadMore ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onLoadMore}
+              className={loadMoreClassName}
+              aria-label={loadMoreLabel}
+            >
+              Carregar mais ({items.length}/{totalCount})
+            </Button>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Mostrando {items.length} de {totalCount}
+            </p>
+          )}
+        </div>
+      </AccordionContent>
+    </AccordionItem>
+  );
 }
 
 export default function SyncPanel() {
@@ -732,89 +879,54 @@ export default function SyncPanel() {
 
         {/* Upload Progress */}
         {uploadProgress && syncing && (
-          <div className="space-y-3 p-4 rounded-xl bg-cyan/10 border border-cyan/20">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-cyan">
-                Enviando para o Drive...
-              </span>
-              <span className="text-cyan/80">
-                {uploadProgress.uploaded}/{uploadProgress.total} ({Math.round(uploadProgress.percent)}%)
-              </span>
-            </div>
-            <Progress value={uploadProgress.percent} className="h-2" />
-            {uploadProgress.current_file && (
-              <p className="text-xs text-cyan/70 truncate">
-                Arquivo atual: {uploadProgress.current_file}
-              </p>
-            )}
-            {uploadProgress.failed > 0 && (
-              <p className="text-xs text-red-400">
-                {uploadProgress.failed} arquivo(s) com falha
-              </p>
-            )}
-          </div>
+          <TransferProgressCard
+            title="Enviando para o Drive..."
+            label={`${uploadProgress.uploaded}/${uploadProgress.total} (${Math.round(uploadProgress.percent)}%)`}
+            percent={uploadProgress.percent}
+            currentFile={uploadProgress.current_file}
+            failed={uploadProgress.failed}
+            wrapperClassName="bg-cyan/10 border border-cyan/20"
+            titleClassName="text-cyan"
+            labelClassName="text-cyan/80"
+            currentFileClassName="text-cyan/70"
+          />
         )}
 
         {/* Download Progress */}
         {downloadProgress && (downloading || downloadingVideo !== null) && (
-          <div className="space-y-3 p-4 rounded-xl bg-purple/10 border border-purple/20">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-purple">
-                {downloading ? "Baixando do Drive..." : "Baixando vídeo..."}
-              </span>
-              <span className="text-purple/80">
-                {downloadProgress.downloaded}/{downloadProgress.total} ({Math.round(downloadProgress.percent)}%)
-              </span>
-            </div>
-            <Progress value={downloadProgress.percent} className="h-2" />
-            {downloadProgress.current_file && (
-              <p className="text-xs text-purple/70 truncate">
-                Arquivo atual: {downloadProgress.current_file}
-              </p>
-            )}
-            {downloadProgress.failed > 0 && (
-              <p className="text-xs text-red-400">
-                {downloadProgress.failed} arquivo(s) com falha
-              </p>
-            )}
-          </div>
+          <TransferProgressCard
+            title={downloading ? "Baixando do Drive..." : "Baixando vídeo..."}
+            label={`${downloadProgress.downloaded}/${downloadProgress.total} (${Math.round(downloadProgress.percent)}%)`}
+            percent={downloadProgress.percent}
+            currentFile={downloadProgress.current_file}
+            failed={downloadProgress.failed}
+            wrapperClassName="bg-purple/10 border border-purple/20"
+            titleClassName="text-purple"
+            labelClassName="text-purple/80"
+            currentFileClassName="text-purple/70"
+          />
         )}
 
         {syncStatus && (
           <>
             {/* Stats */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white/5 border border-white/10">
-                <HardDrive className="h-5 w-5 text-teal" />
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-white">
-                    {syncStatus.total_local}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Local</div>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white/5 border border-white/10">
-                <Cloud className="h-5 w-5 text-cyan" />
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-white">
-                    {syncStatus.total_drive}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Drive</div>
-                </div>
-              </div>
-
-	              <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-teal/10 border border-teal/20">
-	                <CheckCircle2 className="h-5 w-5 text-teal" />
-	                <div className="text-center">
-	                  <div className="text-2xl font-bold text-white">
-	                    {syncStatus.synced_count}
-	                  </div>
-	                  <div className="text-xs text-muted-foreground">
-	                    Sincronizados
-	                  </div>
-	                </div>
-	              </div>
+              <SyncStatCard
+                icon={<HardDrive className="h-5 w-5 text-teal" />}
+                value={syncStatus.total_local}
+                label="Local"
+              />
+              <SyncStatCard
+                icon={<Cloud className="h-5 w-5 text-cyan" />}
+                value={syncStatus.total_drive}
+                label="Drive"
+              />
+              <SyncStatCard
+                icon={<CheckCircle2 className="h-5 w-5 text-teal" />}
+                value={syncStatus.synced_count}
+                label="Sincronizados"
+                className="bg-teal/10 border border-teal/20"
+              />
             </div>
 
             {/* Progress */}
@@ -905,176 +1017,103 @@ export default function SyncPanel() {
               value={openSection}
               onValueChange={setOpenSection}
             >
-              {/* Local Only */}
-              {syncStatus.local_only_count > 0 && (
-                <AccordionItem value="local-only" className="border-white/10 rounded-xl overflow-hidden">
-                  <AccordionTrigger className="px-4 py-3 hover:bg-white/5 hover:no-underline">
-                    <div className="flex items-center gap-2">
-                      <HardDrive className="h-4 w-4 text-teal" />
-                      <span className="text-white">Apenas Local ({syncStatus.local_only_count})</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="px-4 pb-3">
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {localOnlyItems.map((item) => (
-                        <div
-                          key={item.path}
-                          className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10"
-                        >
-                          <span className="text-sm truncate flex-1 text-white">
-                            {item.path}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleUploadSingle(item.path)}
-                            disabled={uploadingVideo !== null || syncing}
-                            className="text-muted-foreground hover:text-cyan hover:bg-cyan/10"
-                            aria-label={`Enviar ${item.path} para o Drive`}
-                          >
-                            {uploadingVideo === item.path ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Upload className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="pt-3">
-                      {loadingLocalOnly ? (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          Carregando...
-                        </div>
-                      ) : localOnlyItems.length < syncStatus.local_only_count ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={loadMoreLocalOnly}
-                          className="text-muted-foreground hover:text-teal hover:bg-teal/10"
-                          aria-label="Carregar mais vídeos locais"
-                        >
-                          Carregar mais ({localOnlyItems.length}/{syncStatus.local_only_count})
-                        </Button>
+              <SyncListSection
+                value="local-only"
+                title="Apenas Local"
+                count={syncStatus.local_only_count}
+                icon={<HardDrive className="h-4 w-4 text-teal" />}
+                items={localOnlyItems}
+                loading={loadingLocalOnly}
+                totalCount={syncStatus.local_only_count}
+                loadMoreLabel="Carregar mais vídeos locais"
+                loadMoreClassName="text-muted-foreground hover:text-teal hover:bg-teal/10"
+                onLoadMore={loadMoreLocalOnly}
+                renderItem={(item) => (
+                  <div
+                    key={item.path}
+                    className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10"
+                  >
+                    <span className="text-sm truncate flex-1 text-white">
+                      {item.path}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleUploadSingle(item.path)}
+                      disabled={uploadingVideo !== null || syncing}
+                      className="text-muted-foreground hover:text-cyan hover:bg-cyan/10"
+                      aria-label={`Enviar ${item.path} para o Drive`}
+                    >
+                      {uploadingVideo === item.path ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <p className="text-xs text-muted-foreground">
-                          Mostrando {localOnlyItems.length} de {syncStatus.local_only_count}
-                        </p>
+                        <Upload className="h-4 w-4" />
                       )}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              )}
+                    </Button>
+                  </div>
+                )}
+              />
 
-              {/* Drive Only */}
-              {syncStatus.drive_only_count > 0 && (
-                <AccordionItem value="drive-only" className="border-white/10 rounded-xl overflow-hidden">
-                  <AccordionTrigger className="px-4 py-3 hover:bg-white/5 hover:no-underline">
-                    <div className="flex items-center gap-2">
-                      <Cloud className="h-4 w-4 text-cyan" />
-                      <span className="text-white">Apenas Drive ({syncStatus.drive_only_count})</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="px-4 pb-3">
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {driveOnlyItems.map((item) => (
-                        <div
-                          key={item.path}
-                          className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10"
-                        >
-                          <span className="text-sm truncate flex-1 text-white">
-                            {item.path}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDownloadSingle(item)}
-                            disabled={downloadingVideo !== null || downloading || syncing || uploadingVideo !== null}
-                            className="text-muted-foreground hover:text-purple hover:bg-purple/10"
-                            aria-label={`Baixar ${item.path}`}
-                          >
-                            {downloadingVideo === item.path ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Download className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="pt-3">
-                      {loadingDriveOnly ? (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          Carregando...
-                        </div>
-                      ) : driveOnlyItems.length < syncStatus.drive_only_count ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={loadMoreDriveOnly}
-                          className="text-muted-foreground hover:text-cyan hover:bg-cyan/10"
-                          aria-label="Carregar mais vídeos do Drive"
-                        >
-                          Carregar mais ({driveOnlyItems.length}/{syncStatus.drive_only_count})
-                        </Button>
+              <SyncListSection
+                value="drive-only"
+                title="Apenas Drive"
+                count={syncStatus.drive_only_count}
+                icon={<Cloud className="h-4 w-4 text-cyan" />}
+                items={driveOnlyItems}
+                loading={loadingDriveOnly}
+                totalCount={syncStatus.drive_only_count}
+                loadMoreLabel="Carregar mais vídeos do Drive"
+                loadMoreClassName="text-muted-foreground hover:text-cyan hover:bg-cyan/10"
+                onLoadMore={loadMoreDriveOnly}
+                renderItem={(item) => (
+                  <div
+                    key={item.path}
+                    className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10"
+                  >
+                    <span className="text-sm truncate flex-1 text-white">
+                      {item.path}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDownloadSingle(item)}
+                      disabled={downloadingVideo !== null || downloading || syncing || uploadingVideo !== null}
+                      className="text-muted-foreground hover:text-purple hover:bg-purple/10"
+                      aria-label={`Baixar ${item.path}`}
+                    >
+                      {downloadingVideo === item.path ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <p className="text-xs text-muted-foreground">
-                          Mostrando {driveOnlyItems.length} de {syncStatus.drive_only_count}
-                        </p>
+                        <Download className="h-4 w-4" />
                       )}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              )}
+                    </Button>
+                  </div>
+                )}
+              />
 
-              {/* Synced */}
-              {syncStatus.synced_count > 0 && (
-                <AccordionItem value="synced" className="border-white/10 rounded-xl overflow-hidden">
-                  <AccordionTrigger className="px-4 py-3 hover:bg-white/5 hover:no-underline">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-teal" />
-                      <span className="text-white">Sincronizados ({syncStatus.synced_count})</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="px-4 pb-3">
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {syncedItems.map((item) => (
-                        <div
-                          key={item.path}
-                          className="flex items-center p-2 rounded-lg bg-teal/5 border border-teal/20"
-                        >
-                          <CheckCircle2 className="h-4 w-4 text-teal mr-2" />
-                          <span className="text-sm truncate text-white">{item.path}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="pt-3">
-                      {loadingSynced ? (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          Carregando...
-                        </div>
-                      ) : syncedItems.length < syncStatus.synced_count ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={loadMoreSynced}
-                          className="text-muted-foreground hover:text-teal hover:bg-teal/10"
-                          aria-label="Carregar mais vídeos sincronizados"
-                        >
-                          Carregar mais ({syncedItems.length}/{syncStatus.synced_count})
-                        </Button>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          Mostrando {syncedItems.length} de {syncStatus.synced_count}
-                        </p>
-                      )}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              )}
+              <SyncListSection
+                value="synced"
+                title="Sincronizados"
+                count={syncStatus.synced_count}
+                icon={<CheckCircle2 className="h-4 w-4 text-teal" />}
+                items={syncedItems}
+                loading={loadingSynced}
+                totalCount={syncStatus.synced_count}
+                loadMoreLabel="Carregar mais vídeos sincronizados"
+                loadMoreClassName="text-muted-foreground hover:text-teal hover:bg-teal/10"
+                onLoadMore={loadMoreSynced}
+                renderItem={(item) => (
+                  <div
+                    key={item.path}
+                    className="flex items-center p-2 rounded-lg bg-teal/5 border border-teal/20"
+                  >
+                    <CheckCircle2 className="h-4 w-4 text-teal mr-2" />
+                    <span className="text-sm truncate text-white">
+                      {item.path}
+                    </span>
+                  </div>
+                )}
+              />
             </Accordion>
           </>
         )}

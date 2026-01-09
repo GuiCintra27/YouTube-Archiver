@@ -2,30 +2,16 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
 import VideoCard from "@/components/common/videos/video-card";
-import VideoPlayerLoading from "@/components/common/videos/video-player-loading";
 import { PaginationControls } from "@/components/common/pagination";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Loader2,
-  VideoOff,
-  Trash2,
-  X,
-  CheckSquare,
-  Library,
-} from "lucide-react";
+import VideoGridHeader from "@/components/common/videos/video-grid-header";
+import VideoGridLoadingState from "@/components/common/videos/video-grid-loading-state";
+import VideoGridErrorState from "@/components/common/videos/video-grid-error-state";
+import VideoGridEmptyState from "@/components/common/videos/video-grid-empty-state";
+import SelectionActionBar from "@/components/common/videos/selection-action-bar";
+import BatchDeleteDialog from "@/components/common/videos/batch-delete-dialog";
+import VideoPlayerModal from "@/components/common/videos/video-player-modal";
+import { Library } from "lucide-react";
 import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
 import {
@@ -34,14 +20,6 @@ import {
   renameLocalVideo,
   updateLocalThumbnail,
 } from "@/lib/client/api";
-
-const VideoPlayer = dynamic(
-  () => import("@/components/common/videos/video-player"),
-  {
-    ssr: false,
-    loading: () => <VideoPlayerLoading />,
-  }
-);
 
 interface Video {
   id: string;
@@ -179,7 +157,6 @@ export default function PaginatedVideoGrid({
     [selectedPaths]
   );
   const selectedCount = selectedPathsArray.length;
-  const hasSelection = selectedCount > 0;
 
   const handleBatchDeleteConfirm = useCallback(async () => {
     if (deleting || selectedCount === 0) return;
@@ -252,58 +229,35 @@ export default function PaginatedVideoGrid({
     <>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="icon-glow p-2">
-              <Library className="h-5 w-5 text-teal" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-white">Minha Biblioteca</h2>
-              <p className="text-sm text-muted-foreground">
-                {total} {total === 1 ? "vídeo" : "vídeos"} encontrados
-              </p>
-            </div>
-          </div>
-
-          <PaginationControls
-            page={page}
-            totalPages={totalPages}
-            loading={loading}
-            onPageChange={setPage}
-            onRefresh={() => fetchVideos(page)}
-          />
-        </div>
+        <VideoGridHeader
+          icon={<Library className="h-5 w-5 text-teal" />}
+          title="Minha Biblioteca"
+          subtitle={`${total} ${total === 1 ? "vídeo" : "vídeos"} encontrados`}
+          rightSlot={
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              loading={loading}
+              onPageChange={setPage}
+              onRefresh={() => fetchVideos(page)}
+            />
+          }
+        />
 
         {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-teal/10 flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-teal" />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Carregando vídeos...
-              </p>
-            </div>
-          </div>
+          <VideoGridLoadingState
+            label="Carregando vídeos..."
+            iconWrapperClassName="bg-teal/10"
+            iconClassName="text-teal"
+          />
         ) : error ? (
-          <Alert className="bg-red-500/10 border-red-500/20">
-            <AlertDescription className="text-red-400">
-              Erro ao carregar vídeos: {error}
-            </AlertDescription>
-          </Alert>
+          <VideoGridErrorState message={`Erro ao carregar vídeos: ${error}`} />
         ) : videos.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center glass-card rounded-2xl">
-            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
-              <VideoOff className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-medium text-white mb-2">
-              Nenhum vídeo encontrado
-            </h3>
-            <p className="text-sm text-muted-foreground max-w-md">
-              Faça o download de alguns vídeos para vê-los aparecer aqui.
-            </p>
-          </div>
+          <VideoGridEmptyState
+            title="Nenhum vídeo encontrado"
+            description="Faça o download de alguns vídeos para vê-los aparecer aqui."
+          />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {videos.map((video, index) => (
@@ -335,113 +289,30 @@ export default function PaginatedVideoGrid({
       </div>
 
       {/* Selection Action Bar */}
-      {hasSelection && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70]">
-          <div className="glass-card rounded-xl px-4 py-3 flex items-center gap-4 shadow-lg shadow-black/20">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-teal/10 flex items-center justify-center">
-                <CheckSquare className="h-4 w-4 text-teal" />
-              </div>
-              <span className="font-medium text-white">
-                {selectedCount}{" "}
-                {selectedCount === 1 ? "selecionado" : "selecionados"}
-              </span>
-            </div>
-
-            <div className="h-6 w-px bg-white/10" />
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={selectAll}
-                disabled={deleting || selectedCount === videos.length}
-                className="text-muted-foreground hover:text-white hover:bg-white/10"
-              >
-                Selecionar todos
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearSelection}
-                disabled={deleting}
-                className="text-muted-foreground hover:text-white hover:bg-white/10"
-              >
-                <X className="h-4 w-4 mr-1" />
-                Limpar
-              </Button>
-
-              <Button
-                size="sm"
-                onClick={() => setBatchDeleteDialogOpen(true)}
-                disabled={deleting}
-                className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
-              >
-                {deleting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Excluindo...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Excluir ({selectedCount})
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SelectionActionBar
+        selectedCount={selectedCount}
+        totalCount={videos.length}
+        deleting={deleting}
+        onSelectAll={selectAll}
+        onClear={clearSelection}
+        onDelete={() => setBatchDeleteDialogOpen(true)}
+        iconWrapperClassName="bg-teal/10"
+        iconClassName="text-teal"
+      />
 
       {/* Batch Delete Confirmation Dialog */}
-      <AlertDialog
+      <BatchDeleteDialog
         open={batchDeleteDialogOpen}
         onOpenChange={handleBatchDialogChange}
-      >
-        <AlertDialogContent className="glass border-white/10">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-white flex items-center gap-2">
-              <Trash2 className="h-5 w-5 text-red-400" />
-              Excluir {selectedCount} vídeos?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-muted-foreground">
-              Tem certeza que deseja excluir {selectedCount}{" "}
-              {selectedCount === 1 ? "vídeo" : "vídeos"} da biblioteca? Esta
-              ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={deleting}
-              className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white"
-            >
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleBatchDeleteConfirm}
-              disabled={deleting}
-              className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
-            >
-              {deleting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Excluindo...
-                </>
-              ) : (
-                `Excluir ${selectedCount} ${
-                  selectedCount === 1 ? "vídeo" : "vídeos"
-                }`
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        deleting={deleting}
+        selectedCount={selectedCount}
+        scopeLabel="da biblioteca"
+        onConfirm={handleBatchDeleteConfirm}
+      />
 
       {/* Video Player Modal */}
       {selectedVideo && (
-        <VideoPlayer
+        <VideoPlayerModal
           video={selectedVideo}
           source="local"
           onClose={() => setSelectedVideo(null)}
