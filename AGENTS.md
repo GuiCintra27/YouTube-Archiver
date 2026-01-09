@@ -150,9 +150,13 @@ open http://localhost:3000
 ```
 yt-archiver/
 ├── backend/                     # FastAPI Python backend
-│   ├── api.py                  # Main API endpoints
-│   ├── downloader.py           # yt-dlp wrapper
-│   ├── drive_manager.py        # Google Drive integration
+│   ├── app/
+│   │   ├── main.py             # Main API endpoints
+│   │   ├── downloads/          # Downloads (router/service/schemas/downloader)
+│   │   ├── drive/              # Google Drive integration
+│   │   ├── catalog/            # Catálogo SQLite (local + drive)
+│   │   ├── library/            # Biblioteca local
+│   │   └── recordings/         # Gravação de tela
 │   ├── requirements.txt
 │   ├── run.sh                  # ALWAYS use this to start backend
 │   └── docs/project/           # Backend-specific docs
@@ -163,6 +167,11 @@ yt-archiver/
 │   ├── src/
 │   │   ├── app/               # Next.js App Router pages
 │   │   ├── components/        # React components
+│   │   │   ├── common/         # Navegação + vídeos compartilhados
+│   │   │   ├── drive/          # Componentes Google Drive
+│   │   │   ├── home/           # Home (downloads)
+│   │   │   ├── library/        # Biblioteca local
+│   │   │   └── record/         # Gravação de tela
 │   │   └── lib/               # Utilities
 │   ├── package.json
 │   └── docs/project/          # Frontend-specific docs
@@ -202,7 +211,7 @@ All are in `.gitignore` - verify before commits.
 
 ### Backend (Python)
 1. **ALWAYS use `./run.sh`** to start backend
-   - ❌ NOT: `python api.py` (doesn't activate venv)
+   - ❌ NOT: `python backend/app/main.py` (doesn't activate venv)
    - ✅ YES: `./run.sh` (activates venv automatically)
 
 2. **Unicode/Encoding**
@@ -226,8 +235,10 @@ All are in `.gitignore` - verify before commits.
    - Server Components by default
    - `suppressHydrationWarning` needed for dynamic themes
 
-2. **Plyr CSS**
-   - Import in `layout.tsx`: `import "plyr-react/plyr.css"`
+2. **Vidstack CSS**
+   - Import in `layout.tsx`:
+     - `import "@vidstack/react/player/styles/default/theme.css";`
+     - `import "@vidstack/react/player/styles/default/layouts/video.css";`
    - Required for correct player styles
 
 3. **API Calls**
@@ -243,9 +254,9 @@ All are in `.gitignore` - verify before commits.
 ## 🛠️ Common Development Tasks
 
 ### Adding a new download option
-1. Add field in `frontend/src/components/download-form.tsx`
-2. Add parameter in Pydantic model at `backend/api.py` (class `DownloadRequest`)
-3. Pass parameter to `Settings` in `backend/downloader.py`
+1. Add field in `frontend/src/components/home/download-form.tsx`
+2. Add parameter in Pydantic model at `backend/app/downloads/schemas.py` (class `DownloadRequest`)
+3. Pass parameter to `Settings` in `backend/app/downloads/service.py`
 4. Implement logic in `_base_opts()` of `Downloader`
 
 ### Adding a shadcn/ui component
@@ -296,12 +307,13 @@ git cz              # Option 3 (if installed globally)
 - API Docs: http://localhost:8000/docs
 
 ### Key Files
-- `backend/api.py:1-700` - All REST endpoints
-- `backend/downloader.py:1-300` - yt-dlp wrapper
-- `backend/drive_manager.py:1-430` - Google Drive manager
+- `backend/app/main.py` - All REST endpoints
+- `backend/app/downloads/downloader.py` - yt-dlp wrapper
+- `backend/app/drive/manager.py` - Google Drive manager
 - `frontend/src/app/page.tsx` - Main page
 - `frontend/src/app/drive/page.tsx` - Drive page
-- `frontend/src/components/video-grid.tsx` - Local video player
+- `frontend/src/components/library/paginated-video-grid.tsx` - Local video grid
+- `frontend/src/components/common/videos/video-player.tsx` - Local video player
 - `CLAUDE.md` - Detailed instructions for Claude
 - `README.md` - Complete project documentation
 

@@ -57,7 +57,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
   - Grafana: `http://localhost:3001`
   - Dashboards provisionados em `ops/observability/grafana/dashboards/`
   - Alertas em `ops/observability/alerts.yml`
-  - Guia completo: `docs/local/OBSERVABILITY.md`
+  - Guia completo: `../docs/project/OBSERVABILITY.md`
 
 ### 📥 Download e Jobs
 - **POST** `/api/download` - Inicia download de vídeo/playlist
@@ -72,6 +72,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - **GET** `/api/videos/stream/{video_path}` - Stream de vídeo (range requests)
 - **GET** `/api/videos/thumbnail/{thumbnail_path}` - Serve thumbnail
 - **DELETE** `/api/videos/{video_path}` - Exclui vídeo e arquivos relacionados
+
+### 🎥 Gravações de Tela
+- **POST** `/api/recordings/upload` - Salva gravação enviada pelo frontend
 
 **Nota:** downloads sempre usam o diretório padrão configurado em `DOWNLOADS_DIR` (default `./downloads`).
 **Naming:** os arquivos são salvos como `Uploader/Playlist/Titulo.ext` (sem data/ID). Se o nome já existir, o download falha com erro amigável (sem sobrescrever).
@@ -89,15 +92,18 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - **GET** `/api/drive/oauth2callback` - Callback OAuth (troca código por token)
 - **GET** `/api/drive/videos` - Lista vídeos no Drive
 - **POST** `/api/drive/upload/{video_path}` - Upload de vídeo individual
+- **POST** `/api/drive/upload-external` - Upload externo (vídeo + thumbnail + extras)
 - **POST** `/api/drive/sync-all` - Sincroniza todos os vídeos locais
 - **GET** `/api/drive/sync-status` - Status de sincronização (local vs Drive)
 - **GET** `/api/drive/sync-items` - Itens paginados (local_only/drive_only/synced)
 - **GET** `/api/drive/stream/{file_id}` - Stream de vídeo do Drive
 - **GET** `/api/drive/thumbnail/{file_id}` - Thumbnail do Drive
+- **GET** `/api/drive/custom-thumbnail/{file_id}` - Thumbnail customizada
 - **DELETE** `/api/drive/videos/{file_id}` - Remove vídeo do Drive (vídeo + arquivos relacionados)
 - **POST** `/api/drive/videos/delete-batch` - Exclui múltiplos vídeos em lote
 - **POST** `/api/drive/download` - Download de vídeo do Drive (por path ou file_id)
 - **POST** `/api/drive/download-all` - Download em lote (Drive -> local)
+- **POST** `/api/drive/videos/{file_id}/thumbnail` - Atualiza thumbnail no Drive
 
 **Notas do delete (Drive):**
 - A exclusão remove o vídeo e arquivos relacionados (thumb, legendas, metadata).
@@ -142,7 +148,7 @@ backend/
 3. Criar credenciais OAuth 2.0 (Desktop app)
 4. Baixar JSON → salvar como `credentials.json`
 
-**Guia completo:** Ver `../GOOGLE-DRIVE-SETUP.md`
+**Guia completo:** Ver `../docs/project/GOOGLE-DRIVE-SETUP.md`
 
 ### Primeiro Uso
 1. Colocar `credentials.json` na pasta `backend/`
@@ -190,7 +196,7 @@ uvicorn app.main:app --reload
 **Causa:** Tentou usar funcionalidades do Drive sem configurar OAuth.
 
 **Solução:**
-1. Ver guia completo: `../GOOGLE-DRIVE-SETUP.md`
+1. Ver guia completo: `../docs/project/GOOGLE-DRIVE-SETUP.md`
 2. Obter `credentials.json` do Google Cloud Console
 3. Colocar em `backend/credentials.json`
 

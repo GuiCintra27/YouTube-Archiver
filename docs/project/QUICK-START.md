@@ -30,6 +30,11 @@ cd ..
 start-dev.bat
 ```
 
+O script:
+- instala dependências do backend
+- instala dependências do frontend (se `node_modules` não existir)
+- verifica `ffmpeg` no sistema (não instala automaticamente)
+
 **Opção B - Manual**
 
 Terminal 1:
@@ -165,7 +170,7 @@ Após testar, explore:
 1. **Opções Avançadas** - Headers customizados, cookies, etc
 2. **API Docs** - http://localhost:8000/docs
 3. **Histórico** - Ver downloads anteriores via API
-4. **CLI Original** - `python python/main.py --help`
+4. **CLI legado** - removido do monorepo atual (use tags antigas, se necessário)
 
 ## 📚 Documentação Completa
 

@@ -7,17 +7,15 @@ Interface web moderna para o YT-Archiver, permitindo downloads de vídeos de for
 ```
 yt-archiver/
 ├── backend/              # API FastAPI
-│   ├── api.py           # Endpoints REST
-│   ├── downloader.py    # Lógica de download
+│   ├── app/             # Código da API
 │   └── requirements.txt
-├── web-ui/              # Frontend Next.js
+├── frontend/             # Frontend Next.js 15
 │   ├── src/
-│   │   ├── app/        # Páginas Next.js
-│   │   ├── components/ # Componentes React
-│   │   └── lib/        # Utilitários
+│   │   ├── app/         # Páginas (App Router)
+│   │   ├── components/  # Componentes React
+│   │   └── lib/         # Utilitários
 │   └── package.json
-└── python/              # Script CLI original
-    └── main.py
+└── docs/                 # Documentação oficial
 ```
 
 ## 🚀 Início Rápido
@@ -40,23 +38,30 @@ pip install -r requirements.txt
 ### 2. Instalar Frontend
 
 ```bash
-cd web-ui
+cd frontend
 npm install
 ```
 
 ### 3. Executar (Desenvolvimento)
 
+**Atalho (recomendado):**
+
+```bash
+./start-dev.sh
+```
+
 **Terminal 1 - Backend:**
+
 ```bash
 cd backend
-source .venv/bin/activate
-python api.py
+./run.sh
 # API rodando em http://localhost:8000
 ```
 
 **Terminal 2 - Frontend:**
+
 ```bash
-cd web-ui
+cd frontend
 npm run dev
 # Interface em http://localhost:3000
 ```
@@ -74,6 +79,12 @@ Abra o navegador em: **http://localhost:3000**
 1. Cole a URL do vídeo/playlist no campo principal
 2. Clique em **Baixar**
 3. Acompanhe o progresso em tempo real
+
+### Biblioteca, Drive e Gravação
+
+- **Biblioteca (`/library`)**: lista vídeos locais com edição, thumbnail e player.
+- **Drive (`/drive`)**: upload/sync local↔Drive, compartilhamento e upload externo com thumbnail customizada.
+- **Gravar (`/record`)**: grava a tela e salva direto na biblioteca (ou baixa no navegador).
 
 ### Opções Avançadas
 
@@ -98,6 +109,7 @@ Clique em "Opções Avançadas" para configurar:
 Inicia um novo download.
 
 **Request:**
+
 ```json
 {
   "url": "https://www.youtube.com/watch?v=...",
@@ -110,6 +122,7 @@ Inicia um novo download.
 **Nota:** o diretório de saída é fixo e usa o padrão configurado no backend (`DOWNLOADS_DIR`).
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -119,6 +132,7 @@ Inicia um novo download.
 ```
 
 **Notas:**
+
 - Diretório de saída é fixo e usa `DOWNLOADS_DIR` do backend.
 - Arquivos são salvos como `Uploader/Playlist/Titulo.ext` (sem data/ID).
 - Se o nome já existir, o download falha sem sobrescrever.
@@ -128,6 +142,7 @@ Inicia um novo download.
 Obtém status de um download.
 
 **Response:**
+
 ```json
 {
   "job_id": "uuid",
@@ -149,6 +164,7 @@ Lista todos os downloads.
 Obtém informações sobre um vídeo sem baixar.
 
 **Request:**
+
 ```json
 {
   "url": "https://www.youtube.com/watch?v=..."
@@ -156,6 +172,7 @@ Obtém informações sobre um vídeo sem baixar.
 ```
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -172,29 +189,19 @@ Obtém informações sobre um vídeo sem baixar.
 
 ### ✅ Implementadas
 
-- [x] Interface web moderna com Next.js 15
-- [x] Componentes UI com shadcn/ui
-- [x] Download de vídeos e playlists
-- [x] Barra de progresso em tempo real
-- [x] Configurações avançadas (headers, cookies, qualidade)
-- [x] API REST com FastAPI
-- [x] Sistema de jobs para gerenciar downloads
-- [x] Feedback visual de sucesso/erro
-- [x] Nomenclatura customizada de arquivos
-- [x] Suporte a streams HLS
-- [x] Alternância de tema claro/escuro com toggle no header
+- [x] Next.js 15 com SSR + cache por tags
+- [x] Biblioteca local com edição, thumbnails e player Vidstack
+- [x] Google Drive com sync, upload em lote e compartilhamento público
+- [x] Upload externo com thumbnail, legendas e transcrição
+- [x] Gravação de tela no navegador com salvamento na biblioteca
+- [x] Global Player com Picture-in-Picture
+- [x] Jobs em background com progresso em tempo real
+- [x] UI moderna com shadcn/ui + Tailwind
 
 ### 🔜 Futuras Melhorias
 
-- [ ] Upload automático para Google Drive via interface
-- [ ] Histórico de downloads persistente
-- [ ] Fila de downloads
-- [ ] Cancelamento de downloads
-- [ ] Dark mode toggle
-- [ ] Preview de vídeo antes de baixar
-- [ ] Download de múltiplas URLs simultâneas
-- [ ] Agendamento de downloads
-- [ ] Notificações por email quando concluir
+- [ ] Notificações de conclusão (desktop)
+- [ ] Fila persistente de downloads
 
 ---
 
@@ -203,11 +210,13 @@ Obtém informações sobre um vídeo sem baixar.
 ### Tecnologias
 
 **Backend:**
+
 - FastAPI - Framework web assíncrono
 - yt-dlp - Motor de download
 - Uvicorn - Servidor ASGI
 
 **Frontend:**
+
 - Next.js 15 - Framework React
 - TypeScript - Tipagem estática
 - Tailwind CSS - Estilização
@@ -215,12 +224,14 @@ Obtém informações sobre um vídeo sem baixar.
 - Lucide React - Ícones
 
 ### Rotas e Endpoints Centralizados
+
 - Prefira os enums já disponíveis a strings literais:
   - `frontend/src/lib/paths.ts` → `PATHS` para caminhos de páginas (`/`, `/drive`, `/record`, `/library`).
   - `frontend/src/lib/api-urls.ts` → `APIURLS` para paths de API (`download`, `jobs`, `drive/auth-status`, etc.).
 - Motivos: evita typos, facilita refactors e mantém URLs coerentes entre chamadas e navegação.
 
 ### SSR + Cache (App Router)
+
 - Páginas principais usam Server Components com dados iniciais:
   - `/library`, `/drive`, `/record` e `/` (recentes).
 - Fetch server-side com cache nativo do Next:
@@ -231,6 +242,7 @@ Obtém informações sobre um vídeo sem baixar.
   - helper: `frontend/src/lib/server/route-utils.ts`
 
 ### Client API Unificado
+
 - Operacoes de mutacao no client usam um wrapper unico:
   - `frontend/src/lib/client/api.ts`
 - Evita repeticao de fetch e padroniza erros.
@@ -242,22 +254,35 @@ src/
 ├── app/
 │   ├── layout.tsx       # Layout principal
 │   ├── page.tsx         # Página inicial
+│   ├── drive/page.tsx   # Página Drive
+│   ├── library/page.tsx # Biblioteca
+│   ├── record/page.tsx  # Gravação de tela
 │   └── globals.css      # Estilos globais
 ├── components/
-│   ├── download-form.tsx  # Formulário principal
-│   └── ui/               # Componentes shadcn/ui
+│   ├── common/            # Componentes compartilhados
+│   ├── drive/             # Drive (auth, grid, sync, upload externo)
+│   ├── home/              # Home (download form)
+│   ├── library/           # Biblioteca (grid paginado)
+│   ├── record/            # Gravação de tela
+│   └── ui/                # Componentes shadcn/ui
 └── lib/
-    └── utils.ts          # Funções utilitárias
+    ├── api-urls.ts        # Endpoints da API
+    ├── paths.ts           # Rotas do app
+    ├── client/api.ts      # Cliente HTTP (frontend)
+    ├── server/api.ts      # Fetch SSR + cache tags
+    ├── server/tags.ts     # Tags de cache
+    └── utils.ts           # Funções utilitárias
 ```
 
 ### Adicionar Novos Componentes shadcn/ui
 
 ```bash
-cd web-ui
+cd frontend
 npx shadcn@latest add [component-name]
 ```
 
 Exemplo:
+
 ```bash
 npx shadcn@latest add dialog
 npx shadcn@latest add table
@@ -266,6 +291,8 @@ npx shadcn@latest add table
 ---
 
 ## 🐳 Deploy com Docker
+
+**Nota:** os exemplos abaixo são templates e podem exigir ajuste (Dockerfiles não estão incluídos por padrão).
 
 ### Backend
 
@@ -279,11 +306,10 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ .
-COPY python/ ./python/
 
 EXPOSE 8000
 
-CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ### Frontend
@@ -292,10 +318,10 @@ CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
 FROM node:18-alpine AS builder
 
 WORKDIR /app
-COPY web-ui/package*.json ./
+COPY frontend/package*.json ./
 RUN npm ci
 
-COPY web-ui/ ./
+COPY frontend/ ./
 RUN npm run build
 
 FROM node:18-alpine
@@ -313,7 +339,7 @@ CMD ["node", "server.js"]
 ### Docker Compose
 
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   backend:
@@ -331,7 +357,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: web-ui/Dockerfile
+      dockerfile: frontend/Dockerfile
     ports:
       - "3000:3000"
     environment:
@@ -364,7 +390,7 @@ python -c "import sys; print(sys.path)"
 ### Erro "Module not found"
 
 ```bash
-cd web-ui
+cd frontend
 rm -rf node_modules package-lock.json
 npm install
 ```
@@ -383,14 +409,14 @@ npm install
 
 ```bash
 cd backend
-python api.py
+./run.sh
 # Logs aparecem no terminal
 ```
 
 ### Logs do Frontend
 
 ```bash
-cd web-ui
+cd frontend
 npm run dev
 # Abrir DevTools do navegador (F12) > Console
 ```

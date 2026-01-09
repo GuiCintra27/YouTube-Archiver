@@ -17,7 +17,7 @@ Este documento lista as melhorias implementadas no frontend do YT-Archiver.
 | 3 | Criar Camada de API Centralizada | ✅ Implementado | `lib/api-client.ts` |
 | 4 | Remover Duplicação de formatBytes | ✅ Implementado | `lib/utils.ts` |
 | 5 | Criar Error Boundary | ✅ Implementado | `components/common/error-boundary.tsx` |
-| 6 | Substituir alert() por mensagens inline | ✅ Implementado | `drive/sync-panel.tsx`, `drive/drive-video-player.tsx` |
+| 6 | Substituir alert() por mensagens inline | ✅ Implementado | `components/drive/sync-panel.tsx`, `components/drive/drive-video-grid.tsx` |
 | 7 | Adicionar useCallback para Event Handlers | ✅ Implementado | 8+ componentes |
 | 8 | Adicionar AbortController às Requisições | ✅ Implementado | `hooks/use-fetch.ts` |
 | 9 | Migrar ESLint para Flat Config | ✅ Implementado | `eslint.config.mjs` |
@@ -149,7 +149,6 @@ frontend/src/
 - `components/common/theme-provider.tsx` - useCallback para setTheme/toggleTheme
 - `components/common/videos/video-card.tsx` - Usa useApiUrl
 - `components/drive/sync-panel.tsx` - Mensagens inline (Alert)
-- `components/drive/drive-video-player.tsx` - useApiUrl + mensagens inline
 - `components/drive/drive-video-grid.tsx` - useApiUrl + useCallback
 - `components/drive/drive-auth.tsx` - useApiUrl
 - `components/library/paginated-video-grid.tsx` - useApiUrl + useCallback
@@ -335,15 +334,10 @@ npm run build
 npx tsc --noEmit
 ```
 
-### Warnings Restantes (Aceitáveis)
+### Warnings Restantes
 
-| Arquivo | Warning | Motivo |
-|---------|---------|--------|
-| `drive-video-player.tsx` | `@typescript-eslint/no-explicit-any` | Plyr ref |
-| `download-form.tsx` | `@typescript-eslint/no-explicit-any` | Plyr ref |
-| `video-card.tsx` | `@next/next/no-img-element` | Thumbnails dinâmicas |
-| `drive-video-grid.tsx` | `@next/next/no-img-element` | Thumbnails dinâmicas |
-| `screen-recorder.tsx` | `no-useless-escape` | Regex |
+Sem warnings críticos registrados na última revisão.  
+Se quiser validar novamente, rode `npm run lint`.
 
 ---
 
@@ -381,11 +375,14 @@ frontend/
 │   │   │   ├── videos/
 │   │   │   │   ├── video-card.tsx
 │   │   │   │   └── video-player.tsx
-│   │   │   └── pagination.tsx
+│   │   │   └── pagination/
+│   │   │       ├── index.ts
+│   │   │       └── pagination-controls.tsx
 │   │   ├── drive/
 │   │   │   ├── drive-auth.tsx
+│   │   │   ├── drive-page-client.tsx
 │   │   │   ├── drive-video-grid.tsx
-│   │   │   ├── drive-video-player.tsx
+│   │   │   ├── external-upload-modal.tsx
 │   │   │   └── sync-panel.tsx
 │   │   ├── home/
 │   │   │   └── download-form.tsx

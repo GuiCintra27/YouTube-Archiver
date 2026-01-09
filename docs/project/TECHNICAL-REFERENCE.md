@@ -2,7 +2,9 @@
 
 Guia de consulta rápida para desenvolvimento e troubleshooting.
 
-**Última atualização:** 2025-11-29
+**Índice:** **[INDEX.md](./INDEX.md)**
+
+**Última atualização:** 2026-01-09
 
 ---
 
@@ -30,24 +32,27 @@ Guia de consulta rápida para desenvolvimento e troubleshooting.
 ### Backend
 | Componente | Tecnologia | Versão | Uso |
 |------------|-----------|---------|-----|
-| Framework | FastAPI | Latest | REST API |
-| Server | Uvicorn | Latest | ASGI server |
-| Validação | Pydantic | Latest | Request/response models |
-| Download | yt-dlp | Latest | Video downloader |
-| OAuth | google-auth-oauthlib | Latest | Google Drive auth |
-| Drive API | google-api-python-client | Latest | Drive operations |
+| Framework | FastAPI | 0.115+ | REST API |
+| Server | Uvicorn | 0.32+ | ASGI server |
+| Validação | Pydantic | 2.9+ | Request/response models |
+| Download | yt-dlp | 2024.07+ | Video downloader |
+| OAuth | google-auth-oauthlib | 1.2+ | Google Drive auth |
+| Drive API | google-api-python-client | 2.137+ | Drive operations |
+| Cache SQLite | aiosqlite | 0.19+ | Drive cache access |
+| Observabilidade | prometheus-client | 0.20+ | Metrics endpoint |
+| Jobs store (opcional) | redis | 5.0+ | Backend compartilhado de jobs |
 | Catalog DB | SQLite | Built-in | Catálogo persistente (local + drive) |
 | Runtime | Python | 3.12+ | Backend runtime |
 
 ### Frontend
 | Componente | Tecnologia | Versão | Uso |
 |------------|-----------|---------|-----|
-| Framework | Next.js | 15.0.0 | React framework |
+| Framework | Next.js | 15.0.5 | React framework |
 | UI Library | shadcn/ui | Latest | Component library |
-| CSS | Tailwind CSS | 3.4+ | Styling |
-| Video Player | Plyr | 3.8.3 | HTML5 player |
-| Icons | Lucide React | Latest | Icon system |
-| Linter | ESLint | 9.x | Flat config |
+| CSS | Tailwind CSS | 3.4.17 | Styling |
+| Video Player | Vidstack | 1.12.13 | HTML5 player |
+| Icons | Lucide React | 0.468+ | Icon system |
+| Linter | ESLint | 9.39.1 | Flat config |
 | Runtime | Node.js | 18+ | Frontend runtime |
 
 ---
@@ -58,28 +63,26 @@ Guia de consulta rápida para desenvolvimento e troubleshooting.
 
 ```
 backend/app/
-├── main.py                         # ⭐ Entry point FastAPI
-│   └── Registra todos os routers
-│
+├── main.py                         # ⭐ Entry point FastAPI + routers + /metrics
 ├── config.py                       # Configurações globais (Settings)
 │
 ├── core/                           # Módulo central compartilhado
-│   ├── logging.py                  # ⭐ Sistema de logging estruturado
+│   ├── logging.py                  # ⭐ Logger estruturado + request_id
+│   ├── metrics.py                  # ⭐ Prometheus metrics
+│   ├── middleware/                 # Middleware HTTP (metrics/context)
 │   ├── blocking.py                 # ⭐ Offload de IO bloqueante (to_thread)
 │   ├── validators.py               # ⭐ Validação de URLs, paths, filenames
-│   ├── errors.py                   # ⭐ ErrorCode, AppException, raise_error()
-│   ├── rate_limit.py               # Rate limiting com slowapi
-│   ├── constants.py                # Constantes (MIME types, extensions)
-│   ├── types.py                    # TypedDicts e type aliases
-│   ├── exceptions.py               # HTTPExceptions customizadas (legacy)
-│   └── security.py                 # Validações de path, sanitização (legacy)
+│   ├── paths.py                    # Helpers de paths
+│   ├── request_context.py          # Request ID/context
+│   └── rate_limit.py               # Rate limiting com slowapi
 │
 ├── catalog/                        # Catálogo persistente (SQLite)
 │   ├── router.py                   # Endpoints /api/catalog/*
 │   ├── service.py                  # Regras de catálogo
 │   ├── repository.py               # Acesso ao SQLite
 │   ├── database.py                 # Schema e conexões
-│   └── drive_snapshot.py           # Snapshot drive (catalog-drive.json.gz)
+│   ├── drive_snapshot.py           # Snapshot drive (catalog-drive.json.gz)
+│   └── identity.py                 # Identidade e hashing do catálogo
 │
 ├── downloads/                      # Módulo de downloads
 │   ├── router.py                   # Endpoints /api/download, /api/video-info
@@ -94,7 +97,7 @@ backend/app/
 │   ├── router.py                   # Endpoints /api/jobs/*
 │   ├── service.py                  # Gerenciamento de jobs
 │   ├── schemas.py                  # Modelos de jobs
-│   ├── store.py                    # Storage in-memory (jobs_db)
+│   ├── store.py                    # Storage (memory/redis)
 │   └── cleanup.py                  # ⭐ Limpeza automática de jobs antigos
 │
 ├── library/                        # Módulo de biblioteca local
@@ -105,27 +108,26 @@ backend/app/
 │
 ├── recordings/                     # Módulo de gravações
 │   ├── router.py                   # Endpoint /api/recordings/upload
-│   └── service.py                  # Salvamento de gravações
+│   ├── service.py                  # Salvamento de gravações
+│   └── schemas.py                  # Modelos de gravações
 │
 └── drive/                          # Módulo Google Drive
     ├── router.py                   # Endpoints /api/drive/*
     ├── service.py                  # Lógica de negócio
     ├── schemas.py                  # Modelos do Drive
-    └── manager.py                  # ⭐ DriveManager
-        ├── get_auth_url():         Gera URL OAuth
-        ├── exchange_code():        Troca código por token
-        ├── upload_video():         Upload com metadata
-        ├── list_videos():          Lista recursiva
-        └── ensure_folder():        Cria/obtém pastas
+    ├── manager.py                  # ⭐ DriveManager
+    └── cache/                      # Cache SQLite (opcional)
+        ├── database.py             # Schema e conexão
+        ├── repository.py           # CRUD de cache
+        ├── sync.py                 # Full/incremental sync
+        └── background.py           # Task periódica de sync
 
 backend/
 ├── tests/                          # ⭐ Testes automatizados (pytest)
-│   ├── conftest.py                 # Fixtures compartilhadas
-│   ├── test_cache.py               # Testes do cache (7 testes)
-│   ├── test_health.py              # Testes do health check (2 testes)
-│   ├── test_jobs.py                # Testes de jobs (8 testes)
-│   ├── test_library.py             # Testes da biblioteca (13 testes)
-│   └── test_validators.py          # Testes de validação (16 testes)
+│   ├── unit/                       # Unit tests
+│   ├── integration/                # Integration tests
+│   ├── e2e/                         # End-to-end tests
+│   └── conftest.py                 # Fixtures compartilhadas
 ├── requirements.txt                # Dependências Python
 ├── pytest.ini                      # Configuração do pytest
 ├── .env.example                    # ⭐ Exemplo de variáveis de ambiente
@@ -152,20 +154,32 @@ frontend/
 │   │   ├── common/                     # Componentes compartilhados
 │   │   │   ├── error-boundary.tsx      # ⭐ Error Boundary com retry
 │   │   │   ├── navigation.tsx          # Menu de navegação
+│   │   │   ├── providers.tsx           # Providers (tema/estado)
 │   │   │   ├── theme-provider.tsx      # Tema dark/light
-│   │   │   ├── pagination.tsx          # Controles de paginação
-│   │   │   └── videos/                 # VideoCard, VideoPlayer
+│   │   │   ├── theme-toggle.tsx        # Toggle de tema
+│   │   │   ├── pagination/             # Controles de paginação
+│   │   │   │   ├── index.ts
+│   │   │   │   └── pagination-controls.tsx
+│   │   │   └── videos/                 # VideoCard, VideoPlayer, RecentVideos
 │   │   ├── drive/                      # Componentes Google Drive
 │   │   │   ├── drive-auth.tsx
+│   │   │   ├── drive-page-client.tsx
+│   │   │   ├── drive-page-section.tsx
+│   │   │   ├── drive-page-skeleton.tsx
 │   │   │   ├── drive-video-grid.tsx
-│   │   │   ├── drive-video-player.tsx
+│   │   │   ├── external-upload-modal.tsx
 │   │   │   └── sync-panel.tsx
 │   │   ├── home/                       # Componentes da Home
-│   │   │   └── download-form.tsx       # ⭐ Formulário de download
+│   │   │   ├── download-form.tsx       # ⭐ Formulário de download
+│   │   │   └── recent-videos-section.tsx
 │   │   ├── library/                    # Componentes da Biblioteca
+│   │   │   ├── library-grid-section.tsx
+│   │   │   ├── library-grid-skeleton.tsx
 │   │   │   └── paginated-video-grid.tsx
 │   │   ├── record/                     # Gravação de tela
-│   │   │   └── screen-recorder.tsx
+│   │   │   ├── record-page-client.tsx
+│   │   │   ├── screen-recorder.tsx
+│   │   │   └── screen-recorder-loading.tsx
 │   │   └── ui/                         # shadcn/ui (30+ componentes)
 │   │
 │   ├── hooks/                          # ⭐ Hooks customizados
@@ -174,10 +188,15 @@ frontend/
 │   │   └── use-fetch.ts                # Fetch com AbortController
 │   │
 │   └── lib/
-│       ├── api-config.ts               # ⭐ Configuração da API
+│       ├── api-config.ts               # Config da API (client/server)
 │       ├── api-client.ts               # Cliente HTTP tipado
 │       ├── api-urls.ts                 # Constantes de endpoints
+│       ├── paths.ts                    # Rotas do app
 │       ├── url-validator.ts            # Validação de URLs
+│       ├── client/api.ts               # Cliente HTTP (frontend)
+│       ├── server/api.ts               # Fetch SSR + cache tags
+│       ├── server/route-utils.ts       # Proxy + revalidate helpers
+│       ├── server/tags.ts              # Tags de cache
 │       └── utils.ts                    # cn(), formatBytes()
 │
 ├── eslint.config.mjs                   # ⭐ ESLint 9 flat config
@@ -195,17 +214,24 @@ frontend/
 ### Health & Info
 ```bash
 GET  /                              # Health check
+GET  /api/health                    # Health check detalhado
+GET  /metrics                       # Prometheus metrics
 GET  /docs                          # API docs (Swagger)
 ```
 
 ### Downloads
 ```bash
 POST /api/download                  # Inicia download
+POST /api/video-info                # Info sem baixar
+```
+
+### Jobs
+```bash
 GET  /api/jobs                      # Lista jobs
 GET  /api/jobs/{id}                 # Status do job
+GET  /api/jobs/{id}/stream          # Stream de progresso (SSE)
 POST /api/jobs/{id}/cancel          # Cancela job
 DELETE /api/jobs/{id}               # Remove job
-POST /api/video-info                # Info sem baixar
 ```
 
 ### Biblioteca Local
@@ -213,7 +239,15 @@ POST /api/video-info                # Info sem baixar
 GET  /api/videos                    # Lista vídeos
 GET  /api/videos/stream/{path}      # Stream (206)
 GET  /api/videos/thumbnail/{path}   # Thumbnail
+PATCH /api/videos/rename/{path}     # Renomear vídeo
+POST /api/videos/update-thumbnail/{path} # Atualizar thumbnail
+POST /api/videos/delete-batch       # Delete em lote
 DELETE /api/videos/{path}           # Exclui vídeo
+```
+
+### Gravações
+```bash
+POST /api/recordings/upload         # Upload de gravação
 ```
 
 ### Catálogo (SQLite)
@@ -232,14 +266,26 @@ GET  /api/drive/auth-url            # URL OAuth
 GET  /api/drive/oauth2callback      # Callback OAuth
 GET  /api/drive/videos              # Lista vídeos
 POST /api/drive/upload/{path}       # Upload individual
+POST /api/drive/upload-external     # Upload externo
 POST /api/drive/sync-all            # Upload em lote
 GET  /api/drive/sync-status         # Status sync
 GET  /api/drive/sync-items          # Itens paginados (diff)
+PATCH /api/drive/videos/{id}/rename # Renomear vídeo
+POST /api/drive/videos/{id}/thumbnail # Atualizar thumbnail
 GET  /api/drive/stream/{id}         # Stream (206)
 GET  /api/drive/thumbnail/{id}      # Thumbnail
+GET  /api/drive/custom-thumbnail/{id} # Thumbnail custom
 DELETE /api/drive/videos/{id}       # Remove vídeo + relacionados (retorna cleanup_job_id)
+POST /api/drive/videos/delete-batch # Delete em lote
+GET  /api/drive/videos/{id}/share   # Status do share
+POST /api/drive/videos/{id}/share   # Ativa share
+DELETE /api/drive/videos/{id}/share # Desativa share
 POST /api/drive/download            # Download (Drive -> local)
 POST /api/drive/download-all        # Download em lote (Drive -> local)
+POST /api/drive/cache/sync          # Sincroniza cache
+GET  /api/drive/cache/stats         # Status do cache
+POST /api/drive/cache/rebuild       # Rebuild do cache
+DELETE /api/drive/cache             # Limpa cache
 ```
 
 ---
@@ -408,7 +454,9 @@ export async function POST(request: Request) {
 ### TypeScript
 1. **SEMPRE usar `"use client"` em componentes interativos**
 2. **SEMPRE usar paths absolutos:** `/api/videos` não `api/videos`
-3. **SEMPRE importar Plyr CSS em layout:** `import "plyr-react/plyr.css"`
+3. **SEMPRE importar CSS do Vidstack no layout:**
+   - `import "@vidstack/react/player/styles/default/theme.css";`
+   - `import "@vidstack/react/player/styles/default/layouts/video.css";`
 4. **SEMPRE tipar variáveis:** Evitar `any`
 
 ---
@@ -423,12 +471,17 @@ cp backend/.env.example backend/.env
 # Variáveis disponíveis:
 APP_NAME=YT-Archiver API          # Nome da aplicação
 LOG_LEVEL=INFO                     # DEBUG, INFO, WARNING, ERROR
+LOG_FORMAT=pretty                  # pretty, text, json
+LOG_COLOR=true                     # cores nos logs (pretty/text)
 HOST=0.0.0.0                       # Host do servidor
 PORT=8000                          # Porta do servidor
+METRICS_ENABLED=true               # Expor /metrics
 CORS_ORIGINS=http://localhost:3000,http://localhost:3001
 DOWNLOADS_DIR=./downloads          # Diretório de downloads
 DEFAULT_MAX_RESOLUTION=1080        # Resolução padrão
 JOB_EXPIRY_HOURS=24               # Tempo para limpeza de jobs
+JOB_STORE_BACKEND=memory           # memory | redis
+REDIS_URL=redis://localhost:6379/0 # Usado quando JOB_STORE_BACKEND=redis
 CATALOG_ENABLED=false              # Catálogo SQLite (local + drive)
 CATALOG_DB_PATH=database.db        # Caminho do catálogo
 CATALOG_DRIVE_AUTO_PUBLISH=true    # Publica snapshot após mutações do Drive
@@ -437,6 +490,13 @@ CATALOG_DRIVE_ALLOW_LEGACY_LISTING_FALLBACK=false # Fallback para listagem diret
 BLOCKING_DRIVE_CONCURRENCY=3       # Limite de IO bloqueante (Drive)
 BLOCKING_FS_CONCURRENCY=2          # Limite de IO bloqueante (filesystem)
 BLOCKING_CATALOG_CONCURRENCY=4     # Limite de IO bloqueante (catalog)
+DRIVE_CACHE_ENABLED=true           # Cache SQLite do Drive
+DRIVE_CACHE_DB_PATH=drive_cache.db # Caminho do cache do Drive
+DRIVE_CACHE_SYNC_INTERVAL=30       # Minutos entre syncs
+DRIVE_CACHE_FALLBACK_TO_API=true   # Fallback para API quando cache falhar
+DRIVE_UPLOAD_CHUNK_SIZE=8388608    # Chunk size para upload resumable
+
+# Para lista completa de variáveis, veja `backend/app/config.py`.
 
 # Arquivos de configuração:
 backend/credentials.json    # OAuth Google (obter no Cloud Console)
@@ -605,7 +665,7 @@ Notas (Download):
 | Frontend não conecta | Backend não rodando | `cd backend && ./run.sh` |
 | No video formats found | DRM ou URL inválida | Verificar URL, tentar cookies |
 | Upload Drive falha | credentials.json faltando | Ver GOOGLE-DRIVE-SETUP.md |
-| Player não carrega | Plyr CSS não importado | Importar em layout.tsx |
+| Player não carrega | CSS do Vidstack ausente | Importar estilos no layout.tsx |
 | Vídeos não aparecem | Ainda baixando | Aguardar job completar |
 
 ---
@@ -636,4 +696,4 @@ Notas (Download):
   - Grafana: `http://localhost:3001`
   - Dashboards: `ops/observability/grafana/dashboards/`
   - Alertas: `ops/observability/alerts.yml`
-  - Guia completo: `docs/local/OBSERVABILITY.md`
+  - Guia completo: `docs/project/OBSERVABILITY.md`

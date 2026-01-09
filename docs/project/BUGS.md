@@ -216,7 +216,7 @@ Aliases compatíveis:
   - Endpoint `GET /api/drive/stream/{file_id}` funcionando perfeitamente
   - Vídeo reproduzido com sucesso (duração 05:48)
   - Range requests funcionando (206 Partial Content)
-  - Player Plyr funcionando corretamente com vídeos do Drive
+  - Player Vidstack funcionando corretamente com vídeos do Drive
 - [x] **Reprodução de vídeos locais** ✅ **[CORRIGIDO]**
   - Endpoint `GET /api/videos/stream/{video_path}` funcionando perfeitamente
   - Fix: RFC 5987 encoding para Content-Disposition header

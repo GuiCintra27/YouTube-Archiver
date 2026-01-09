@@ -142,7 +142,7 @@ if (pollCount > 10) interval = 2000;
 
 ### Backend: Update Threshold
 
-No arquivo `backend/downloader.py`:
+No arquivo `backend/app/downloads/downloader.py`:
 
 ```python
 class DownloadProgress:
@@ -158,7 +158,7 @@ class DownloadProgress:
 
 ### Frontend: Poll Interval
 
-No arquivo `web-ui/src/components/download-form.tsx`:
+No arquivo `frontend/src/components/home/download-form.tsx`:
 
 ```typescript
 const pollJobStatus = async (id: string) => {
@@ -235,7 +235,7 @@ status = get_cached_job_status(job_id, cache_key)
 
 ### Para Downloads Rápidos (<1min)
 ```python
-# backend/downloader.py
+# backend/app/downloads/downloader.py
 self.update_threshold = 5  # Updates apenas a cada 5%
 ```
 
@@ -246,7 +246,7 @@ let pollInterval = 1000;  // Não precisa ser tão responsivo
 
 ### Para Downloads Lentos (>10min)
 ```python
-# backend/downloader.py
+# backend/app/downloads/downloader.py
 self.update_threshold = 1  # Mais suave (a cada 1%)
 ```
 

@@ -18,6 +18,7 @@
    - `GET /api/drive/oauth2callback` - Callback OAuth
    - `GET /api/drive/videos` - Listar vídeos no Drive
    - `POST /api/drive/upload/{path}` - Upload de vídeo individual
+   - `POST /api/drive/upload-external` - Upload externo (vídeo + thumbnail + extras)
    - `GET /api/drive/sync-status` - Status de sincronização
    - `GET /api/drive/sync-items` - Itens paginados (local_only/drive_only/synced)
    - `POST /api/drive/sync-all` - Sincronizar todos os vídeos
@@ -26,6 +27,7 @@
    - `GET /api/drive/videos/{id}/share` - Status do compartilhamento público
    - `POST /api/drive/videos/{id}/share` - Habilitar link público de compartilhamento
    - `DELETE /api/drive/videos/{id}/share` - Revogar compartilhamento público
+   - `GET /api/drive/custom-thumbnail/{id}` - Thumbnail customizada
    - `POST /api/drive/download` - Download de vídeo para local (por path ou file_id)
    - `POST /api/drive/download-all` - Download em lote (Drive -> local)
    - `PATCH /api/drive/videos/{id}/rename` - Renomear vídeo no Drive
@@ -69,6 +71,11 @@
    - Edição de vídeos (renomear e atualizar thumbnail)
    - Compartilhamento público (link com toggle de ativação)
    - Componente VideoCard unificado (mesmo usado na biblioteca local)
+
+5. **Componente `ExternalUploadModal`**
+   - Upload de vídeo externo direto para o Drive
+   - Thumbnail customizada (JPG/PNG/WebP)
+   - Legendas e transcrição opcionais
 
 5. **Componente `Navigation`**
    - Menu de navegação Local / Drive
@@ -176,10 +183,11 @@ frontend/src/
 │   └── drive/
 │       └── page.tsx             # Página do Drive
 └── components/
-    ├── navigation.tsx           # Menu Local / Drive
-    ├── drive-auth.tsx           # Autenticação
-    ├── drive-video-grid.tsx     # Grid de vídeos do Drive
-    └── sync-panel.tsx           # Painel de sincronização
+    ├── common/navigation.tsx    # Menu Local / Drive
+    └── drive/                   # Componentes do Drive
+        ├── drive-auth.tsx       # Autenticação
+        ├── drive-video-grid.tsx # Grid de vídeos do Drive
+        └── sync-panel.tsx       # Painel de sincronização
 
 docs/
 ├── GOOGLE-DRIVE-SETUP.md      # Guia completo de setup

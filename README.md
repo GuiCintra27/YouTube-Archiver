@@ -1,6 +1,6 @@
 # YT-Archiver
 
-Sistema completo para download e arquivamento de vídeos do YouTube e streams HLS (sem DRM), com interface web moderna e integração opcional com Google Drive.
+Sistema completo para download e arquivamento ético de vídeos e streams HLS (sem DRM), com interface web moderna, integração opcional com Google Drive e funcionalidade de gravação de tela.
 
 ## 📋 Visão Geral
 
@@ -13,12 +13,14 @@ O YT-Archiver combina uma API REST robusta com uma interface web moderna para fa
 
 ### Principais Funcionalidades
 
-- ✅ Download de vídeos do YouTube (canais, playlists, vídeos individuais)
+- ✅ Download de vídeos do YouTube (canais, playlists, vídeos individuais) e plataformas de vídeos em geral (para alguns casos será necessária a utilização de cookies)
 - ✅ Suporte a streams HLS (M3U8) sem DRM
 - ✅ Headers customizados (Referer, Origin, User-Agent)
 - ✅ Cookies personalizados via arquivo Netscape
 - ✅ **Biblioteca de vídeos local** - Visualize, reproduza e gerencie vídeos baixados
+- ✅ **Gravação de tela no navegador** - Salve gravações diretamente na biblioteca
 - ✅ **Sincronização com Google Drive** - Upload, visualização e streaming de vídeos no Drive
+- ✅ **Upload externo para o Drive** - Envie qualquer vídeo com thumbnail, legendas e transcrição
 - ✅ **Compartilhamento no Drive** - Gere link público para visualizar vídeos
 - ✅ **Catálogo persistente (SQLite)** - Índice local + snapshot no Drive para listagem rápida
 - ✅ **Sistema de jobs assíncronos** - Downloads em background com progresso em tempo real
@@ -30,6 +32,7 @@ O YT-Archiver combina uma API REST robusta com uma interface web moderna para fa
 - ✅ Nomes de arquivo e caminhos customizados
 - ✅ **Global Player com PiP** - Reproduza vídeos em background enquanto navega
 - ✅ **SSR e cache inteligente** - Renderização inicial com dados e invalidação por tags
+- ✅ **Observabilidade local** - Prometheus + Grafana com dashboards prontos
 - ✅ API REST completa para integração
 
 ---
@@ -55,12 +58,16 @@ start-dev.bat
 ```
 
 Isso irá:
-1. Configurar e ativar o ambiente virtual do backend
-2. Instalar dependências Python
-3. Iniciar o backend na porta 8000
-4. Iniciar o frontend na porta 3000
+
+1. Verificar se `ffmpeg` está instalado (não instala automaticamente)
+2. Configurar e ativar o ambiente virtual do backend
+3. Instalar dependências Python
+4. Instalar dependências do frontend (se `node_modules` não existir)
+5. Iniciar o backend na porta 8000
+6. Iniciar o frontend na porta 3000
 
 Para iniciar API + worker no dev:
+
 ```bash
 START_WORKER=true WORKER_PORT=8001 ./start-dev.sh
 ```
@@ -69,13 +76,17 @@ START_WORKER=true WORKER_PORT=8001 ./start-dev.sh
 
 #### Opção 2: Manual
 
+Primeiramente, **instale o ffmpeg na sua máquina**.
+
 **Backend:**
+
 ```bash
 cd backend
 ./run.sh  # Ou: source .venv/bin/activate && uvicorn app.main:app --reload
 ```
 
 **API + worker (prod ou dev):**
+
 ```bash
 # API sem tasks de background
 WORKER_ROLE=api ./run.sh
@@ -85,6 +96,7 @@ WORKER_ROLE=worker PORT=8001 ./run.sh
 ```
 
 **Frontend:**
+
 ```bash
 cd frontend
 npm install
@@ -92,9 +104,23 @@ npm run dev
 ```
 
 **Acesse:**
+
 - Interface Web: http://localhost:3000
 - API: http://localhost:8000
 - Documentação da API: http://localhost:8000/docs
+
+---
+
+## Documentacao
+
+- Index geral: **[INDEX.md](./docs/project/INDEX.md)**
+- Arquitetura: **[ARCHITECTURE.md](./docs/project/ARCHITECTURE.md)**
+- Observabilidade (Prometheus + Grafana): **[OBSERVABILITY.md](./docs/project/OBSERVABILITY.md)**
+- Guia rapido: **[QUICK-START.md](./docs/project/QUICK-START.md)**
+- Referencia tecnica: **[TECHNICAL-REFERENCE.md](./docs/project/TECHNICAL-REFERENCE.md)**
+- Setup do Google Drive: **[GOOGLE-DRIVE-SETUP.md](./docs/project/GOOGLE-DRIVE-SETUP.md)**
+- Recursos do Google Drive: **[GOOGLE-DRIVE-FEATURES.md](./docs/project/GOOGLE-DRIVE-FEATURES.md)**
+- Global Player: **[GLOBAL-PLAYER.md](./docs/project/GLOBAL-PLAYER.md)**
 
 ---
 
@@ -103,6 +129,7 @@ npm run dev
 ### Funcionalidades da UI
 
 **Página Principal (`/`):**
+
 - 📥 Formulário de download com todas as opções configuráveis
 - 📊 Barra de progresso em tempo real durante downloads
 - 📚 Biblioteca de vídeos locais com thumbnails e duração
@@ -113,9 +140,11 @@ npm run dev
 - ⚡ SSR + cache para vídeos recentes
 
 **Página Google Drive (`/drive`):**
+
 - ☁️ Autenticação OAuth2 com Google Drive
 - 📂 Visualização de vídeos sincronizados no Drive com thumbnails
 - ⬆️ Upload individual ou em lote de vídeos locais
+- 🧩 Upload externo (vídeo + thumbnail + legendas + transcrição)
 - ⬇️ Download de vídeos do Drive para armazenamento local
 - 🔄 Painel de sincronização mostrando diferenças entre local e Drive
 - ▶️ Streaming direto do Google Drive com suporte a seek/skip
@@ -124,14 +153,22 @@ npm run dev
 - ℹ️ Modal de informações detalhadas do vídeo
 - ⚡ SSR + cache com invalidação por tags
 
+**Página Gravar (`/record`):**
+
+- 🎥 Gravação de tela com áudio do sistema e microfone
+- 💾 Download local ou salvar direto na biblioteca
+- 🧭 Lista de gravações recentes com refresh automático
+
 **Global Player (Background Playback):**
+
 - 🎵 Minimize vídeos para reproduzir em background
 - 🖼️ Picture-in-Picture nativo do navegador
 - 🔊 Controle de volume na mini barra
 - 🔄 Continua tocando ao navegar entre páginas
-- 📖 Documentação completa: **[GLOBAL-PLAYER-FEATURE.md](./docs/local/GLOBAL-PLAYER-FEATURE.md)**
+- 📖 Documentação completa: **[GLOBAL-PLAYER.md](./docs/project/GLOBAL-PLAYER.md)**
 
 **Recursos da Interface:**
+
 - ✨ Design moderno e responsivo (Next.js 15 + Tailwind CSS)
 - 🎨 Componentes shadcn/ui (Radix UI primitives)
 - 📱 Compatível com desktop e mobile
@@ -156,20 +193,24 @@ npm run dev
 ### Opções Avançadas
 
 **Configurações de Qualidade:**
+
 - Resolução máxima (altura em pixels)
 - Apenas áudio (extração MP3)
 - Download de legendas e miniaturas
 
 **Nomenclatura Customizada:**
-- Subpasta personalizada (ex: `Curso/Módulo 01`)
-- Nome do arquivo customizado (ex: `Aula 01 - Introdução`)
+
+- Subpasta personalizada (ex: `Músicas/Vídeo 01`)
+- Nome do arquivo customizado (ex: `Video 001`)
 
 **Headers HTTP:**
+
 - Referer customizado
 - Origin customizado
 - Arquivo de cookies (formato Netscape)
 
 **Proteção Anti-Ban (para playlists grandes):**
+
 - Delay entre vídeos (recomendado: 2-5s)
 - Agrupamento em batches (ex: 5 vídeos por batch)
 - Delay entre batches (recomendado: 10-30s)
@@ -180,12 +221,13 @@ npm run dev
 
 **Configuração Inicial:**
 
-1. Siga o guia completo: **[GOOGLE-DRIVE-SETUP.md](./GOOGLE-DRIVE-SETUP.md)**
+1. Siga o guia completo: **[GOOGLE-DRIVE-SETUP.md](./docs/project/GOOGLE-DRIVE-SETUP.md)**
 2. Resumo rápido:
    - Criar projeto no Google Cloud Console
    - Ativar Google Drive API
    - Criar credenciais OAuth 2.0 (Desktop app)
-   - Baixar `credentials.json` → `backend/credentials.json`
+   - Baixar `credentials.json`
+   - Inserir arquivo de credenciais no backend → `backend/credentials.json`
 
 **Usando o Drive:**
 
@@ -194,6 +236,7 @@ npm run dev
 3. Autorize o aplicativo no navegador
 4. Gerencie vídeos:
    - 📤 Upload individual ou sincronização completa
+   - 🧩 Upload externo com thumbnail customizada
    - 📊 Visualize status de sincronização
    - ▶️ Reproduza vídeos diretamente do Drive
    - 🗑️ Exclua vídeos do Drive
@@ -217,6 +260,7 @@ A API FastAPI oferece endpoints completos para integração:
 ### Endpoints de Download
 
 **POST** `/api/download` - Inicia um download em background
+
 ```json
 {
   "url": "https://www.youtube.com/watch?v=...",
@@ -378,13 +422,19 @@ yt-archiver/
 │   │   │   ├── layout.tsx        # Layout raiz
 │   │   │   └── globals.css       # Estilos globais
 │   │   ├── components/           # Componentes React
-│   │   │   ├── download-form.tsx       # Formulário de download
-│   │   │   ├── video-grid.tsx          # Grid de vídeos locais
-│   │   │   ├── video-player.tsx        # Player de vídeo
-│   │   │   ├── drive-auth.tsx          # Autenticação Drive
-│   │   │   ├── drive-video-grid.tsx    # Grid de vídeos do Drive
-│   │   │   ├── sync-panel.tsx          # Painel de sincronização
-│   │   │   ├── navigation.tsx          # Navegação entre páginas
+│   │   │   ├── common/                 # Componentes compartilhados
+│   │   │   │   ├── navigation.tsx      # Navegação entre páginas
+│   │   │   │   └── videos/             # VideoCard / VideoPlayer
+│   │   │   ├── home/                   # Home (downloads)
+│   │   │   │   └── download-form.tsx   # Formulário de download
+│   │   │   ├── library/                # Biblioteca local
+│   │   │   │   └── paginated-video-grid.tsx
+│   │   │   ├── drive/                  # Google Drive
+│   │   │   │   ├── drive-auth.tsx      # Autenticação Drive
+│   │   │   │   ├── drive-video-grid.tsx
+│   │   │   │   └── sync-panel.tsx      # Painel de sincronização
+│   │   │   ├── record/                 # Gravação de tela
+│   │   │   │   └── screen-recorder.tsx
 │   │   │   └── ui/                     # Componentes shadcn/ui
 │   │   └── lib/                  # Utilitários
 │   │       ├── utils.ts          # Funções helper
@@ -392,11 +442,20 @@ yt-archiver/
 │   ├── package.json
 │   └── next.config.ts
 │
+├── docs/
+│   ├── project/                  # Documentação oficial
+│   │   ├── ARCHITECTURE.md
+│   │   ├── QUICK-START.md
+│   │   ├── TECHNICAL-REFERENCE.md
+│   │   ├── GOOGLE-DRIVE-SETUP.md
+│   │   ├── GOOGLE-DRIVE-FEATURES.md
+│   │   ├── OBSERVABILITY.md
+│   │   └── GLOBAL-PLAYER.md
+│   └── local/                    # Notas internas
+│       └── archive/              # Planejamentos e historico
 ├── start-dev.sh                  # Script de início rápido (Linux/Mac)
 ├── start-dev.bat                 # Script de início rápido (Windows)
 ├── CLAUDE.md                     # Instruções para Claude Code
-├── GOOGLE-DRIVE-SETUP.md         # Guia de configuração do Drive
-├── GOOGLE-DRIVE-FEATURES.md      # Documentação de features do Drive
 └── README.md                     # Esta documentação
 ```
 
@@ -405,6 +464,7 @@ yt-archiver/
 ## 🔧 Tecnologias
 
 ### Backend
+
 - **FastAPI** - Framework web assíncrono
 - **Arquitetura Modular** - Organização similar ao NestJS (router/service/schema)
 - **yt-dlp** - Motor de download de vídeos
@@ -416,18 +476,19 @@ yt-archiver/
 
 O backend segue uma arquitetura modular com separação clara de responsabilidades:
 
-| Módulo | Responsabilidade | Endpoints |
-|--------|-----------------|-----------|
-| `downloads` | Download de vídeos via yt-dlp | `/api/download`, `/api/video-info` |
-| `jobs` | Gerenciamento de jobs assíncronos | `/api/jobs/*` |
-| `library` | Biblioteca de vídeos locais | `/api/videos/*` |
-| `recordings` | Upload de gravações de tela | `/api/recordings/upload` |
-| `drive` | Integração Google Drive | `/api/drive/*` |
-| `drive/cache` | Cache SQLite para metadados | `/api/drive/cache/*` |
-| `catalog` | Catálogo persistente (SQLite + snapshot) | `/api/catalog/*` |
-| `core` | Exceções, segurança, utilitários | - |
+| Módulo        | Responsabilidade                         | Endpoints                          |
+| ------------- | ---------------------------------------- | ---------------------------------- |
+| `downloads`   | Download de vídeos via yt-dlp            | `/api/download`, `/api/video-info` |
+| `jobs`        | Gerenciamento de jobs assíncronos        | `/api/jobs/*`                      |
+| `library`     | Biblioteca de vídeos locais              | `/api/videos/*`                    |
+| `recordings`  | Upload de gravações de tela              | `/api/recordings/upload`           |
+| `drive`       | Integração Google Drive                  | `/api/drive/*`                     |
+| `drive/cache` | Cache SQLite para metadados              | `/api/drive/cache/*`               |
+| `catalog`     | Catálogo persistente (SQLite + snapshot) | `/api/catalog/*`                   |
+| `core`        | Exceções, segurança, utilitários         | -                                  |
 
 **Padrão de cada módulo:**
+
 - `router.py` - Define endpoints (APIRouter)
 - `service.py` - Lógica de negócio
 - `schemas.py` - Modelos Pydantic (request/response)
@@ -439,6 +500,7 @@ O backend segue uma arquitetura modular com separação clara de responsabilidad
 - Para múltiplos workers em produção, é necessário mover o estado dos jobs para storage compartilhado (Redis/DB).
 
 ### Frontend
+
 - **Next.js 15** - Framework React com App Router
 - **TypeScript** - Type safety
 - **Tailwind CSS** - Utility-first CSS
@@ -447,9 +509,11 @@ O backend segue uma arquitetura modular com separação clara de responsabilidad
 - **Lucide React** - Ícones
 
 ### Infraestrutura
+
 - **ffmpeg** - Processamento de vídeo/áudio (requerido)
 - **Python 3.12+** - Runtime backend
 - **Node.js 18+** - Runtime frontend
+- **Observabilidade local** - Prometheus + Grafana (**[OBSERVABILITY.md](./docs/project/OBSERVABILITY.md)**)
 
 ---
 
@@ -466,7 +530,8 @@ custom aula-01-introducao
 ```
 
 **Comportamento:**
-- Downloads do YouTube são automaticamente registrados por ID de vídeo
+
+- Downloads dos vídeos são automaticamente registrados por ID de vídeo
 - Com `--archive-id` (via opção customizada), você pode definir IDs manuais
 - Vídeos já registrados são pulados automaticamente
 - Ao excluir um vídeo pela interface, o registro é removido do archive
@@ -478,17 +543,19 @@ custom aula-01-introducao
 ### Padrão de Nomenclatura
 
 **Sem customização:**
+
 ```
 backend/downloads/
 └── NomeDoCanal/
     └── NomePlaylist/
-        └── 2024-01-15 - Título do Vídeo [VIDEO_ID].mp4
-        └── 2024-01-15 - Título do Vídeo [VIDEO_ID].jpg
-        └── 2024-01-15 - Título do Vídeo [VIDEO_ID].pt-BR.vtt
-        └── 2024-01-15 - Título do Vídeo [VIDEO_ID].info.json
+        └── Título do Vídeo.mp4
+        └── Título do Vídeo.jpg
+        └── Título do Vídeo.pt-BR.vtt
+        └── Título do Vídeo.info.json
 ```
 
 **Com path e file_name customizados:**
+
 ```
 backend/downloads/
 └── Curso/
@@ -525,6 +592,7 @@ Necessário para conteúdo que requer autenticação (vídeos privados, conteúd
 ### Exportar cookies do navegador
 
 Use extensões:
+
 - **Chrome/Edge**: [Get cookies.txt LOCALLY](https://chrome.google.com/webstore/detail/get-cookiestxt-locally/)
 - **Firefox**: [cookies.txt](https://addons.mozilla.org/firefox/addon/cookies-txt/)
 
@@ -555,11 +623,13 @@ Este projeto **NÃO** suporta conteúdo protegido por DRM (Widevine, FairPlay, P
 Para evitar bloqueios ao baixar playlists grandes:
 
 ✅ **Recomendado:**
+
 - Use o preset "Seguro" (delay 5s, batch 5, delay entre batches 30s)
 - Ative "Randomizar Delays"
 - Evite baixar mais de 50-100 vídeos de uma vez
 
 ⚠️ **Evite:**
+
 - Preset "Rápido" para playlists grandes
 - Downloads paralelos massivos (a UI usa 1 worker)
 - Ignorar termos de serviço das plataformas
@@ -578,6 +648,7 @@ Para evitar bloqueios ao baixar playlists grandes:
 ### "Erro ao conectar com o servidor"
 
 **Solução:**
+
 ```bash
 cd backend
 ./run.sh  # Certifique-se de que o backend está rodando
@@ -588,6 +659,7 @@ Verifique se http://localhost:8000 responde.
 ### "ffmpeg not found"
 
 **Instalação:**
+
 ```bash
 # Ubuntu/Debian
 sudo apt install ffmpeg
@@ -602,6 +674,7 @@ brew install ffmpeg
 ### "No video formats found"
 
 **Possíveis causas:**
+
 - URL inacessível ou inválida
 - Conteúdo protegido por DRM
 - Requer cookies (tente adicionar cookies.txt)
@@ -610,6 +683,7 @@ brew install ffmpeg
 ### Upload para Drive falha
 
 **Soluções:**
+
 1. Verifique se `backend/credentials.json` existe e é válido
 2. Delete `backend/token.json` e reautentique
 3. Confirme que a Google Drive API está ativada no console
@@ -618,6 +692,7 @@ brew install ffmpeg
 ### Downloads muito lentos
 
 **Otimizações:**
+
 - Configure "Resolução Máxima" menor (720p em vez de 1080p)
 - Verifique sua conexão de internet
 - Tente outro horário (pode ser throttling do provedor)
@@ -626,6 +701,7 @@ brew install ffmpeg
 ### Vídeos não aparecem na biblioteca
 
 **Checklist:**
+
 1. Aguarde o download completar (veja progresso)
 2. Verifique se estão em `backend/downloads/`
 3. Atualize a página (F5)
@@ -633,27 +709,19 @@ brew install ffmpeg
 
 ---
 
-## 🤝 Contribuindo
-
-Contribuições são bem-vindas!
-
-1. Fork o projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/MinhaFeature`)
-3. Commit suas mudanças usando Commitizen (veja abaixo)
-4. Push para a branch (`git push origin feature/MinhaFeature`)
-5. Abra um Pull Request
-
 ### 📝 Commits Convencionais (Commitizen)
 
 Este projeto usa [Commitizen](https://github.com/commitizen/cz-cli) para padronizar mensagens de commit seguindo a convenção [Conventional Commits](https://www.conventionalcommits.org/).
 
 **Setup inicial (primeira vez):**
+
 ```bash
 # Na raiz do repositório
 npm install
 ```
 
 **Como fazer commits:**
+
 ```bash
 # Opção 1: Usando o script npm
 npm run commit
@@ -666,6 +734,7 @@ git cz
 ```
 
 O Commitizen irá guiá-lo através de um wizard interativo para criar commits padronizados:
+
 - **feat**: Nova funcionalidade
 - **fix**: Correção de bug
 - **docs**: Alterações na documentação
@@ -675,23 +744,13 @@ O Commitizen irá guiá-lo através de um wizard interativo para criar commits p
 - **test**: Adição ou correção de testes
 - **chore**: Tarefas de build, configurações, etc
 
-### Áreas de melhoria
-
-- [ ] Suporte a mais plataformas além do YouTube
-- [ ] Sistema de filas mais robusto (com prioridades)
-- [ ] Testes automatizados (backend e frontend)
-- [ ] Docker Compose para deploy simplificado
-- [ ] Suporte a múltiplos usuários (autenticação)
-- [ ] Compressão automática de vídeos
-- [ ] Notificações push quando downloads completam
-
 ---
 
 ## 📄 Licença
 
 Este projeto é fornecido "como está", sem garantias. Use por sua conta e risco.
 
-**Importante:** Respeite direitos autorais e termos de serviço das plataformas. Este projeto é destinado para arquivamento ético de conteúdo público e educacional.
+**Importante:** Respeite direitos autorais e termos de serviço das plataformas. Este projeto é destinado para arquivamento ético de conteúdo público.
 
 ---
 

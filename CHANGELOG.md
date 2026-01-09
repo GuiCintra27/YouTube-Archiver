@@ -173,7 +173,7 @@ GET /api/drive/videos
   - CORS configurado para desenvolvimento local
 
 #### Frontend Web (Novo)
-- **Interface Next.js 15** (`web-ui/`)
+- **Interface Next.js 15** (`frontend/`)
   - Design moderno com shadcn/ui e Tailwind CSS
   - Formulário intuitivo para download de vídeos
   - Barra de progresso em tempo real
@@ -253,7 +253,7 @@ GET /api/drive/videos
 
 - ✅ CLI Python 100% compatível (nenhuma breaking change)
 - ✅ Todos os parâmetros existentes mantidos
-- ✅ Frontend antigo (`frontend/`) ainda funcional
+- ✅ Frontend Next.js (`frontend/`) disponível
 - ✅ Google Drive upload suportado via CLI
 
 ### 📊 Estrutura do Projeto
@@ -261,15 +261,15 @@ GET /api/drive/videos
 ```
 yt-archiver/
 ├── backend/              # API FastAPI (NOVO)
-│   ├── api.py
-│   ├── downloader.py
+│   ├── app/
+│   │   ├── main.py
+│   │   └── downloads/
+│   │       └── downloader.py
 │   └── requirements.txt
-├── web-ui/               # Interface Next.js (NOVO)
+├── frontend/             # Interface Next.js (NOVO)
 │   ├── src/
 │   └── package.json
-├── python/               # CLI original
-│   └── main.py
-├── frontend/             # CLI generator (legado)
+├── docs/                 # Documentação
 ├── start-dev.sh          # Script Linux/Mac (NOVO)
 ├── start-dev.bat         # Script Windows (NOVO)
 ├── README.md             # Atualizado
@@ -285,15 +285,12 @@ yt-archiver/
 # Acesse http://localhost:3000
 ```
 
-**CLI (inalterado):**
-```bash
-python python/main.py download "URL"
-```
+**CLI (legado):** removido do monorepo atual (use tags antigas, se necessário)
 
 **API (novo):**
 ```bash
 cd backend
-python api.py
+./run.sh
 # Acesse http://localhost:8000/docs
 ```
 

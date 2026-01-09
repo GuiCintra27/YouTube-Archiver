@@ -106,12 +106,14 @@ src/
 │   │   ├── error-boundary.tsx   # Error Boundary com retry
 │   │   ├── navigation.tsx       # Navegação
 │   │   ├── theme-provider.tsx   # Tema dark/light
-│   │   ├── pagination.tsx       # Controles de paginação
+│   │   ├── pagination/          # Controles de paginação
+│   │   │   ├── index.ts
+│   │   │   └── pagination-controls.tsx
 │   │   └── videos/              # Componentes de vídeo
 │   ├── drive/                   # Componentes Google Drive
 │   │   ├── drive-auth.tsx
 │   │   ├── drive-video-grid.tsx
-│   │   ├── drive-video-player.tsx
+│   │   ├── external-upload-modal.tsx
 │   │   └── sync-panel.tsx
 │   ├── home/                    # Componentes da Home
 │   │   └── download-form.tsx
@@ -125,11 +127,12 @@ src/
 │   ├── use-api-url.ts           # URL da API (SSR-safe)
 │   └── use-fetch.ts             # Fetch com AbortController
 └── lib/
-    ├── api-config.ts            # Configuração centralizada da API
-    ├── api-client.ts            # Cliente HTTP tipado
     ├── api-urls.ts              # Constantes de endpoints
-    ├── url-validator.ts         # Validação de URLs
-    └── utils.ts                 # Utilitários (cn, formatBytes)
+    ├── paths.ts                 # Rotas do app
+    ├── client/api.ts            # Cliente HTTP (frontend)
+    ├── server/api.ts            # Fetch SSR + cache tags
+    ├── server/tags.ts           # Tags de cache
+    └── utils.ts                 # Helpers (cn, formatBytes)
 ```
 
 **Arquivos de Configuração:**
@@ -138,7 +141,7 @@ src/
 - `tailwind.config.ts` - Configuração Tailwind
 - `tsconfig.json` - TypeScript config
 
-**Player de vídeo:** Plyr (HTML5 video player)
+**Player de vídeo:** Vidstack (HTML5 video player)
 
 ---
 
@@ -150,7 +153,7 @@ src/
 - [x] Sistema de jobs assíncronos com polling de progresso
 - [x] Biblioteca de vídeos com thumbnails
 - [x] Streaming de vídeos locais com range requests (HTTP 206)
-- [x] Player de vídeo integrado (Plyr)
+- [x] Player de vídeo integrado (Vidstack)
 - [x] Exclusão de vídeos com limpeza de arquivos relacionados
 - [x] Sistema de arquivamento (evita duplicatas)
 
@@ -184,7 +187,7 @@ src/
 - [x] Controle de volume (mute + slider)
 - [x] Persistência entre páginas (player no layout.tsx)
 - [x] Transferência de tempo de reprodução ao minimizar
-- [x] **Documentação:** `docs/local/GLOBAL-PLAYER-FEATURE.md`
+- [x] **Documentação:** `docs/project/GLOBAL-PLAYER.md`
 
 ---
 
@@ -366,8 +369,10 @@ git cz              # Opção 3 (se instalado globalmente)
    - Retorna string vazia no servidor, URL real no cliente
    - Evita erros de hidratação
 
-3. **Plyr CSS**
-   - Importar em `layout.tsx`: `import "plyr-react/plyr.css"`
+3. **Vidstack CSS**
+   - Importar em `layout.tsx`:
+     - `import "@vidstack/react/player/styles/default/theme.css";`
+     - `import "@vidstack/react/player/styles/default/layouts/video.css";`
    - Necessário para estilos corretos do player
 
 4. **API Calls**
@@ -378,7 +383,7 @@ git cz              # Opção 3 (se instalado globalmente)
 5. **ESLint**
    - Flat config em `eslint.config.mjs` (ESLint 9)
    - Comando: `npm run lint` (usa ESLint CLI diretamente)
-   - Warnings de `any` são aceitáveis para refs do Plyr
+   - Warnings de `any` são aceitáveis para refs do Vidstack
 
 6. **shadcn/ui**
    - Componentes instalados sob demanda em `components/ui/`
@@ -465,23 +470,28 @@ frontend/
 │   │   ├── common/                   # Componentes compartilhados
 │   │   │   ├── error-boundary.tsx    # ⭐ Error Boundary
 │   │   │   ├── navigation.tsx        # Navegação
-│   │   │   ├── theme-provider.tsx    # Tema dark/light
-│   │   │   └── videos/               # VideoCard, VideoPlayer
+│   │   │   ├── pagination/           # Controles de paginação
+│   │   │   │   ├── index.ts
+│   │   │   │   └── pagination-controls.tsx
+│   │   │   └── videos/               # VideoCard, VideoPlayer, RecentVideos
 │   │   ├── drive/                    # Componentes Google Drive
 │   │   ├── home/                     # Componentes da Home
 │   │   │   └── download-form.tsx     # ⭐ Formulário de download
 │   │   ├── library/                  # Biblioteca
 │   │   │   └── paginated-video-grid.tsx
+│   │   ├── record/                   # Gravação de tela
+│   │   │   └── screen-recorder.tsx
 │   │   └── ui/                       # shadcn/ui components
 │   ├── hooks/                        # ⭐ Hooks customizados
 │   │   ├── index.ts                  # Barrel export
 │   │   ├── use-api-url.ts            # ⭐ URL da API (SSR-safe)
 │   │   └── use-fetch.ts              # Fetch com AbortController
 │   └── lib/
-│       ├── api-config.ts             # ⭐ Configuração da API
-│       ├── api-client.ts             # Cliente HTTP tipado
 │       ├── api-urls.ts               # Constantes de endpoints
-│       ├── url-validator.ts          # Validação de URLs
+│       ├── paths.ts                  # Rotas do app
+│       ├── client/api.ts             # Cliente HTTP (frontend)
+│       ├── server/api.ts             # Fetch SSR + cache tags
+│       ├── server/tags.ts            # Tags de cache
 │       └── utils.ts                  # Helpers (cn, formatBytes)
 ├── eslint.config.mjs                 # ⭐ ESLint flat config
 ├── package.json
@@ -497,17 +507,25 @@ frontend/
 ├── README.md                    # ⭐ Documentação principal do projeto
 ├── CHANGELOG.md                 # Changelog principal
 ├── start-dev.sh                 # Script de início rápido
-└── docs/project/                # Documentações gerais
-    ├── BUGS.md                  # ⭐ Bug tracking e correções
-    ├── CHANGELOG-v2.2.md
-    ├── FEATURES-V2.1.md
-    ├── GOOGLE-DRIVE-FEATURES.md # Features do Google Drive
-    ├── GOOGLE-DRIVE-SETUP.md    # Guia de configuração OAuth
-    ├── MCP-README.md            # Configuração MCP
-    ├── QUICK-FIX.md
-    ├── QUICK-START.md
-    ├── TECHNICAL-REFERENCE.md   # ⭐ Referência técnica rápida
-    └── TESTING.md
+└── docs/
+    ├── project/                 # Documentações gerais
+    │   ├── BUGS.md              # ⭐ Bug tracking e correções
+    │   ├── GOOGLE-DRIVE-FEATURES.md
+    │   ├── GOOGLE-DRIVE-SETUP.md
+    │   ├── GLOBAL-PLAYER.md
+    │   ├── OBSERVABILITY.md
+    │   ├── QUICK-FIX.md
+    │   ├── QUICK-START.md
+    │   ├── TECHNICAL-REFERENCE.md # ⭐ Referência técnica rápida
+    │   ├── TESTING.md
+    │   └── archive/
+    │       ├── CHANGELOG-v2.2.md
+    │       └── FEATURES-V2.1.md
+    └── local/
+        ├── DOCS-CLEANUP-PLAN.md
+        ├── RECRUITER-HIGHLIGHTS.md
+        └── archive/
+            └── MCP-README.md
 ```
 
 ---
@@ -547,7 +565,7 @@ frontend/
 ## 🎯 Pedidos Típicos e Como Resolver
 
 ### "Adicionar uma nova opção ao formulário de download"
-1. Adicionar campo no componente `frontend/src/components/download-form.tsx`
+1. Adicionar campo no componente `frontend/src/components/home/download-form.tsx`
 2. Adicionar parâmetro no modelo Pydantic em `backend/app/downloads/schemas.py` (classe `DownloadRequest`)
 3. Passar parâmetro para `Settings` em `backend/app/downloads/service.py` (função `create_download_settings`)
 4. Implementar lógica em `_base_opts()` do `Downloader` em `backend/app/downloads/downloader.py`
@@ -714,7 +732,7 @@ cat BUGS.md
 6. **Bugs conhecidos:** Todos corrigidos (ver BUGS.md para histórico)
 7. **Google Drive:** OAuth em `app/drive/manager.py`, streaming funcionando
 8. **Drive Cache:** SQLite em `app/drive/cache/` (~20-50x mais rápido que API)
-9. **Player:** Plyr com range requests (HTTP 206) funcionando local + Drive
+9. **Player:** Vidstack com range requests (HTTP 206) funcionando local + Drive
 10. **Sistema de jobs:** Em `app/jobs/`, assíncrono com polling + limpeza automática
 
 **Localização dos arquivos principais:**
