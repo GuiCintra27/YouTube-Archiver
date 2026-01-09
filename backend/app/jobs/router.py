@@ -16,7 +16,7 @@ from fastapi.responses import StreamingResponse
 
 from app.core.rate_limit import limiter, RateLimits
 from . import store
-from .service import cancel_job
+from .service import cancel_job, get_job_or_raise
 from .schemas import JobListResponse, JobStatus, JobActionResponse
 from app.core.exceptions import JobNotFoundException, InvalidRequestException
 
@@ -87,11 +87,7 @@ Retorna o status atual de um job específico.
 @limiter.limit(RateLimits.GET_STATUS)
 async def get_job_status(request: Request, job_id: str) -> JobStatus:
     """Obtém o status de um job."""
-    job = store.get_job(job_id)
-    if not job:
-        raise JobNotFoundException()
-    job.setdefault("job_id", job_id)
-    return job
+    return get_job_or_raise(job_id)
 
 
 @router.post(
@@ -113,9 +109,7 @@ Jobs já finalizados (`completed`, `error`, `cancelled`) não podem ser cancelad
 @limiter.limit(RateLimits.DELETE)
 async def cancel_job_endpoint(request: Request, job_id: str) -> JobActionResponse:
     """Cancela um job em execução."""
-    job = store.get_job(job_id)
-    if not job:
-        raise JobNotFoundException()
+    job = get_job_or_raise(job_id)
 
     # Only cancel running jobs
     if job["status"] not in ["pending", "downloading"]:
@@ -151,8 +145,7 @@ Esta ação não pode ser desfeita.
 @limiter.limit(RateLimits.DELETE)
 async def delete_job(request: Request, job_id: str) -> JobActionResponse:
     """Remove um job do histórico."""
-    if not store.job_exists(job_id):
-        raise JobNotFoundException()
+    get_job_or_raise(job_id)
 
     # Cancel first if running
     task = store.get_task(job_id)
@@ -195,8 +188,7 @@ eventSource.onmessage = (e) => {
 @limiter.limit(RateLimits.GET_STATUS)
 async def stream_job_progress(request: Request, job_id: str):
     """Stream de progresso em tempo real usando Server-Sent Events (SSE)."""
-    if not store.job_exists(job_id):
-        raise JobNotFoundException()
+    get_job_or_raise(job_id)
 
     async def event_generator():
         last_progress = None

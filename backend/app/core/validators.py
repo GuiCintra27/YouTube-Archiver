@@ -4,10 +4,11 @@ Input validation utilities for the application.
 Provides URL validation, filename sanitization, and other input validation functions.
 """
 import re
-from typing import Optional, Tuple
+from typing import Optional, Sequence, Tuple
 from urllib.parse import urlparse
 
 from app.core.logging import get_module_logger
+from app.core.exceptions import InvalidRequestException
 
 logger = get_module_logger("validators")
 
@@ -204,6 +205,36 @@ def validate_path_safe(path: str) -> str:
         raise ValueError("Absolute paths not allowed")
 
     return path
+
+
+def validate_batch_items(
+    items: Sequence[object],
+    *,
+    list_label: str,
+    item_label: str,
+    max_items: int = 100,
+) -> None:
+    if not items:
+        raise InvalidRequestException(f"{list_label} list cannot be empty")
+    if len(items) > max_items:
+        raise InvalidRequestException(
+            f"Cannot delete more than {max_items} {item_label} at once"
+        )
+
+
+def validate_pagination(page: int, limit: int) -> None:
+    if page < 1 or limit < 1:
+        raise InvalidRequestException("page and limit must be positive integers")
+
+
+def validate_page(page: int) -> None:
+    if page < 1:
+        raise InvalidRequestException("page must be a positive integer")
+
+
+def validate_page_limit(limit: int) -> None:
+    if limit < 1:
+        raise InvalidRequestException("limit must be a positive integer")
 
 
 def validate_resolution(resolution: Optional[int]) -> Optional[int]:

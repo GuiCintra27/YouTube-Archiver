@@ -10,7 +10,7 @@ from datetime import datetime
 from fastapi import APIRouter, Request
 
 from app.core.rate_limit import limiter, RateLimits
-from app.core.blocking import run_blocking, get_drive_semaphore
+from app.core.blocking import run_drive_blocking
 from app.catalog.service import (
     bootstrap_local_catalog,
     get_catalog_status,
@@ -25,8 +25,9 @@ from app.catalog.schemas import (
     CatalogDrivePublishResponse,
     CatalogJobResponse,
 )
+from app.core.drive import require_drive_auth
 from app.drive.manager import drive_manager
-from app.core.exceptions import DriveNotAuthenticatedException
+from app.core.responses import job_response
 import io
 from googleapiclient.http import MediaIoBaseDownload
 import app.jobs.store as store
@@ -56,8 +57,7 @@ async def import_drive_catalog(request: Request):
     This endpoint downloads a single snapshot file (`catalog-drive.json.gz`) from:
     `YouTube Archiver/.catalog/`.
     """
-    if not drive_manager.is_authenticated():
-        raise DriveNotAuthenticatedException()
+    require_drive_auth(request)
 
     def _download_snapshot() -> tuple[str, bytes]:
         service = drive_manager.get_service()
@@ -85,9 +85,8 @@ async def import_drive_catalog(request: Request):
 
         return file_id, buf.getvalue()
 
-    file_id, snapshot_bytes = await run_blocking(
+    file_id, snapshot_bytes = await run_drive_blocking(
         _download_snapshot,
-        semaphore=get_drive_semaphore(),
         label="catalog.import_drive",
     )
     if not file_id:
@@ -140,8 +139,7 @@ async def rebuild_drive_catalog(request: Request):
 
     Use this when the Drive already has videos but `catalog-drive.json.gz` does not exist yet.
     """
-    if not drive_manager.is_authenticated():
-        raise DriveNotAuthenticatedException()
+    require_drive_auth(request)
 
     job_id = str(uuid.uuid4())
     store.set_job(
@@ -159,4 +157,4 @@ async def rebuild_drive_catalog(request: Request):
     task = asyncio.create_task(_run_drive_rebuild_job(job_id))
     store.set_task(job_id, task)
 
-    return {"status": "success", "job_id": job_id, "message": "Rebuild do catálogo do Drive iniciado"}
+    return job_response(job_id, "Rebuild do catálogo do Drive iniciado")

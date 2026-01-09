@@ -36,13 +36,15 @@ from app.catalog.service import (
     rename_local_video_in_catalog,
     upsert_local_video_from_fs,
 )
-from app.core.blocking import run_blocking, get_fs_semaphore
+from app.core.blocking import run_fs_blocking
 
 
 class RenameRequest(BaseModel):
     new_name: str
 from app.config import settings
 from app.core.security import sanitize_path, validate_path_within_base, validate_file_exists, encode_filename_for_header
+from app.core.uploads import read_thumbnail_upload
+from app.core.validators import validate_batch_items, validate_page, validate_page_limit
 from app.core.exceptions import (
     VideoNotFoundException,
     ThumbnailNotFoundException,
@@ -108,21 +110,19 @@ Os resultados são cacheados por 30 segundos para melhor performance.
 @limiter.limit(RateLimits.LIST_VIDEOS)
 async def list_videos(request: Request, base_dir: str = "./downloads", page: int = 1, limit: Optional[int] = None):
     """Lista vídeos disponíveis na biblioteca (com paginação opcional)."""
-    if page < 1:
-        raise InvalidRequestException("Página deve ser >= 1")
-    if limit is not None and limit <= 0:
-        raise InvalidRequestException("Limite deve ser > 0")
+    validate_page(page)
+    if limit is not None:
+        validate_page_limit(limit)
 
     if settings.CATALOG_ENABLED:
         effective_limit = limit if limit is not None else 1000000
         return await list_local_videos_paginated(page=page, limit=effective_limit)
 
-    return await run_blocking(
+    return await run_fs_blocking(
         get_paginated_videos,
         base_dir,
         page,
         limit,
-        semaphore=get_fs_semaphore(),
         label="library.list_videos",
     )
 
@@ -297,9 +297,8 @@ async def get_thumbnail(request: Request, thumbnail_path: str, base_dir: str = "
                 },
             )
 
-        content = await run_blocking(
+        content = await run_fs_blocking(
             full_path.read_bytes,
-            semaphore=get_fs_semaphore(),
             label="library.thumbnail",
         )
         return Response(
@@ -358,17 +357,12 @@ Exclui múltiplos vídeos e todos os arquivos associados de uma só vez.
 async def delete_videos_batch_endpoint(request: Request, video_paths: List[str], base_dir: str = "./downloads"):
     """Exclui múltiplos vídeos e seus arquivos associados."""
     try:
-        if not video_paths:
-            raise InvalidRequestException("video_paths list cannot be empty")
+        validate_batch_items(video_paths, list_label="video_paths", item_label="videos")
 
-        if len(video_paths) > 100:
-            raise InvalidRequestException("Cannot delete more than 100 videos at once")
-
-        result = await run_blocking(
+        result = await run_fs_blocking(
             delete_videos_batch,
             video_paths,
             base_dir,
-            semaphore=get_fs_semaphore(),
             label="library.delete_batch",
         )
         for item in result.get("deleted", []):
@@ -421,12 +415,11 @@ Renomeia um vídeo e todos os arquivos associados.
 async def rename_video_endpoint(request: Request, video_path: str, body: RenameRequest, base_dir: str = "./downloads"):
     """Renomeia um vídeo e seus arquivos associados."""
     try:
-        result = await run_blocking(
+        result = await run_fs_blocking(
             rename_video,
             video_path,
             body.new_name,
             base_dir,
-            semaphore=get_fs_semaphore(),
             label="library.rename",
         )
         new_path = result.get("new_path")
@@ -494,24 +487,16 @@ async def update_thumbnail_endpoint(
 ):
     """Atualiza a thumbnail de um vídeo."""
     try:
-        # Get file extension from uploaded file
-        if not thumbnail.filename:
-            raise InvalidRequestException("Thumbnail filename is required")
+        thumbnail_data, file_ext = await read_thumbnail_upload(
+            thumbnail, settings.THUMBNAIL_EXTENSIONS
+        )
 
-        file_ext = Path(thumbnail.filename).suffix.lower()
-        if file_ext not in settings.THUMBNAIL_EXTENSIONS:
-            raise InvalidRequestException(f"Invalid image format: {file_ext}. Supported: {', '.join(settings.THUMBNAIL_EXTENSIONS)}")
-
-        # Read file content
-        thumbnail_data = await thumbnail.read()
-
-        result = await run_blocking(
+        result = await run_fs_blocking(
             update_video_thumbnail,
             video_path,
             thumbnail_data,
             file_ext,
             base_dir,
-            semaphore=get_fs_semaphore(),
             label="library.update_thumbnail",
         )
         thumb_path = result.get("thumbnail_path")
@@ -573,11 +558,10 @@ Exclui um vídeo e todos os arquivos associados.
 async def delete_video(request: Request, video_path: str, base_dir: str = "./downloads"):
     """Exclui um vídeo e seus arquivos associados."""
     try:
-        result = await run_blocking(
+        result = await run_fs_blocking(
             delete_video_with_related,
             video_path,
             base_dir,
-            semaphore=get_fs_semaphore(),
             label="library.delete_video",
         )
         await delete_local_video_from_catalog(video_path=sanitize_path(video_path))

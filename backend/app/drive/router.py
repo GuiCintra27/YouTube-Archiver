@@ -34,7 +34,6 @@ from .service import (
     download_all_from_drive,
     resolve_drive_file_id_by_path,
 )
-from .manager import drive_manager
 from app.catalog.identity import ensure_catalog_id_for_video, sidecar_path_for
 from .schemas import (
     DriveAuthStatus,
@@ -56,11 +55,17 @@ from app.core.exceptions import (
     InvalidRequestException,
     ThumbnailNotFoundException,
 )
+from app.core.uploads import read_thumbnail_upload, save_upload_file
+from app.core.validators import validate_batch_items, validate_pagination
 from app.core.errors import AppException
 from app.core.rate_limit import limiter, RateLimits
-from app.core.blocking import run_blocking, get_drive_semaphore
+from app.core.blocking import run_drive_blocking
+from app.core.drive import require_drive_auth
+from app.core.http import build_cache_response
+from app.core.responses import job_response
 from app.config import settings
 from pydantic import BaseModel
+from .manager import drive_manager
 
 
 class RenameRequest(BaseModel):
@@ -68,12 +73,6 @@ class RenameRequest(BaseModel):
 
 
 router = APIRouter(prefix="/api/drive", tags=["drive"])
-
-
-def _require_auth():
-    """Helper to check Drive authentication"""
-    if not drive_manager.is_authenticated():
-        raise DriveNotAuthenticatedException()
 
 
 @router.get("/auth-status", response_model=DriveAuthStatus)
@@ -101,10 +100,9 @@ async def auth_url(request: Request):
 async def oauth2callback(request: Request, code: str):
     """OAuth callback - exchange code for tokens"""
     try:
-        result = await run_blocking(
+        result = await run_drive_blocking(
             exchange_auth_code,
             code,
-            semaphore=get_drive_semaphore(),
             label="drive.oauth",
         )
 
@@ -130,10 +128,8 @@ async def oauth2callback(request: Request, code: str):
 async def list_videos(request: Request, page: int = 1, limit: int = 24):
     """List videos in Google Drive with pagination"""
     try:
-        _require_auth()
-
-        if page < 1 or limit < 1:
-            raise InvalidRequestException("page and limit must be positive integers")
+        require_drive_auth(request)
+        validate_pagination(page, limit)
 
         return await list_videos_paginated(page, limit)
     except (DriveNotAuthenticatedException, InvalidRequestException):
@@ -152,13 +148,9 @@ async def upload_to_drive(request: Request, video_path: str, base_dir: str = "./
     Use GET /api/jobs/{job_id} para acompanhar o progresso.
     """
     try:
-        _require_auth()
+        require_drive_auth(request)
         job_id = await upload_single_video(video_path, base_dir)
-        return {
-            "status": "success",
-            "job_id": job_id,
-            "message": "Upload iniciado em background"
-        }
+        return job_response(job_id, "Upload iniciado em background")
     except DriveNotAuthenticatedException:
         raise
     except AppException:
@@ -174,7 +166,7 @@ async def upload_to_drive(request: Request, video_path: str, base_dir: str = "./
 async def sync_status(request: Request, base_dir: str = "./downloads"):
     """Get sync status between local and Drive"""
     try:
-        _require_auth()
+        require_drive_auth(request)
         return await get_sync_status(base_dir)
     except DriveNotAuthenticatedException:
         raise
@@ -190,9 +182,8 @@ async def sync_items(request: Request, kind: str, page: int = 1, limit: int = 50
     kind: local_only | drive_only | synced
     """
     try:
-        _require_auth()
-        if page < 1 or limit < 1:
-            raise InvalidRequestException("page and limit must be positive integers")
+        require_drive_auth(request)
+        validate_pagination(page, limit)
         return await get_sync_items_from_catalog(kind=kind, page=page, limit=limit)
     except (DriveNotAuthenticatedException, InvalidRequestException):
         raise
@@ -211,13 +202,9 @@ async def sync_all(request: Request, base_dir: str = "./downloads"):
     acompanhar o progresso.
     """
     try:
-        _require_auth()
+        require_drive_auth(request)
         job_id = await sync_all_videos(base_dir)
-        return {
-            "status": "success",
-            "job_id": job_id,
-            "message": "Sincronização iniciada em background"
-        }
+        return job_response(job_id, "Sincronização iniciada em background")
     except DriveNotAuthenticatedException:
         raise
     except Exception as e:
@@ -229,7 +216,7 @@ async def sync_all(request: Request, base_dir: str = "./downloads"):
 async def delete_drive_video(request: Request, file_id: str):
     """Remove a video from Google Drive"""
     try:
-        _require_auth()
+        require_drive_auth(request)
         return await delete_video(file_id)
     except DriveNotAuthenticatedException:
         raise
@@ -250,13 +237,8 @@ async def delete_drive_videos_batch(request: Request, file_ids: List[str]):
         Results with deleted count and any failures
     """
     try:
-        _require_auth()
-
-        if not file_ids:
-            raise InvalidRequestException("file_ids list cannot be empty")
-
-        if len(file_ids) > 100:
-            raise InvalidRequestException("Cannot delete more than 100 files at once")
+        require_drive_auth(request)
+        validate_batch_items(file_ids, list_label="file_ids", item_label="files")
 
         return await delete_videos_batch(file_ids)
     except (DriveNotAuthenticatedException, InvalidRequestException):
@@ -270,7 +252,7 @@ async def delete_drive_videos_batch(request: Request, file_ids: List[str]):
 async def get_drive_share(request: Request, file_id: str):
     """Get public sharing status for a Drive video"""
     try:
-        _require_auth()
+        require_drive_auth(request)
         return await get_drive_share_status(file_id)
     except DriveNotAuthenticatedException:
         raise
@@ -283,7 +265,7 @@ async def get_drive_share(request: Request, file_id: str):
 async def share_drive(request: Request, file_id: str):
     """Enable public sharing for a Drive video"""
     try:
-        _require_auth()
+        require_drive_auth(request)
         return await share_drive_video(file_id)
     except DriveNotAuthenticatedException:
         raise
@@ -296,7 +278,7 @@ async def share_drive(request: Request, file_id: str):
 async def unshare_drive(request: Request, file_id: str):
     """Disable public sharing for a Drive video"""
     try:
-        _require_auth()
+        require_drive_auth(request)
         return await unshare_drive_video(file_id)
     except DriveNotAuthenticatedException:
         raise
@@ -312,7 +294,7 @@ async def rename_drive_video(request: Request, file_id: str, body: RenameRequest
     Also renames related files (thumbnails, metadata, subtitles).
     """
     try:
-        _require_auth()
+        require_drive_auth(request)
 
         if not body.new_name or not body.new_name.strip():
             raise InvalidRequestException("New name cannot be empty")
@@ -336,19 +318,11 @@ async def update_drive_thumbnail(
     Replaces any existing thumbnail.
     """
     try:
-        _require_auth()
+        require_drive_auth(request)
 
-        if not thumbnail.filename:
-            raise InvalidRequestException("Thumbnail filename is required")
-
-        file_ext = Path(thumbnail.filename).suffix.lower()
-        if file_ext not in settings.THUMBNAIL_EXTENSIONS:
-            raise InvalidRequestException(
-                f"Invalid image format: {file_ext}. Supported: {', '.join(settings.THUMBNAIL_EXTENSIONS)}"
-            )
-
-        thumbnail_data = await thumbnail.read()
-
+        thumbnail_data, file_ext = await read_thumbnail_upload(
+            thumbnail, settings.THUMBNAIL_EXTENSIONS
+        )
         return await update_drive_thumbnail_service(file_id, thumbnail_data, file_ext)
     except (DriveNotAuthenticatedException, InvalidRequestException):
         raise
@@ -364,18 +338,16 @@ async def stream_drive_video(request: Request, file_id: str):
     Allows direct playback in browser with seek/skip.
     """
     try:
-        _require_auth()
+        require_drive_auth(request)
 
         range_header = request.headers.get('range')
-        file_metadata = await run_blocking(
+        file_metadata = await run_drive_blocking(
             drive_manager.get_file_metadata,
             file_id,
-            semaphore=get_drive_semaphore(),
             label="drive.stream.metadata",
         )
-        access_token = await run_blocking(
+        access_token = await run_drive_blocking(
             drive_manager._get_access_token,
-            semaphore=get_drive_semaphore(),
             label="drive.stream.token",
         )
         generator, headers, status_code = stream_video(
@@ -409,24 +381,21 @@ async def stream_drive_video(request: Request, file_id: str):
 async def get_drive_thumbnail(request: Request, file_id: str):
     """Get thumbnail for a Drive video"""
     try:
-        _require_auth()
+        require_drive_auth(request)
 
-        thumbnail_bytes = await run_blocking(
+        thumbnail_bytes = await run_drive_blocking(
             get_thumbnail,
             file_id,
-            semaphore=get_drive_semaphore(),
             label="drive.thumbnail",
         )
 
         if not thumbnail_bytes:
             raise ThumbnailNotFoundException()
 
-        return Response(
-            content=thumbnail_bytes,
-            media_type="image/jpeg",
-            headers={
-                "Cache-Control": "public, max-age=86400"  # Cache for 1 day
-            }
+        return build_cache_response(
+            thumbnail_bytes,
+            "image/jpeg",
+            max_age=86400,
         )
     except (DriveNotAuthenticatedException, ThumbnailNotFoundException):
         raise
@@ -443,12 +412,11 @@ async def get_drive_custom_thumbnail(request: Request, file_id: str):
     are stored alongside videos.
     """
     try:
-        _require_auth()
+        require_drive_auth(request)
 
-        result = await run_blocking(
+        result = await run_drive_blocking(
             get_custom_thumbnail,
             file_id,
-            semaphore=get_drive_semaphore(),
             label="drive.custom_thumbnail",
         )
 
@@ -457,12 +425,10 @@ async def get_drive_custom_thumbnail(request: Request, file_id: str):
 
         thumbnail_bytes, mime_type = result
 
-        return Response(
-            content=thumbnail_bytes,
-            media_type=mime_type,
-            headers={
-                "Cache-Control": "public, max-age=86400"  # Cache for 1 day
-            }
+        return build_cache_response(
+            thumbnail_bytes,
+            mime_type,
+            max_age=86400,
         )
     except (DriveNotAuthenticatedException, ThumbnailNotFoundException):
         raise
@@ -493,7 +459,7 @@ async def upload_external_to_drive(
     Retorna job_id para tracking de progresso via GET /api/jobs/{job_id}.
     """
     try:
-        _require_auth()
+        require_drive_auth(request)
 
         # Criar diretório temporário único
         temp_dir = Path(f"/tmp/yt-archiver-upload/{uuid.uuid4()}")
@@ -504,8 +470,7 @@ async def upload_external_to_drive(
         try:
             # Salvar vídeo principal
             video_path = temp_dir / video.filename
-            with open(video_path, "wb") as f:
-                shutil.copyfileobj(video.file, f)
+            save_upload_file(video, video_path)
             temp_files.append(str(video_path))
 
             # Garantir catalog_id e criar sidecar
@@ -525,35 +490,28 @@ async def upload_external_to_drive(
                 thumb_ext = Path(thumbnail.filename).suffix or ".jpg"
                 thumb_name = f"{video_base}{thumb_ext.lower()}"
                 thumb_path = temp_dir / thumb_name
-                with open(thumb_path, "wb") as f:
-                    shutil.copyfileobj(thumbnail.file, f)
+                save_upload_file(thumbnail, thumb_path)
                 temp_files.append(str(thumb_path))
 
             # Salvar legendas (múltiplas)
             for subtitle in subtitles:
                 if subtitle.filename:
                     sub_path = temp_dir / subtitle.filename
-                    with open(sub_path, "wb") as f:
-                        shutil.copyfileobj(subtitle.file, f)
+                    save_upload_file(subtitle, sub_path)
                     temp_files.append(str(sub_path))
 
             # Salvar transcrição (se fornecida)
             if transcription and transcription.filename:
                 trans_path = temp_dir / transcription.filename
-                with open(trans_path, "wb") as f:
-                    shutil.copyfileobj(transcription.file, f)
+                save_upload_file(transcription, trans_path)
                 temp_files.append(str(trans_path))
 
             # Iniciar upload em background
             job_id = await upload_external_files(folder_name, temp_files)
 
-            return {
-                "status": "success",
-                "job_id": job_id,
-                "message": "Upload iniciado em background",
-                "folder_name": folder_name,
-                "files_count": len(temp_files)
-            }
+            response = job_response(job_id, "Upload iniciado em background")
+            response.update({"folder_name": folder_name, "files_count": len(temp_files)})
+            return response
 
         except Exception as e:
             # Limpar arquivos temporários em caso de erro
@@ -586,17 +544,16 @@ async def download_from_drive(
         base_dir: Diretório base local para downloads
     """
     try:
-        _require_auth()
+        require_drive_auth(request)
 
         resolved_file_id = file_id
         if not resolved_file_id:
             if settings.CATALOG_ENABLED:
                 resolved_file_id = await resolve_drive_file_id_by_path(drive_path=path)
             else:
-                video = await run_blocking(
+                video = await run_drive_blocking(
                     drive_manager.get_video_by_path,
                     path,
-                    semaphore=get_drive_semaphore(),
                     label="drive.get_video_by_path",
                 )
                 if not video:
@@ -604,11 +561,7 @@ async def download_from_drive(
                 resolved_file_id = video["id"]
 
         job_id = await download_single_from_drive(resolved_file_id, path, base_dir)
-        return {
-            "status": "success",
-            "job_id": job_id,
-            "message": "Download iniciado em background"
-        }
+        return job_response(job_id, "Download iniciado em background")
     except DriveNotAuthenticatedException:
         raise
     except HTTPException:
@@ -634,13 +587,9 @@ async def download_all_from_drive_endpoint(
         base_dir: Diretório base local para downloads
     """
     try:
-        _require_auth()
+        require_drive_auth(request)
         job_id = await download_all_from_drive(base_dir)
-        return {
-            "status": "success",
-            "job_id": job_id,
-            "message": "Download de todos os vídeos iniciado em background"
-        }
+        return job_response(job_id, "Download de todos os vídeos iniciado em background")
     except DriveNotAuthenticatedException:
         raise
     except Exception as e:
@@ -664,7 +613,7 @@ async def sync_cache(request: Request, full: bool = False):
         Sync result with statistics
     """
     try:
-        _require_auth()
+        require_drive_auth(request)
 
         if not settings.DRIVE_CACHE_ENABLED:
             raise InvalidRequestException("Drive cache is disabled")
@@ -733,7 +682,7 @@ async def rebuild_cache(request: Request):
         Rebuild result with statistics
     """
     try:
-        _require_auth()
+        require_drive_auth(request)
 
         if not settings.DRIVE_CACHE_ENABLED:
             raise InvalidRequestException("Drive cache is disabled")

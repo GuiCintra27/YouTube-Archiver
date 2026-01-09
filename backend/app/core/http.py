@@ -7,6 +7,7 @@ import time
 from typing import Iterable, Optional
 
 import requests
+from fastapi.responses import Response
 
 from app.core.logging import get_module_logger
 
@@ -85,3 +86,16 @@ def request_with_retry(
             )
             time.sleep(sleep_for)
             attempt += 1
+
+
+def build_cache_response(
+    content: bytes,
+    media_type: str,
+    *,
+    max_age: int = 86400,
+) -> Response:
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Cache-Control": f"public, max-age={max_age}"},
+    )

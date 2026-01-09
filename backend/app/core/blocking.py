@@ -54,3 +54,33 @@ async def run_blocking(
         finally:
             if label:
                 logger.debug(f"Blocking end: {label}")
+
+
+async def run_drive_blocking(
+    fn: Callable[..., T],
+    *args,
+    label: Optional[str] = None,
+    **kwargs,
+) -> T:
+    return await run_blocking(
+        fn,
+        *args,
+        semaphore=get_drive_semaphore(),
+        label=label,
+        **kwargs,
+    )
+
+
+async def run_fs_blocking(
+    fn: Callable[..., T],
+    *args,
+    label: Optional[str] = None,
+    **kwargs,
+) -> T:
+    return await run_blocking(
+        fn,
+        *args,
+        semaphore=get_fs_semaphore(),
+        label=label,
+        **kwargs,
+    )

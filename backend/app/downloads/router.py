@@ -11,6 +11,7 @@ from .schemas import VideoInfoRequest, VideoInfoResponse, DownloadRequest, Downl
 from .service import get_video_info, create_download_settings
 from app.jobs.service import create_and_start_job
 from app.core.rate_limit import limiter, RateLimits
+from app.core.responses import job_response
 
 router = APIRouter(prefix="/api", tags=["downloads"])
 
@@ -77,10 +78,6 @@ async def start_download(request: Request, body: DownloadRequest):
     """Inicia um download em background."""
     try:
         job_id = await create_and_start_job(body)
-        return {
-            "status": "success",
-            "job_id": job_id,
-            "message": "Download iniciado",
-        }
+        return job_response(job_id, "Download iniciado")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

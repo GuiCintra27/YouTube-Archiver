@@ -19,6 +19,7 @@ from app.downloads.service import create_download_settings, execute_download
 from app.catalog.service import upsert_local_video_from_fs
 from app.config import settings
 from app.core.logging import get_module_logger
+from app.core.exceptions import JobNotFoundException
 from app.core.types import JobData, JobProgress, DownloadResult
 
 if TYPE_CHECKING:
@@ -28,6 +29,14 @@ logger = get_module_logger("jobs.service")
 
 FORMAT_SUFFIX_RE = re.compile(r"^\.f\d+$", re.IGNORECASE)
 TEMP_SUFFIXES = {".part", ".ytdl", ".temp"}
+
+
+def get_job_or_raise(job_id: str) -> Dict[str, Any]:
+    job = store.get_job(job_id)
+    if not job:
+        raise JobNotFoundException()
+    job.setdefault("job_id", job_id)
+    return job
 
 
 def _strip_suffix(path: Path) -> Path:
