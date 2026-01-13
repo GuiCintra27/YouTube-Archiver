@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { X, Play, Pause, PictureInPicture2, Loader2, Volume2, VolumeX } from "lucide-react";
 import type { MediaPlayerInstance } from "@vidstack/react";
@@ -17,6 +17,19 @@ export default function GlobalPlayer() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [canPip, setCanPip] = useState(false);
+  const exitPictureInPictureIfActive = useCallback(async () => {
+    if (!("pictureInPictureElement" in document)) {
+      return;
+    }
+
+    if (document.pictureInPictureElement) {
+      try {
+        await document.exitPictureInPicture?.();
+      } catch (error) {
+        console.warn("Failed to exit Picture-in-Picture:", error);
+      }
+    }
+  }, []);
 
   // Construir URL do stream
   const videoUrl =
@@ -78,6 +91,12 @@ export default function GlobalPlayer() {
     }
   }, [volume, isMuted, isReady]);
 
+  useEffect(() => {
+    if (!isActive) {
+      void exitPictureInPictureIfActive();
+    }
+  }, [isActive, exitPictureInPictureIfActive]);
+
   const handlePlayPause = () => {
     if (!playerRef.current || !isReady) return;
 
@@ -119,10 +138,11 @@ export default function GlobalPlayer() {
     playerRef.current.muted = newMuted;
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
     if (playerRef.current) {
       playerRef.current.pause();
     }
+    await exitPictureInPictureIfActive();
     stopVideo();
   };
 
