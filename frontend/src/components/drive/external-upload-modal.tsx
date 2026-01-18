@@ -77,6 +77,20 @@ export default function ExternalUploadModal({
   const subtitlesInputRef = useRef<HTMLInputElement>(null);
   const transcriptionInputRef = useRef<HTMLInputElement>(null);
   const pollingCleanupRef = useRef<(() => void) | null>(null);
+  const resetFileInputs = useCallback(() => {
+    if (videoInputRef.current) {
+      videoInputRef.current.value = "";
+    }
+    if (thumbnailInputRef.current) {
+      thumbnailInputRef.current.value = "";
+    }
+    if (subtitlesInputRef.current) {
+      subtitlesInputRef.current.value = "";
+    }
+    if (transcriptionInputRef.current) {
+      transcriptionInputRef.current.value = "";
+    }
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -101,14 +115,17 @@ export default function ExternalUploadModal({
           setError(null);
           setSuccess(false);
           setUploadProgress(null);
+          resetFileInputs();
         }
       }, 300);
     }
-  }, [open, uploading]);
+  }, [open, uploading, resetFileInputs]);
 
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSuccess(false);
+      setError(null);
       setVideoFile(file);
       // Auto-fill folder name from video name if empty
       if (!folderName) {
@@ -116,18 +133,28 @@ export default function ExternalUploadModal({
         setFolderName(nameWithoutExt);
       }
     }
+    if (videoInputRef.current) {
+      videoInputRef.current.value = "";
+    }
   };
 
   const handleThumbnailSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSuccess(false);
+      setError(null);
       setThumbnail(file);
+    }
+    if (thumbnailInputRef.current) {
+      thumbnailInputRef.current.value = "";
     }
   };
 
   const handleSubtitlesSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
+      setSuccess(false);
+      setError(null);
       setSubtitles((prev) => [...prev, ...files]);
     }
     // Reset input to allow selecting same file again
@@ -143,7 +170,12 @@ export default function ExternalUploadModal({
   const handleTranscriptionSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSuccess(false);
+      setError(null);
       setTranscription(file);
+    }
+    if (transcriptionInputRef.current) {
+      transcriptionInputRef.current.value = "";
     }
   };
 
@@ -268,6 +300,7 @@ export default function ExternalUploadModal({
           setSubtitles([]);
           setTranscription(null);
           setFolderName("");
+          resetFileInputs();
           onUploadComplete?.();
         } else if (job.status === "error") {
           setError(job.error || "Erro durante upload");
@@ -368,7 +401,10 @@ export default function ExternalUploadModal({
                     variant="ghost"
                     size="sm"
                     className="h-6 w-6 p-0 text-muted-foreground hover:text-white"
-                    onClick={() => setVideoFile(null)}
+                    onClick={() => {
+                      setVideoFile(null);
+                      resetFileInputs();
+                    }}
                     aria-label="Remover vídeo selecionado"
                   >
                     <X className="h-3 w-3" />
@@ -408,7 +444,10 @@ export default function ExternalUploadModal({
                       variant="ghost"
                       size="sm"
                       className="h-6 w-6 p-0 text-muted-foreground hover:text-white"
-                      onClick={() => setThumbnail(null)}
+                      onClick={() => {
+                        setThumbnail(null);
+                        resetFileInputs();
+                      }}
                       aria-label="Remover thumbnail selecionada"
                     >
                       <X className="h-3 w-3" />
@@ -510,7 +549,10 @@ export default function ExternalUploadModal({
                       variant="ghost"
                       size="sm"
                       className="h-6 w-6 p-0 text-muted-foreground hover:text-white"
-                      onClick={() => setTranscription(null)}
+                      onClick={() => {
+                        setTranscription(null);
+                        resetFileInputs();
+                      }}
                       aria-label="Remover transcrição selecionada"
                     >
                       <X className="h-3 w-3" />
