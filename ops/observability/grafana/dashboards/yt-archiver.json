@@ -107,7 +107,7 @@
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "100 * sum(rate(yt_archiver_http_requests_total{status=~\"5..\",method=~\"$method\",path=~\"$path\"}[$__rate_interval])) / sum(rate(yt_archiver_http_requests_total{method=~\"$method\",path=~\"$path\"}[$__rate_interval]))",
+          "expr": "100 * ((sum(increase(yt_archiver_http_requests_total{status=~\"5..\",method=~\"$method\",path=~\"$path\"}[$__rate_interval])) or vector(0)) / clamp_min((sum(increase(yt_archiver_http_requests_total{method=~\"$method\",path=~\"$path\"}[$__rate_interval])) or vector(0)), 1))",
           "refId": "A"
         }
       ],
@@ -161,7 +161,7 @@
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "100 * (1 - (sum(rate(yt_archiver_http_requests_total{status=~\"5..\",method=~\"$method\",path=~\"$path\"}[$__rate_interval])) / sum(rate(yt_archiver_http_requests_total{method=~\"$method\",path=~\"$path\"}[$__rate_interval]))))",
+          "expr": "100 * (1 - ((sum(increase(yt_archiver_http_requests_total{status=~\"5..\",method=~\"$method\",path=~\"$path\"}[$__rate_interval])) or vector(0)) / clamp_min((sum(increase(yt_archiver_http_requests_total{method=~\"$method\",path=~\"$path\"}[$__rate_interval])) or vector(0)), 1)))",
           "refId": "A"
         }
       ],
@@ -189,7 +189,7 @@
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "100 * sum(rate(yt_archiver_http_request_duration_seconds_bucket{le=\"1\",method=~\"$method\",path=~\"$path\"}[$__rate_interval])) / sum(rate(yt_archiver_http_request_duration_seconds_count{method=~\"$method\",path=~\"$path\"}[$__rate_interval]))",
+          "expr": "100 * ((sum(increase(yt_archiver_http_request_duration_seconds_bucket{le=\"1\",method=~\"$method\",path=~\"$path\"}[$__rate_interval])) or vector(0)) / clamp_min((sum(increase(yt_archiver_http_request_duration_seconds_count{method=~\"$method\",path=~\"$path\"}[$__rate_interval])) or vector(0)), 1))",
           "refId": "A"
         }
       ],
@@ -217,7 +217,7 @@
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "(sum(rate(yt_archiver_http_requests_total{status=~\"5..\",method=~\"$method\",path=~\"$path\"}[$__rate_interval])) / sum(rate(yt_archiver_http_requests_total{method=~\"$method\",path=~\"$path\"}[$__rate_interval]))) / 0.01",
+          "expr": "((sum(increase(yt_archiver_http_requests_total{status=~\"5..\",method=~\"$method\",path=~\"$path\"}[$__rate_interval])) or vector(0)) / clamp_min((sum(increase(yt_archiver_http_requests_total{method=~\"$method\",path=~\"$path\"}[$__rate_interval])) or vector(0)), 1)) / 0.01",
           "refId": "A"
         }
       ],

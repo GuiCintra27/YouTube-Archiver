@@ -10,6 +10,7 @@ import os
 import uuid
 import asyncio
 import re
+import time
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional, Dict, Any
 from pathlib import Path
@@ -21,6 +22,13 @@ from app.config import settings
 from app.core.logging import get_module_logger
 from app.core.exceptions import JobNotFoundException
 from app.core.types import JobData, JobProgress, DownloadResult
+from app.core.metrics import (
+    DOWNLOAD_JOBS_ACTIVE,
+    DOWNLOAD_JOBS_COMPLETED,
+    DOWNLOAD_JOBS_FAILED,
+    DOWNLOAD_JOBS_STARTED,
+    DOWNLOAD_JOB_DURATION,
+)
 
 if TYPE_CHECKING:
     from app.downloads.schemas import DownloadRequest
@@ -199,8 +207,12 @@ async def run_download_job(job_id: str, url: str, request: "DownloadRequest") ->
         url: Video URL
         request: Download request parameters
     """
+    job_started_ts = datetime.now().timestamp()
+    start_time = time.perf_counter()
+    DOWNLOAD_JOBS_STARTED.inc()
+    DOWNLOAD_JOBS_ACTIVE.inc()
+    failed = False
     try:
-        job_started_ts = datetime.now().timestamp()
 
         # Create settings from request
         download_settings = create_download_settings(
@@ -246,6 +258,7 @@ async def run_download_job(job_id: str, url: str, request: "DownloadRequest") ->
         result = await execute_download(url, download_settings, progress_callback)
 
         if result["status"] == "error":
+            failed = True
             fail_job(job_id, result.get("error", "Unknown error"))
         else:
             file_candidates = set(finished_files)
@@ -324,7 +337,15 @@ async def run_download_job(job_id: str, url: str, request: "DownloadRequest") ->
             complete_job(job_id, result)
 
     except Exception as e:
+        failed = True
         fail_job(job_id, str(e))
+    finally:
+        DOWNLOAD_JOBS_ACTIVE.dec()
+        DOWNLOAD_JOB_DURATION.observe(time.perf_counter() - start_time)
+        if failed:
+            DOWNLOAD_JOBS_FAILED.inc()
+        else:
+            DOWNLOAD_JOBS_COMPLETED.inc()
 
 
 async def create_and_start_job(request: "DownloadRequest") -> str:

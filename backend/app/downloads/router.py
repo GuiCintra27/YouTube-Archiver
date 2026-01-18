@@ -5,12 +5,15 @@ Provides endpoints for:
 - Getting video/playlist metadata without downloading
 - Starting background download jobs
 """
+import time
+
 from fastapi import APIRouter, HTTPException, Request
 
 from .schemas import VideoInfoRequest, VideoInfoResponse, DownloadRequest, DownloadResponse
 from .service import get_video_info, create_download_settings
 from app.jobs.service import create_and_start_job
 from app.core.rate_limit import limiter, RateLimits
+from app.core.metrics import DOWNLOAD_REQUESTS, VIDEO_INFO_REQUESTS, VIDEO_INFO_LATENCY
 from app.core.responses import job_response
 
 router = APIRouter(prefix="/api", tags=["downloads"])
@@ -38,7 +41,10 @@ Obtém metadados de um vídeo ou playlist do YouTube sem baixar.
 async def video_info(request: Request, body: VideoInfoRequest):
     """Obtém informações sobre um vídeo sem baixar."""
     try:
+        start = time.perf_counter()
         info = await get_video_info(body.url)
+        VIDEO_INFO_REQUESTS.inc()
+        VIDEO_INFO_LATENCY.observe(time.perf_counter() - start)
         return info
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -78,6 +84,7 @@ async def start_download(request: Request, body: DownloadRequest):
     """Inicia um download em background."""
     try:
         job_id = await create_and_start_job(body)
+        DOWNLOAD_REQUESTS.inc()
         return job_response(job_id, "Download iniciado")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -17,7 +17,7 @@
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "sum(rate(yt_archiver_http_requests_total{path=\"/api/download\",method=\"POST\"}[$__rate_interval]))",
+          "expr": "sum(rate(yt_archiver_download_requests_total[$__rate_interval]))",
           "refId": "A"
         }
       ],
@@ -27,15 +27,15 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Video Info RPS",
+      "title": "Active Download Jobs",
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "sum(rate(yt_archiver_http_requests_total{path=\"/api/video-info\",method=\"POST\"}[$__rate_interval]))",
+          "expr": "yt_archiver_download_jobs_active",
           "refId": "A"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "req/s" }, "overrides": [] },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 }
     },
     {
@@ -45,7 +45,7 @@
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "100 * sum(rate(yt_archiver_http_requests_total{path=\"/api/download\",status=~\"5..\"}[$__rate_interval])) / sum(rate(yt_archiver_http_requests_total{path=\"/api/download\"}[$__rate_interval]))",
+          "expr": "100 * sum(rate(yt_archiver_download_jobs_failed_total[$__rate_interval])) / sum(rate(yt_archiver_download_jobs_started_total[$__rate_interval]))",
           "refId": "A"
         }
       ],
@@ -59,7 +59,7 @@
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(yt_archiver_http_request_duration_seconds_bucket{path=\"/api/download\"}[$__rate_interval])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(yt_archiver_download_job_duration_seconds_bucket[$__rate_interval])) by (le))",
           "refId": "A"
         }
       ],
@@ -69,18 +69,13 @@
     {
       "id": 5,
       "type": "timeseries",
-      "title": "RPS by Endpoint",
+      "title": "Download Start RPS",
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "sum(rate(yt_archiver_http_requests_total{path=\"/api/download\"}[$__rate_interval]))",
+          "expr": "sum(rate(yt_archiver_download_requests_total[$__rate_interval]))",
           "legendFormat": "download",
           "refId": "A"
-        },
-        {
-          "expr": "sum(rate(yt_archiver_http_requests_total{path=\"/api/video-info\"}[$__rate_interval]))",
-          "legendFormat": "video-info",
-          "refId": "B"
         }
       ],
       "fieldConfig": { "defaults": { "unit": "req/s" }, "overrides": [] },
@@ -94,17 +89,17 @@
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(yt_archiver_http_request_duration_seconds_bucket{path=\"/api/download\"}[$__rate_interval])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(yt_archiver_download_job_duration_seconds_bucket[$__rate_interval])) by (le))",
           "legendFormat": "p50",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(yt_archiver_http_request_duration_seconds_bucket{path=\"/api/download\"}[$__rate_interval])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(yt_archiver_download_job_duration_seconds_bucket[$__rate_interval])) by (le))",
           "legendFormat": "p95",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(yt_archiver_http_request_duration_seconds_bucket{path=\"/api/download\"}[$__rate_interval])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(yt_archiver_download_job_duration_seconds_bucket[$__rate_interval])) by (le))",
           "legendFormat": "p99",
           "refId": "C"
         }
@@ -115,31 +110,26 @@
     {
       "id": 7,
       "type": "timeseries",
-      "title": "Video Info Latency (p50 / p95)",
+      "title": "Download Jobs Started",
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(yt_archiver_http_request_duration_seconds_bucket{path=\"/api/video-info\"}[$__rate_interval])) by (le))",
-          "legendFormat": "p50",
+          "expr": "increase(yt_archiver_download_jobs_started_total[$__rate_interval])",
+          "legendFormat": "started",
           "refId": "A"
-        },
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(yt_archiver_http_request_duration_seconds_bucket{path=\"/api/video-info\"}[$__rate_interval])) by (le))",
-          "legendFormat": "p95",
-          "refId": "B"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 }
     },
     {
       "id": 8,
       "type": "table",
-      "title": "Download HTTP Status Codes",
+      "title": "Download Job Outcomes",
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "sum by (status) (rate(yt_archiver_http_requests_total{path=\"/api/download\"}[5m]))",
+          "expr": "sum by (status) (label_replace(increase(yt_archiver_download_jobs_completed_total[$__rate_interval]), \"status\", \"completed\", \"\", \"\") or label_replace(increase(yt_archiver_download_jobs_failed_total[$__rate_interval]), \"status\", \"failed\", \"\", \"\"))",
           "format": "table",
           "instant": true,
           "refId": "A"

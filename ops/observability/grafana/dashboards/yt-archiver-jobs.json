@@ -31,7 +31,7 @@
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "100 * sum(rate(yt_archiver_http_requests_total{path=~\"^/api/jobs.*\",status=~\"5..\"}[$__rate_interval])) / sum(rate(yt_archiver_http_requests_total{path=~\"^/api/jobs.*\"}[$__rate_interval]))",
+          "expr": "100 * ((sum(increase(yt_archiver_http_requests_total{path=~\"^/api/jobs.*\",status=~\"5..\"}[$__rate_interval])) or vector(0)) / clamp_min((sum(increase(yt_archiver_http_requests_total{path=~\"^/api/jobs.*\"}[$__rate_interval])) or vector(0)), 1))",
           "refId": "A"
         }
       ],
@@ -59,7 +59,7 @@
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "100 * (1 - (sum(rate(yt_archiver_http_requests_total{path=~\"^/api/jobs.*\",status=~\"5..\"}[$__rate_interval])) / sum(rate(yt_archiver_http_requests_total{path=~\"^/api/jobs.*\"}[$__rate_interval]))))",
+          "expr": "100 * (1 - ((sum(increase(yt_archiver_http_requests_total{path=~\"^/api/jobs.*\",status=~\"5..\"}[$__rate_interval])) or vector(0)) / clamp_min((sum(increase(yt_archiver_http_requests_total{path=~\"^/api/jobs.*\"}[$__rate_interval])) or vector(0)), 1)))",
           "refId": "A"
         }
       ],
