@@ -60,3 +60,13 @@ class ThumbnailUpdateResponse(BaseModel):
     status: str
     message: str
     thumbnail_path: str
+
+
+class ExternalUploadResponse(BaseModel):
+    """Response for external upload to local library"""
+    status: str
+    message: str
+    folder_name: str
+    video_path: str
+    saved_files: List[str]
+    thumbnail_path: Optional[str] = None

@@ -27,4 +27,5 @@ export enum APIURLS {
   VIDEOS_DELETE_BATCH = "videos/delete-batch",
   VIDEOS_RENAME = "videos/rename",
   VIDEOS_UPDATE_THUMBNAIL = "videos/update-thumbnail",
+  VIDEOS_UPLOAD_EXTERNAL = "videos/upload-external",
 }

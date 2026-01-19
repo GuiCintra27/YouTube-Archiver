@@ -22,13 +22,21 @@ from app.core.rate_limit import limiter, RateLimits
 from typing import List
 from fastapi import UploadFile, File, Form
 from pydantic import BaseModel
-from .service import get_paginated_videos, delete_video_with_related, delete_videos_batch, rename_video, update_video_thumbnail
+from .service import (
+    get_paginated_videos,
+    delete_video_with_related,
+    delete_videos_batch,
+    rename_video,
+    update_video_thumbnail,
+    save_external_upload,
+)
 from .schemas import (
     VideoListResponse,
     DeleteVideoResponse,
     BatchDeleteResponse,
     RenameVideoResponse,
     ThumbnailUpdateResponse,
+    ExternalUploadResponse,
 )
 from app.catalog.service import (
     list_local_videos_paginated,
@@ -52,7 +60,6 @@ from app.core.exceptions import (
     InvalidRangeHeaderException,
     RangeNotSatisfiableException,
 )
-
 logger = get_module_logger("library")
 
 router = APIRouter(prefix="/api/videos", tags=["library"])
@@ -444,6 +451,80 @@ async def rename_video_endpoint(request: Request, video_path: str, body: RenameR
         raise
     except Exception as e:
         logger.error(f"Error renaming video: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/upload-external",
+    summary="Upload externo para biblioteca",
+    description="""
+Upload de vídeo externo para a biblioteca local.
+
+Permite enviar um vídeo do PC e anexar arquivos opcionais:
+- thumbnail (jpg, png, webp)
+- legendas (.srt, .vtt)
+- transcrição (.txt)
+    """,
+    response_model=ExternalUploadResponse,
+)
+@limiter.limit(RateLimits.UPLOAD)
+async def upload_external_video(
+    request: Request,
+    folder_name: str = Form(...),
+    video: UploadFile = File(...),
+    thumbnail: UploadFile = File(default=None),
+    subtitles: List[UploadFile] = File(default=[]),
+    transcription: UploadFile = File(default=None),
+    base_dir: str = settings.DOWNLOADS_DIR,
+):
+    """Upload externo para a biblioteca local."""
+    try:
+        if not folder_name or not folder_name.strip():
+            raise InvalidRequestException("Folder name is required")
+        if not video.filename:
+            raise InvalidRequestException("Video filename is required")
+
+        if thumbnail and thumbnail.filename:
+            file_ext = Path(thumbnail.filename).suffix.lower()
+            if file_ext not in settings.THUMBNAIL_EXTENSIONS:
+                raise InvalidRequestException(
+                    f"Invalid image format: {file_ext}. Supported: {', '.join(settings.THUMBNAIL_EXTENSIONS)}"
+                )
+
+        result = await run_fs_blocking(
+            save_external_upload,
+            folder_name.strip(),
+            video,
+            thumbnail,
+            subtitles,
+            transcription,
+            base_dir,
+            label="library.external_upload",
+        )
+
+        if settings.CATALOG_ENABLED:
+            try:
+                await upsert_local_video_from_fs(
+                    video_path=result["video_path"],
+                    base_dir=base_dir,
+                    thumbnail_path=result.get("thumbnail_path"),
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Catalog update skipped for external upload {result.get('video_path')}: {e}"
+                )
+
+        return {
+            "status": "success",
+            "message": "Upload concluído com sucesso",
+            **result,
+        }
+    except InvalidRequestException:
+        raise
+    except ValueError as e:
+        raise InvalidRequestException(str(e))
+    except Exception as e:
+        logger.error(f"Error uploading external video: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

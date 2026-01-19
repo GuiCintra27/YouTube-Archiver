@@ -9,12 +9,102 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 
 from app.config import settings
-from app.catalog.identity import read_catalog_id_for_video
+from app.catalog.identity import (
+    read_catalog_id_for_video,
+    ensure_catalog_id_for_video,
+    sidecar_path_for,
+)
 from app.core.logging import get_module_logger
-from app.core.security import validate_path_within_base, validate_file_exists, sanitize_path
+from app.core.security import (
+    get_safe_relative_path,
+    validate_path_within_base,
+    validate_file_exists,
+    sanitize_path,
+)
+from app.core.uploads import save_upload_file
 from .cache import video_cache
 
 logger = get_module_logger("library")
+
+
+def _unique_path(target_dir: Path, filename: str) -> Path:
+    safe_name = Path(filename).name or "upload"
+    candidate = target_dir / safe_name
+    counter = 1
+    while candidate.exists():
+        candidate = target_dir / f"{candidate.stem}-{counter}{candidate.suffix}"
+        counter += 1
+    return candidate
+
+
+def save_external_upload(
+    folder_name: str,
+    video: "UploadFile",
+    thumbnail: Optional["UploadFile"],
+    subtitles: List["UploadFile"],
+    transcription: Optional["UploadFile"],
+    base_dir: str = "./downloads",
+) -> Dict[str, Any]:
+    """
+    Save an external upload to the local library.
+    """
+    base_path = Path(base_dir).resolve()
+    relative_target = get_safe_relative_path(folder_name)
+    target_dir = (base_path / relative_target).resolve()
+
+    validate_path_within_base(target_dir, base_path)
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    saved_paths: List[Path] = []
+    thumbnail_path: Optional[Path] = None
+
+    try:
+        video_filename = Path(video.filename or "video.mp4").name
+        video_path = _unique_path(target_dir, video_filename)
+        save_upload_file(video, video_path)
+        saved_paths.append(video_path)
+
+        ensure_catalog_id_for_video(video_path)
+        sidecar_path = sidecar_path_for(video_path)
+        if sidecar_path.exists():
+            saved_paths.append(sidecar_path)
+
+        if thumbnail and thumbnail.filename:
+            thumb_ext = Path(thumbnail.filename).suffix.lower() or ".jpg"
+            thumbnail_path = _unique_path(target_dir, f"{video_path.stem}{thumb_ext}")
+            save_upload_file(thumbnail, thumbnail_path)
+            saved_paths.append(thumbnail_path)
+
+        for subtitle in subtitles or []:
+            if not subtitle.filename:
+                continue
+            sub_path = _unique_path(target_dir, Path(subtitle.filename).name)
+            save_upload_file(subtitle, sub_path)
+            saved_paths.append(sub_path)
+
+        if transcription and transcription.filename:
+            trans_path = _unique_path(target_dir, Path(transcription.filename).name)
+            save_upload_file(transcription, trans_path)
+            saved_paths.append(trans_path)
+
+        return {
+            "folder_name": relative_target.as_posix(),
+            "video_path": video_path.relative_to(base_path).as_posix(),
+            "thumbnail_path": (
+                thumbnail_path.relative_to(base_path).as_posix()
+                if thumbnail_path
+                else None
+            ),
+            "saved_files": [path.relative_to(base_path).as_posix() for path in saved_paths],
+        }
+    except Exception:
+        for path in saved_paths:
+            try:
+                if path.exists():
+                    path.unlink()
+            except Exception:
+                continue
+        raise
 
 
 def get_video_duration(video_path: Path) -> Optional[float]:

@@ -11,7 +11,9 @@ import VideoGridEmptyState from "@/components/common/videos/video-grid-empty-sta
 import SelectionActionBar from "@/components/common/videos/selection-action-bar";
 import BatchDeleteDialog from "@/components/common/videos/batch-delete-dialog";
 import VideoPlayerModal from "@/components/common/videos/video-player-modal";
-import { Library } from "lucide-react";
+import ExternalUploadModal from "@/components/library/external-upload-modal";
+import { Library, Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { APIURLS } from "@/lib/api-urls";
 import { useApiUrl } from "@/hooks/use-api-url";
 import {
@@ -55,6 +57,7 @@ export default function PaginatedVideoGrid({
   const [total, setTotal] = useState(initialData?.total || 0);
   const skipInitialFetch = useRef(Boolean(initialData));
   const [thumbnailBusters, setThumbnailBusters] = useState<Record<string, string>>({});
+  const [showExternalUpload, setShowExternalUpload] = useState(false);
   const router = useRouter();
 
   // Selection state
@@ -225,6 +228,11 @@ export default function PaginatedVideoGrid({
     [page, fetchVideos]
   );
 
+  const handleExternalUploadComplete = useCallback(async () => {
+    await fetchVideos(page);
+    window.dispatchEvent(new Event("yt-archiver:videos-updated"));
+  }, [fetchVideos, page]);
+
   return (
     <>
       <div className="space-y-6">
@@ -234,13 +242,23 @@ export default function PaginatedVideoGrid({
           title="Minha Biblioteca"
           subtitle={`${total} ${total === 1 ? "vídeo" : "vídeos"} encontrados`}
           rightSlot={
-            <PaginationControls
-              page={page}
-              totalPages={totalPages}
-              loading={loading}
-              onPageChange={setPage}
-              onRefresh={() => fetchVideos(page)}
-            />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <Button
+                variant="outline"
+                className="bg-white/5 border-white/10 text-muted-foreground hover:text-white hover:bg-white/10"
+                onClick={() => setShowExternalUpload(true)}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload externo
+              </Button>
+              <PaginationControls
+                page={page}
+                totalPages={totalPages}
+                loading={loading}
+                onPageChange={setPage}
+                onRefresh={() => fetchVideos(page)}
+              />
+            </div>
           }
         />
 
@@ -319,6 +337,12 @@ export default function PaginatedVideoGrid({
           onDelete={() => handleDelete(selectedVideo)}
         />
       )}
+
+      <ExternalUploadModal
+        open={showExternalUpload}
+        onOpenChange={setShowExternalUpload}
+        onUploadComplete={handleExternalUploadComplete}
+      />
     </>
   );
 }
