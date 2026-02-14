@@ -1,6 +1,41 @@
 # YT-Archiver
 
+<div align="center">
+  <img src="./media/YT-ARCHIVER_BANNER_2.png" width="90%"/>
+  <br/>
+  <br/>
+  <a href="https://www.canva.com/design/DAG-I5UrfUM/FMg8nXujmfAdu35FAepRAw/view?utm_content=DAG-I5UrfUM&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h019bf85e3a" target=”_blank”><strong>Link da Apresentação »</strong></a>
+  <br/>
+  <br/>
+</div>
+
+<br/>
+
 Sistema completo para download e arquivamento ético de vídeos e streams HLS (sem DRM), com interface web moderna, integração opcional com Google Drive e funcionalidade de gravação de tela.
+
+<a id="indice"></a>
+
+## 📑 Índice
+
+- [📋 Visão Geral](#visao-geral)
+- [🚀 Início Rápido](#inicio-rapido)
+- [Documentação](#documentacao)
+- [🌐 Interface Web](#interface-web)
+- [📖 Uso](#uso)
+- [🔌 API REST](#api-rest)
+- [📁 Estrutura do Projeto](#estrutura-do-projeto)
+- [🔧 Tecnologias](#tecnologias)
+- [📝 Sistema de Arquivamento](#sistema-de-arquivamento)
+- [📂 Estrutura de Pastas](#estrutura-de-pastas)
+- [🍪 Usando Cookies](#usando-cookies)
+- [⚠️ Limitações e Boas Práticas](#limitacoes-e-boas-praticas)
+- [🐛 Troubleshooting](#troubleshooting)
+- [📄 Licença](#licenca)
+- [📚 Recursos Adicionais](#recursos-adicionais)
+
+---
+
+<a id="visao-geral"></a>
 
 ## 📋 Visão Geral
 
@@ -36,6 +71,8 @@ O YT-Archiver combina uma API REST robusta com uma interface web moderna para fa
 - ✅ API REST completa para integração
 
 ---
+
+<a id="inicio-rapido"></a>
 
 ## 🚀 Início Rápido
 
@@ -111,6 +148,8 @@ npm run dev
 
 ---
 
+<a id="documentacao"></a>
+
 ## Documentacao
 
 - Index geral: **[INDEX.md](./docs/project/INDEX.md)**
@@ -123,6 +162,8 @@ npm run dev
 - Global Player: **[GLOBAL-PLAYER.md](./docs/project/GLOBAL-PLAYER.md)**
 
 ---
+
+<a id="interface-web"></a>
 
 ## 🌐 Interface Web
 
@@ -177,6 +218,8 @@ npm run dev
 - ⚡ Atualizações de progresso em tempo real via polling
 
 ---
+
+<a id="uso"></a>
 
 ## 📖 Uso
 
@@ -252,6 +295,8 @@ npm run dev
   - `POST /api/catalog/bootstrap-local`
 
 ---
+
+<a id="api-rest"></a>
 
 ## 🔌 API REST
 
@@ -359,6 +404,8 @@ A API FastAPI oferece endpoints completos para integração:
 
 ---
 
+<a id="estrutura-do-projeto"></a>
+
 ## 📁 Estrutura do Projeto
 
 ```
@@ -461,6 +508,8 @@ yt-archiver/
 
 ---
 
+<a id="tecnologias"></a>
+
 ## 🔧 Tecnologias
 
 ### Backend
@@ -517,6 +566,8 @@ O backend segue uma arquitetura modular com separação clara de responsabilidad
 
 ---
 
+<a id="sistema-de-arquivamento"></a>
+
 ## 📝 Sistema de Arquivamento
 
 ### Controle de Duplicatas
@@ -537,6 +588,8 @@ custom aula-01-introducao
 - Ao excluir um vídeo pela interface, o registro é removido do archive
 
 ---
+
+<a id="estrutura-de-pastas"></a>
 
 ## 📂 Estrutura de Pastas
 
@@ -583,6 +636,8 @@ Google Drive/
 
 ---
 
+<a id="usando-cookies"></a>
+
 ## 🍪 Usando Cookies
 
 ### Quando usar
@@ -611,6 +666,8 @@ Use extensões:
 3. Na interface web, configure "Arquivo de Cookies" como `./cookies.txt`
 
 ---
+
+<a id="limitacoes-e-boas-praticas"></a>
 
 ## ⚠️ Limitações e Boas Práticas
 
@@ -642,6 +699,8 @@ Para evitar bloqueios ao baixar playlists grandes:
 - Monitore espaço disponível regularmente
 
 ---
+
+<a id="troubleshooting"></a>
 
 ## 🐛 Troubleshooting
 
@@ -746,6 +805,8 @@ O Commitizen irá guiá-lo através de um wizard interativo para criar commits p
 
 ---
 
+<a id="licenca"></a>
+
 ## 📄 Licença
 
 Este projeto é fornecido "como está", sem garantias. Use por sua conta e risco.
@@ -753,6 +814,8 @@ Este projeto é fornecido "como está", sem garantias. Use por sua conta e risco
 **Importante:** Respeite direitos autorais e termos de serviço das plataformas. Este projeto é destinado para arquivamento ético de conteúdo público.
 
 ---
+
+<a id="recursos-adicionais"></a>
 
 ## 📚 Recursos Adicionais
 
