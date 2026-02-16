@@ -1,30 +1,30 @@
-# Documentation Index
+# Índice da Documentação
 
-This index groups the main project documentation for quick access.
+Este índice agrupa a documentação principal do projeto para acesso rápido.
 
-## Getting Started
+## Primeiros Passos
 
-- **Quick Start:** [QUICK-START.md](./QUICK-START.md)
-- **Technical Reference:** [TECHNICAL-REFERENCE.md](./TECHNICAL-REFERENCE.md)
+- **Início Rápido:** [QUICK-START.md](./QUICK-START.md)
+- **Referência Técnica:** [TECHNICAL-REFERENCE.md](./TECHNICAL-REFERENCE.md)
 
-## Architecture
+## Arquitetura
 
-- **Architecture Overview:** [ARCHITECTURE.md](./ARCHITECTURE.md)
+- **Visão Geral da Arquitetura:** [ARCHITECTURE.md](./ARCHITECTURE.md)
 - **Global Player:** [GLOBAL-PLAYER.md](./GLOBAL-PLAYER.md)
 
 ## Google Drive
 
-- **Setup Guide:** [GOOGLE-DRIVE-SETUP.md](./GOOGLE-DRIVE-SETUP.md)
-- **Features & Endpoints:** [GOOGLE-DRIVE-FEATURES.md](./GOOGLE-DRIVE-FEATURES.md)
+- **Guia de Configuração:** [GOOGLE-DRIVE-SETUP.md](./GOOGLE-DRIVE-SETUP.md)
+- **Funcionalidades e Endpoints:** [GOOGLE-DRIVE-FEATURES.md](./GOOGLE-DRIVE-FEATURES.md)
 
-## Observability
+## Observabilidade
 
 - **Prometheus + Grafana:** [OBSERVABILITY.md](./OBSERVABILITY.md)
 
-## QA / Tracking
+## QA / Rastreamento
 
-- **Bug Tracking:** [BUGS.md](./BUGS.md)
+- **Rastreamento de Bugs:** [BUGS.md](./BUGS.md)
 
-## Archive
+## Arquivo
 
-- **Archived docs:** [archive/](./archive/)
+- **Docs arquivadas:** [archive](./archive/README.md)

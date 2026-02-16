@@ -3,7 +3,7 @@
 ## Status dos Testes
 
 ✅ **Backend API** - 63 testes automatizados (pytest, excluindo drive_cache)
-✅ **Frontend Next.js** - Build funcionando
+✅ **Frontend Next.js** - compilação funcionando
 
 ---
 
@@ -78,7 +78,7 @@ npm run dev
 ```
 
 **Acesse:**
-- Web UI: http://localhost:3000
+- Interface Web: http://localhost:3000
 
 ### 3. Ambos (Script Automático)
 
@@ -92,7 +92,7 @@ npm run dev
 
 ### Backend API
 
-#### 1. Health Check
+#### 1. Verificação de saúde
 ```bash
 curl http://localhost:8000/
 # Esperado: {"status":"ok","service":"YT-Archiver API","version":"2.0.0"}
@@ -125,7 +125,7 @@ curl -X POST http://localhost:8000/api/download \
     "max_res": 720
   }'
 # Retorna: {"status":"success","job_id":"..."}
-# Nota: o diretorio de saida e fixo e usa o padrao do backend (DOWNLOADS_DIR).
+# Nota: o diretório de saída é fixo e usa o padrão do backend (DOWNLOADS_DIR).
 ```
 
 #### 5. Verificar Status do Job
@@ -144,7 +144,7 @@ curl http://localhost:8000/api/jobs/JOB_ID
 
 ---
 
-## 🐛 Troubleshooting
+## 🐛 Solução de Problemas
 
 ### Backend não inicia
 
@@ -189,7 +189,7 @@ brew install ffmpeg
    ```
 3. Reiniciar frontend: `npm run dev`
 
-### CORS Error
+### Erro de CORS
 
 Se aparecer erro de CORS no navegador:
 1. Verificar se o backend está configurado para aceitar `localhost:3000`

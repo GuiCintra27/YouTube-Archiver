@@ -1,4 +1,4 @@
-# Multi-User Authentication Architecture
+# Arquitetura de Autenticação Multiusuário
 
 Documentação de referência para implementação futura de sistema multi-usuário com OAuth e sessões.
 
@@ -9,7 +9,7 @@ Documentação de referência para implementação futura de sistema multi-usuá
 
 ## Visão Geral
 
-### Arquitetura Atual (Single-User)
+### Arquitetura Atual (Usuário Único)
 
 ```
 ┌──────────┐     ┌──────────┐     ┌──────────┐
@@ -23,12 +23,12 @@ Documentação de referência para implementação futura de sistema multi-usuá
 
 **Limitação:** Um único `token.json` armazena credenciais de um usuário.
 
-### Arquitetura Proposta (Multi-User)
+### Arquitetura Proposta (Multiusuário)
 
 ```
 ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-│ Frontend │────▶│ Backend  │────▶│ Database │     │ Google   │
-│ (Next.js)│     │ (FastAPI)│     │(Postgres)│     │ Drive    │
+│ Frontend │────▶│ Backend  │────▶│ Banco de │     │ Google   │
+│ (Next.js)│     │ (FastAPI)│     │ Dados    │     │ Drive    │
 └──────────┘     └──────────┘     └──────────┘     └──────────┘
      │                │                 │                │
      │   JWT/Cookie   │                 │                │
@@ -45,7 +45,7 @@ Documentação de referência para implementação futura de sistema multi-usuá
 
 ### 1. Banco de Dados
 
-#### Schema Proposto
+#### Esquema Proposto
 
 ```sql
 -- Tabela de usuários
@@ -329,7 +329,7 @@ async def get_current_user_optional(
 
 ---
 
-### 4. DriveManager Multi-User
+### 4. DriveManager Multiusuário
 
 ```python
 # drive_manager_v2.py
@@ -688,7 +688,7 @@ async def upload_to_drive(
      │                         │                         │                         │
 ```
 
-### Fluxo 3: Request Autenticado ao Drive
+### Fluxo 3: Requisição autenticada ao Drive
 
 ```
 ┌──────────┐              ┌──────────┐              ┌──────────┐              ┌──────────┐
@@ -877,9 +877,9 @@ Serviços gerenciados que cuidam de toda a autenticação:
 
 ## Referências
 
-- [Google OAuth 2.0 Documentation](https://developers.google.com/identity/protocols/oauth2)
+- [Documentação do Google OAuth 2.0](https://developers.google.com/identity/protocols/oauth2)
 - [FastAPI Security](https://fastapi.tiangolo.com/tutorial/security/)
-- [NextAuth.js Documentation](https://next-auth.js.org/)
+- [Documentação do NextAuth.js](https://next-auth.js.org/)
 - [SQLAlchemy ORM](https://docs.sqlalchemy.org/en/20/)
 - [JWT Best Practices](https://auth0.com/blog/jwt-security-best-practices/)
 

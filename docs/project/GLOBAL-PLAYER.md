@@ -165,7 +165,7 @@ const [isMuted, setIsMuted] = useState(false);
 
 ---
 
-## Troubleshooting
+## Solução de Problemas
 
 ### Player não carrega (loading infinito)
 

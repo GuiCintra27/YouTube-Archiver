@@ -1,4 +1,4 @@
-# Changelog
+# Registro de Alterações
 
 ## [2.4.0] - 2025-12-04
 
@@ -10,18 +10,18 @@
 
 #### Cache SQLite para Metadados do Drive
 - **Banco de dados local** (`drive_cache.db`) armazena metadados de vídeos e pastas
-- **Listagem ~10x mais rápida** - consultas locais em vez de API calls para cada requisição
-- **WAL mode** habilitado para melhor performance de leitura concorrente
+- **Listagem ~10x mais rápida** - consultas locais em vez de chamadas de API para cada requisição
+- **Modo WAL** habilitado para melhor performance de leitura concorrente
 - **Paginação otimizada** com índices SQLite
 
 #### Sincronização Inteligente
-- **Full sync** - Rebuild completo do cache (primeira autenticação ou recovery)
-- **Incremental sync** - Apenas mudanças desde última sincronização (a cada 30 min)
-- **Real-time sync** - Atualização imediata após upload/delete/rename
-- **Auto-recovery** - Detecção de corrupção com rebuild automático
+- **Sincronização completa** - Reconstrução completa do cache (primeira autenticação ou recuperação)
+- **Sincronização incremental** - Apenas mudanças desde a última sincronização (a cada 30 min)
+- **Sincronização em tempo real** - Atualização imediata após upload/delete/rename
+- **Auto-recuperação** - Detecção de corrupção com reconstrução automática
 
 #### Novos Endpoints de Cache
-- `POST /api/drive/cache/sync` - Trigger sync manual (`?full=true` para rebuild)
+- `POST /api/drive/cache/sync` - Disparar sincronização manual (`?full=true` para reconstrução)
 - `GET /api/drive/cache/stats` - Estatísticas do cache (contagem, tamanho, última sync)
 - `POST /api/drive/cache/rebuild` - Força rebuild completo
 - `DELETE /api/drive/cache` - Limpa o cache
@@ -34,26 +34,26 @@
 
 #### Testes
 - **22 novos testes** para o sistema de cache
-- Cobertura de repository CRUD, sync, database manager e statistics
+- Cobertura de CRUD de repositório, sincronização, gerenciador de banco e estatísticas
 - Total de testes do projeto: **68 testes**
 
 ### 🔧 Modificado
 
 #### Backend
 - `app/drive/cache/` - Novo submódulo com:
-  - `database.py` - Schema SQLite, conexão, migrations
-  - `repository.py` - CRUD operations para videos/folders
-  - `sync.py` - Full sync, incremental sync, real-time sync
-  - `background.py` - Task de sincronização periódica
+  - `database.py` - Esquema SQLite, conexão e migrações
+  - `repository.py` - Operações CRUD para vídeos/pastas
+  - `sync.py` - Sincronização completa, incremental e em tempo real
+  - `background.py` - Tarefa de sincronização periódica
 - `app/drive/service.py` - Integração com cache em `list_videos_paginated()`
 - `app/drive/router.py` - Novos endpoints de cache, sync inicial no OAuth callback
-- `app/main.py` - Background task de sync no lifespan
-- `app/config.py` - Novas settings de cache
+- `app/main.py` - Tarefa em segundo plano de sincronização no lifespan
+- `app/config.py` - Novas configurações de cache
 
 ### 📦 Dependências
 
 #### Backend
-- `aiosqlite>=0.19.0` - Async SQLite para operações de banco
+- `aiosqlite>=0.19.0` - SQLite assíncrono para operações de banco
 
 ### 📊 Ganhos de Performance
 
@@ -74,9 +74,9 @@ GET /api/drive/videos
     │       │
     │       ├─► Sim → Busca no SQLite
     │       │           │
-    │       │           ├─► Cache hit → Retorna (~50ms)
+    │       │           ├─► Acerto de cache → Retorna (~50ms)
     │       │           │
-    │       │           └─► Cache vazio → Full sync + retorna
+    │       │           └─► Cache vazio → Sincronização completa + retornar
     │       │
     │       └─► Não → API direta (~2-3s)
     │
@@ -87,13 +87,13 @@ GET /api/drive/videos
 
 ## [2.3.0] - 2025-12-01
 
-### 🎨 UI/UX - Redesign de Video Cards
+### 🎨 UI/UX - Redesenho dos Cards de Vídeo
 
 **Cards de vídeo estilo YouTube com experiência aprimorada.**
 
 ### ✨ Adicionado
 
-#### Video Cards Redesenhados
+#### Cards de Vídeo Redesenhados
 - **Layout estilo YouTube** com thumbnails arredondadas e efeito de zoom no hover
 - **Duração do vídeo** exibida como badge sobre a thumbnail
 - **Modal de informações** com detalhes do vídeo (título, duração, tamanho, data)
@@ -158,7 +158,7 @@ GET /api/drive/videos
 
 ## [2.0.0] - 2025-10-06
 
-### 🎉 Major Release - Interface Web Completa
+### 🎉 Lançamento Principal - Interface Web Completa
 
 **Nova arquitetura com separação frontend/backend para uso visual e intuitivo.**
 
@@ -172,7 +172,7 @@ GET /api/drive/videos
   - Documentação automática com Swagger (OpenAPI)
   - CORS configurado para desenvolvimento local
 
-#### Frontend Web (Novo)
+#### Frontend (Web) (Novo)
 - **Interface Next.js 15** (`frontend/`)
   - Design moderno com shadcn/ui e Tailwind CSS
   - Formulário intuitivo para download de vídeos
@@ -298,7 +298,7 @@ cd backend
 
 ## [1.0.0] - 2024-09-14
 
-### Inicial Release
+### Lançamento Inicial
 
 - CLI Python com yt-dlp
 - Download de YouTube e HLS

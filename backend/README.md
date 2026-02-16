@@ -46,7 +46,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ## 📡 Endpoints Principais
 
-### 🏥 Health Check
+### 🏥 Verificação de Saúde
 - **GET** `/` - Status da API
 - **GET** `/api/health` - Status detalhado (app, version, worker role)
 
@@ -160,7 +160,7 @@ backend/
 
 ---
 
-## 🐛 Troubleshooting
+## 🐛 Solução de Problemas
 
 ### Erro: "ModuleNotFoundError: No module named 'fastapi'"
 
@@ -202,7 +202,7 @@ uvicorn app.main:app --reload
 
 ### Erro 500 ao fazer streaming de vídeos locais
 
-**Status:** ✅ CORRIGIDO (ver `../BUGS.md`)
+**Status:** ✅ CORRIGIDO (ver `../docs/project/BUGS.md`)
 
 **Causa anterior:** UnicodeEncodeError com caracteres especiais (⧸, acentos, etc.)
 
@@ -210,7 +210,7 @@ uvicorn app.main:app --reload
 
 ### Erro 500 ao fazer upload para Google Drive
 
-**Status:** ✅ CORRIGIDO (ver `../BUGS.md`)
+**Status:** ✅ CORRIGIDO (ver `../docs/project/BUGS.md`)
 
 **Causa anterior:** Aspas simples não escapadas em queries do Drive API
 
@@ -282,7 +282,7 @@ REDIS_URL=redis://localhost:6379/0
 - [yt-dlp GitHub](https://github.com/yt-dlp/yt-dlp)
 - [Google Drive API Docs](https://developers.google.com/drive/api/guides/about-sdk)
 - [Documentação Principal do Projeto](../README.md)
-- [Bug Tracking](../BUGS.md)
+- [Bug Tracking](../docs/project/BUGS.md)
 
 ---
 

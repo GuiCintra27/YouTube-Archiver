@@ -153,7 +153,7 @@ Google Drive/
 
 A estrutura de pastas local será espelhada no Drive.
 
-## ❓ Troubleshooting
+## ❓ Solução de Problemas
 
 ### Erro: "Credentials file not found"
 
@@ -206,6 +206,6 @@ Após configurar:
 
 ## 📚 Recursos Adicionais
 
-- [Google Drive API Documentation](https://developers.google.com/drive/api/v3/about-sdk)
+- [Documentação da API Google Drive](https://developers.google.com/drive/api/v3/about-sdk)
 - [OAuth 2.0 for Desktop Apps](https://developers.google.com/identity/protocols/oauth2/native-app)
-- [YT-Archiver README](./README.md)
+- [YT-Archiver README](../../README.md)

@@ -1,8 +1,8 @@
 # Observabilidade local (Prometheus + Grafana)
 
-Este setup adiciona um painel visual com Grafana e coleta de metricas via Prometheus.
+Este setup adiciona um painel visual com Grafana e coleta de métricas via Prometheus.
 
-## Pre-requisitos
+## Pré-requisitos
 - Backend rodando em http://localhost:8000
 - Docker + Docker Compose
 
@@ -22,13 +22,13 @@ docker compose -f docker-compose.observability.yml up -d
 - YT-Archiver - Downloads
 
 ## Alertas (Prometheus)
-Alertas basicos de disponibilidade, 5xx e latencia sao definidos em
+Alertas básicos de disponibilidade, 5xx e latência são definidos em
 `ops/observability/alerts.yml`.
 
 Para ver o estado atual:
 - http://localhost:9090/alerts
 
-## Observacoes
+## Observações
 - O stack usa `network_mode: host` para acessar o backend local via `127.0.0.1`.
 - O Prometheus faz scrape de http://127.0.0.1:8000/metrics
 - Se o backend estiver em outra porta, ajuste `ops/observability/prometheus.yml`

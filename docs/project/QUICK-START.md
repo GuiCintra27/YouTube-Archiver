@@ -1,4 +1,4 @@
-# 🚀 Quick Start - YT-Archiver Web Interface
+# 🚀 Início Rápido - Interface Web do YT-Archiver
 
 ## Teste em 3 Passos
 
@@ -97,7 +97,7 @@ Se você pretende usar o Drive ou já tem vídeos locais:
 3. **Drive já populado, sem snapshot**
    - `POST /api/catalog/drive/rebuild`
 
-## 🐛 Troubleshooting Rápido
+## 🐛 Solução de Problemas Rápida
 
 ### Backend não inicia
 

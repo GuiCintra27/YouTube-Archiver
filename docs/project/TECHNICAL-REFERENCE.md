@@ -211,7 +211,7 @@ frontend/
 
 ## 🔑 Endpoints HTTP Cheat Sheet
 
-### Health & Info
+### Saúde e Informações
 ```bash
 GET  /                              # Health check
 GET  /api/health                    # Health check detalhado
@@ -290,7 +290,7 @@ DELETE /api/drive/cache             # Limpa cache
 
 ---
 
-## 🐛 Bugs Corrigidos (Reference Sheet)
+## 🐛 Bugs Corrigidos (folha de referencia)
 
 ### BUG #1: Local Video Streaming (CORRIGIDO ✅)
 **Erro:** `UnicodeEncodeError: 'latin-1' codec can't encode character '\u29f8'`
@@ -319,7 +319,7 @@ query = f"name='{escaped_name}' and '{parent_id}' in parents and trashed=false"
 
 ### Backend (Python) - Arquitetura Modular
 
-#### Router Pattern (router.py)
+#### Padrão de Router (router.py)
 ```python
 from fastapi import APIRouter, Request
 from .service import business_logic
@@ -347,7 +347,7 @@ async def endpoint_name(request: Request, body: RequestModel) -> ResponseModel:
         raise_error(500, ErrorCode.INTERNAL_ERROR, "Internal server error")
 ```
 
-#### Service Pattern (service.py)
+#### Padrão de Service (service.py)
 ```python
 from .schemas import RequestModel
 
@@ -376,7 +376,7 @@ return StreamingResponse(
 
 ### Frontend (TypeScript/React)
 
-#### Component Pattern (Client)
+#### Padrão de Componente (Client)
 ```typescript
 "use client";
 
@@ -407,7 +407,7 @@ export default function ComponentName() {
 }
 ```
 
-#### Component Pattern (Server)
+#### Padrão de Componente (Server)
 ```typescript
 import { fetchLocalVideosPage } from "@/lib/server/api";
 
@@ -417,14 +417,14 @@ export default async function LibraryPage() {
 }
 ```
 
-#### API Call Pattern (Client via Next BFF)
+#### Padrão de chamada de API (client via Next BFF)
 ```typescript
 import { deleteLocalVideo } from "@/lib/client/api";
 
 await deleteLocalVideo("Channel/Video.mp4");
 ```
 
-#### API Call Pattern (Route Handler + Revalidate)
+#### Padrão de chamada de API (Route Handler + revalidação)
 ```typescript
 import { proxyJsonWithRevalidate } from "@/lib/server/route-utils";
 import { CACHE_TAG_SETS } from "@/lib/server/tags";
@@ -440,7 +440,7 @@ export async function POST(request: Request) {
 
 ---
 
-## 🚨 Gotchas Críticos
+## 🚨 Pontos de Atenção Críticos
 
 ### Python
 1. **SEMPRE escapar `'` em queries Drive:** `name.replace("'", "\\'")`
@@ -517,7 +517,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ## 🛠️ Comandos de Desenvolvimento
 
-### Setup Inicial
+### Configuração Inicial
 ```bash
 # Backend
 cd backend
@@ -537,7 +537,7 @@ cd backend && ./run.sh
 # Ou manualmente:
 # source .venv/bin/activate && uvicorn app.main:app --reload
 
-# API + worker (recomendado para prod ou simulacao)
+# API + worker (recomendado para prod ou simulação)
 # WORKER_ROLE=api ./run.sh
 # WORKER_ROLE=worker PORT=8001 ./run.sh
 
@@ -548,7 +548,7 @@ cd frontend && npm run dev
 ./start-dev.sh
 ```
 
-### Testing
+### Testes
 ```bash
 # Backend - Testes automatizados (pytest) - 63 testes (sem drive_cache)
 cd backend && source .venv/bin/activate
@@ -572,7 +572,7 @@ curl http://localhost:8000/api/drive/auth-status
 # Frontend: console do navegador (F12)
 ```
 
-### Debugging
+### Depuração
 ```bash
 # Matar processos travados
 lsof -ti:8000 | xargs kill -9  # Backend
@@ -653,7 +653,7 @@ Notas (Download):
 
 ---
 
-## 🎯 Troubleshooting Matrix
+## 🎯 Matriz de Solução de Problemas
 
 | Sintoma | Causa Provável | Solução |
 |---------|----------------|---------|

@@ -34,12 +34,12 @@
    - `POST /api/drive/videos/{id}/thumbnail` - Atualizar thumbnail no Drive
 
 3. **Cache SQLite para metadados (v2.4)**
-   - `POST /api/drive/cache/sync` - Sync manual (`?full=true` para rebuild)
+   - `POST /api/drive/cache/sync` - sincronização manual (`?full=true` para rebuild)
    - `GET /api/drive/cache/stats` - Estatísticas do cache
-   - `POST /api/drive/cache/rebuild` - Rebuild completo
+   - `POST /api/drive/cache/rebuild` - reconstrução completa
    - `DELETE /api/drive/cache` - Limpar cache
 
-### Frontend (Web UI)
+### Frontend (Interface Web)
 
 1. **Nova página `/drive`**
    - Visualização de vídeos do Google Drive
@@ -102,11 +102,11 @@ O cache permanece como opção/legado para cenários específicos.
 
 ### Como funciona?
 
-1. **Primeira autenticação**: Full sync automático popula o cache
+1. **Primeira autenticação**: sincronização completa automática popula o cache
 2. **Listagem de vídeos**: Busca no SQLite local (~50ms)
-3. **A cada 30 minutos**: Incremental sync detecta mudanças no Drive
-4. **Upload/Delete/Rename**: Atualização imediata no cache (real-time sync)
-5. **Erro no cache**: Fallback automático para API do Drive
+3. **A cada 30 minutos**: sincronização incremental detecta mudanças no Drive
+4. **Upload/Delete/Rename**: atualização imediata no cache (sincronização em tempo real)
+5. **Erro no cache**: fallback automático para API do Drive
 
 ### Configurações (.env)
 
@@ -114,13 +114,13 @@ O cache permanece como opção/legado para cenários específicos.
 DRIVE_CACHE_ENABLED=true           # Habilitar cache (padrão: true)
 DRIVE_CACHE_DB_PATH=./drive_cache.db  # Caminho do banco
 DRIVE_CACHE_SYNC_INTERVAL=30       # Intervalo em minutos
-DRIVE_CACHE_FALLBACK_TO_API=true   # Fallback se cache falhar
+DRIVE_CACHE_FALLBACK_TO_API=true   # alternativa se cache falhar
 ```
 
 ### Endpoints de Gerenciamento
 
 ```bash
-# Sync manual (incremental)
+# sincronização manual (incremental)
 curl -X POST http://localhost:8000/api/drive/cache/sync
 
 # Full rebuild
@@ -295,7 +295,7 @@ Todos já estão no `.gitignore`!
 - Tokens com renovação automática
 - Escopo atual: `drive` (necessário para gerenciar permissões de compartilhamento)
 
-## 🐛 Troubleshooting
+## 🐛 Solução de Problemas
 
 ### "Credentials file not found"
 

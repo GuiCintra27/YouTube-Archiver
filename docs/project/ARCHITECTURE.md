@@ -1,19 +1,19 @@
-# YT-Archiver - Architecture Overview
+# YT-Archiver - Visão Geral da Arquitetura
 
 ## Objetivo
 
-Documentar a arquitetura do YT-Archiver para facilitar entendimento tecnico, onboarding e apresentacao para recrutadores.
+Documentar a arquitetura do YT-Archiver para facilitar entendimento técnico, onboarding e apresentação para recrutadores.
 
-## Visao Geral
+## Visão Geral
 
-O projeto e um monorepo full-stack com tres blocos principais:
+O projeto é um monorepo full-stack com três blocos principais:
 
-- **Frontend (Next.js 15)**: UI com SSR/ISR, cache por tags e componentes client para interacoes.
-- **Backend (FastAPI)**: API modular com jobs em background, catalogo SQLite e integracao com Google Drive.
+- **Frontend (Next.js 15)**: interface com SSR/ISR, cache por tags e componentes client para interações.
+- **Backend (FastAPI)**: API modular com jobs em background, catálogo SQLite e integração com Google Drive.
 - **Infra local (opcional)**: Observabilidade com Prometheus + Grafana via Docker Compose.
 
 ```
-[Usuario] -> [Frontend Next.js] -> [Backend FastAPI] -> [yt-dlp | SQLite | Google Drive]
+[Usuário] -> [Frontend Next.js] -> [Backend FastAPI] -> [yt-dlp | SQLite | Google Drive]
                                   \-> [Prometheus metrics]
 ```
 
@@ -21,37 +21,37 @@ O projeto e um monorepo full-stack com tres blocos principais:
 
 ### Camadas principais
 
-- **Router**: expoe endpoints e valida entrada (Pydantic).
-- **Service**: regras de negocio, orquestracao de catalogo e Drive.
-- **Manager/Adapters**: integracoes externas (yt-dlp, Google Drive).
-- **Catalogo**: SQLite + snapshot para listagem rapida.
+- **Router**: expõe endpoints e valida entrada (Pydantic).
+- **Service**: regras de negócio, orquestração de catálogo e Drive.
+- **Manager/Adapters**: integrações externas (yt-dlp, Google Drive).
+- **Catálogo**: SQLite + snapshot para listagem rápida.
 
-### Modulos
+### Módulos
 
-- `downloads/`: download de videos, playlists e metadata via yt-dlp.
-- `jobs/`: controle de jobs assincronos com progresso.
+- `downloads/`: download de vídeos, playlists e metadados via yt-dlp.
+- `jobs/`: controle de jobs assíncronos com progresso.
 - `library/`: streaming local, thumbnails e metadados.
 - `drive/`: auth, upload, sync, rename, share, thumbnails.
-- `recordings/`: upload de gravacoes do browser.
-- `catalog/`: persistencia e reconciliacao local <-> Drive.
+- `recordings/`: upload de gravações do browser.
+- `catalog/`: persistência e reconciliação local <-> Drive.
 
-### Fluxos criticos
+### Fluxos críticos
 
-**Download (video/playlist)**
+**Download (vídeo/playlist)**
 1. Frontend solicita `/api/download`.
 2. Backend cria job e inicia yt-dlp.
 3. A cada progresso, job atualiza status.
-4. Catalogo escreve o item e sidecars (thumbnails, legendas).
+4. Catálogo escreve o item e sidecars (thumbnails, legendas).
 
 **Sync local -> Drive**
 1. Frontend dispara `/api/drive/sync-all`.
-2. Backend compara catalogo local vs Drive.
-3. Uploads usam resumable upload com retry e backoff.
-4. Catalogo e cache do Drive atualizam estado.
+2. Backend compara catálogo local vs Drive.
+3. Uploads usam envio resumível com retry e backoff.
+4. Catálogo e cache do Drive atualizam estado.
 
-### Persistencia
+### Persistência
 
-- **SQLite local** para catalogo principal.
+- **SQLite local** para catálogo principal.
 - **Drive cache** (opcional) para reduzir custo de listagens.
 - **Sidecars** para thumbnails, legendas e metadados.
 
@@ -59,36 +59,36 @@ O projeto e um monorepo full-stack com tres blocos principais:
 
 ### Estrutura
 
-- **App Router** com Server Components por default.
-- **Client Components** para interacoes (download, sync, gravacao).
-- **Cache tags** para invalidacao seletiva (listas e detalhes).
+- **App Router** com Server Components por padrão.
+- **Client Components** para interações (download, sync, gravação).
+- **Cache tags** para invalidação seletiva (listas e detalhes).
 
 ### Pilares
 
 - **SSR/ISR**: render inicial com dados do backend.
-- **Cache por tags**: invalidacao via route handlers.
-- **Componentes por dominio**: `home/`, `library/`, `drive/`, `record/`.
+- **Cache por tags**: invalidação via route handlers.
+- **Componentes por domínio**: `home/`, `library/`, `drive/`, `record/`.
 
 ### Fluxo de dados
 
-1. Server Components chamam backend via `lib/server/api.ts`.
-2. Cache tags mantem listas consistentes.
-3. Acoes do usuario disparam revalidate + eventos client-side.
+1. Server Components chamam o backend via `lib/server/api.ts`.
+2. Cache tags mantêm listas consistentes.
+3. Ações do usuário disparam revalidate + eventos client-side.
 
 ## Observabilidade (opcional)
 
-- **/metrics** expoe Prometheus metrics.
+- **/metrics** expõe métricas Prometheus.
 - **Grafana** com dashboards para API, jobs, downloads e Drive.
 - Stack isolada em `docker-compose.observability.yml`.
 
-## Decisoes de arquitetura
+## Decisões de arquitetura
 
-- **Monorepo** para coesao e demo completa.
-- **FastAPI + Pydantic** por produtividade e validacao robusta.
+- **Monorepo** para coesão e demo completa.
+- **FastAPI + Pydantic** por produtividade e validação robusta.
 - **Next.js App Router** para SSR e cache nativo.
-- **SQLite** por simplicidade, portabilidade e leitura rapida.
+- **SQLite** por simplicidade, portabilidade e leitura rápida.
 
-## Referencias
+## Referências
 
 - `docs/project/TECHNICAL-REFERENCE.md`
 - `docs/project/OBSERVABILITY.md`

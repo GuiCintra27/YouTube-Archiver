@@ -1,4 +1,4 @@
-# YT-Archiver - Bug Report
+# YT-Archiver - Relatório de Bugs
 **Data**: 2025-11-29 (atualizado)
 **Testado em**: localhost:3000
 **Backend**: FastAPI rodando em http://0.0.0.0:8000
@@ -16,9 +16,9 @@ A reprodução de vídeos da biblioteca local estava falhando. Quando o usuário
 
 ### Solução Implementada
 1. **RFC 5987 Encoding**: Alterado o formato do header `Content-Disposition` de `filename="..."` para `filename*=UTF-8''...` com percent-encoding
-2. **Suporte a Range Requests**: Implementado suporte completo a HTTP 206 Partial Content para streaming com seek
-3. **Detecção de MIME Type**: Adicionado mapeamento correto de extensões (.mp4, .webm, .mkv, etc.)
-4. **Logging Detalhado**: Adicionado debug logs para troubleshooting
+2. **Suporte a Requisições de Range**: Implementado suporte completo a HTTP 206 Partial Content para streaming com seek
+3. **Detecção de Tipo MIME**: Adicionado mapeamento correto de extensões (.mp4, .webm, .mkv, etc.)
+4. **Logging Detalhado**: Adicionados logs de depuração para solução de problemas
 5. **Tratamento de Exceções**: Envolvido código em try/except com traceback
 
 ### Arquivo Modificado
@@ -67,7 +67,7 @@ O upload individual de vídeos para o Google Drive estava falhando. Quando o usu
    - `upload_video()`: Para verificação de arquivo existente (linha 196)
    - `upload_video()`: Para verificação de arquivos relacionados (linha 268)
    - `ensure_folder()`: Para verificação de pastas existentes (linha 142)
-3. **Logging Detalhado**: Adicionado debug logs mostrando queries construídas
+3. **Logging Detalhado**: Adicionados logs de depuração mostrando queries construídas
 4. **Tratamento de Exceções**: Envolvido código em try/except com traceback completo
 
 ### Arquivos Modificados

@@ -29,7 +29,7 @@ Sistema completo para download e arquivamento ético de vídeos e streams HLS (s
 - [📂 Estrutura de Pastas](#estrutura-de-pastas)
 - [🍪 Usando Cookies](#usando-cookies)
 - [⚠️ Limitações e Boas Práticas](#limitacoes-e-boas-praticas)
-- [🐛 Troubleshooting](#troubleshooting)
+- [🐛 Solução de Problemas](#solucao-de-problemas)
 - [📄 Licença](#licenca)
 - [📚 Recursos Adicionais](#recursos-adicionais)
 
@@ -150,16 +150,27 @@ npm run dev
 
 <a id="documentacao"></a>
 
-## Documentacao
+## Documentação
 
-- Index geral: **[INDEX.md](./docs/project/INDEX.md)**
-- Arquitetura: **[ARCHITECTURE.md](./docs/project/ARCHITECTURE.md)**
-- Observabilidade (Prometheus + Grafana): **[OBSERVABILITY.md](./docs/project/OBSERVABILITY.md)**
-- Guia rapido: **[QUICK-START.md](./docs/project/QUICK-START.md)**
-- Referencia tecnica: **[TECHNICAL-REFERENCE.md](./docs/project/TECHNICAL-REFERENCE.md)**
-- Setup do Google Drive: **[GOOGLE-DRIVE-SETUP.md](./docs/project/GOOGLE-DRIVE-SETUP.md)**
-- Recursos do Google Drive: **[GOOGLE-DRIVE-FEATURES.md](./docs/project/GOOGLE-DRIVE-FEATURES.md)**
-- Global Player: **[GLOBAL-PLAYER.md](./docs/project/GLOBAL-PLAYER.md)**
+### Ponto de Entrada (oficial)
+
+- Índice geral: **[INDEX.md](./docs/project/INDEX.md)**
+
+### Leitura Recomendada
+
+1. **[QUICK-START.md](./docs/project/QUICK-START.md)** (subir ambiente e testar rápido)
+2. **[ARCHITECTURE.md](./docs/project/ARCHITECTURE.md)** (visão de alto nível)
+3. **[TECHNICAL-REFERENCE.md](./docs/project/TECHNICAL-REFERENCE.md)** (detalhes técnicos)
+4. **[OBSERVABILITY.md](./docs/project/OBSERVABILITY.md)** (Prometheus + Grafana)
+5. **[GOOGLE-DRIVE-SETUP.md](./docs/project/GOOGLE-DRIVE-SETUP.md)** e **[GOOGLE-DRIVE-FEATURES.md](./docs/project/GOOGLE-DRIVE-FEATURES.md)**
+6. **[GLOBAL-PLAYER.md](./docs/project/GLOBAL-PLAYER.md)** (reprodução em segundo plano)
+
+### Taxonomia da Documentação
+
+- `docs/project/`: documentação oficial/pública (fonte de verdade atual)
+- `docs/local/`: notas internas de trabalho em andamento (WIP)
+- `docs/project/archive/`: documentação pública antiga/substituída
+- `docs/local/archive/`: histórico interno (planos, QA, logs e decisões antigas)
 
 ---
 
@@ -200,7 +211,7 @@ npm run dev
 - 💾 Download local ou salvar direto na biblioteca
 - 🧭 Lista de gravações recentes com refresh automático
 
-**Global Player (Background Playback):**
+**Global Player (Reprodução em Segundo Plano):**
 
 - 🎵 Minimize vídeos para reproduzir em background
 - 🖼️ Picture-in-Picture nativo do navegador
@@ -260,7 +271,7 @@ npm run dev
 - Randomização de delays (simula comportamento humano)
 - **Presets:** Seguro, Moderado, Rápido
 
-### Google Drive Integration
+### Integração com Google Drive
 
 **Configuração Inicial:**
 
@@ -302,7 +313,7 @@ npm run dev
 
 A API FastAPI oferece endpoints completos para integração:
 
-### Endpoints de Download
+### Endpoints de download
 
 **POST** `/api/download` - Inicia um download em background
 
@@ -330,7 +341,7 @@ A API FastAPI oferece endpoints completos para integração:
 
 **POST** `/api/video-info` - Obtém informações de um vídeo sem baixar
 
-### Endpoints de Biblioteca Local
+### Endpoints da biblioteca local
 
 **GET** `/api/videos` - Lista vídeos baixados localmente (com duração)
 
@@ -338,7 +349,7 @@ A API FastAPI oferece endpoints completos para integração:
 
 **GET** `/api/videos/thumbnail/{thumbnail_path}` - Serve thumbnail de vídeo local
 
-### Endpoints de Catálogo (SQLite)
+### Endpoints do catálogo (SQLite)
 
 **GET** `/api/catalog/status` - Status do catálogo (local/drive)
 
@@ -354,7 +365,7 @@ A API FastAPI oferece endpoints completos para integração:
 
 **POST** `/api/videos/delete-batch` - Exclui múltiplos vídeos em lote
 
-### Endpoints Google Drive
+### Endpoints do Google Drive
 
 **GET** `/api/drive/auth-status` - Verifica status de autenticação
 
@@ -390,7 +401,7 @@ A API FastAPI oferece endpoints completos para integração:
 
 **POST** `/api/drive/download-all` - Download em lote (Drive -> local)
 
-### Endpoints de Cache do Drive (opcional)
+### Endpoints do cache do Drive (opcional)
 
 **POST** `/api/drive/cache/sync` - Sincronização manual do cache (`?full=true` para rebuild)
 
@@ -499,7 +510,7 @@ yt-archiver/
 │   │   ├── OBSERVABILITY.md
 │   │   └── GLOBAL-PLAYER.md
 │   └── local/                    # Notas internas
-│       └── archive/              # Planejamentos e historico
+│       └── archive/              # Planejamentos e histórico
 ├── start-dev.sh                  # Script de início rápido (Linux/Mac)
 ├── start-dev.bat                 # Script de início rápido (Windows)
 ├── CLAUDE.md                     # Instruções para Claude Code
@@ -700,9 +711,9 @@ Para evitar bloqueios ao baixar playlists grandes:
 
 ---
 
-<a id="troubleshooting"></a>
+<a id="solucao-de-problemas"></a>
 
-## 🐛 Troubleshooting
+## 🐛 Solução de Problemas
 
 ### "Erro ao conectar com o servidor"
 
@@ -820,9 +831,9 @@ Este projeto é fornecido "como está", sem garantias. Use por sua conta e risco
 ## 📚 Recursos Adicionais
 
 - [Documentação do yt-dlp](https://github.com/yt-dlp/yt-dlp#readme)
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [shadcn/ui Components](https://ui.shadcn.com/)
+- [Documentação do FastAPI](https://fastapi.tiangolo.com/)
+- [Documentação do Next.js](https://nextjs.org/docs)
+- [Componentes do shadcn/ui](https://ui.shadcn.com/)
 - [Google Drive API](https://developers.google.com/drive/api/guides/about-sdk)
 
 ---

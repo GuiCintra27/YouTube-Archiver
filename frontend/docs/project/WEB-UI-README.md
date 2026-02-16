@@ -108,7 +108,7 @@ Clique em "Opções Avançadas" para configurar:
 
 Inicia um novo download.
 
-**Request:**
+**Requisição:**
 
 ```json
 {
@@ -121,7 +121,7 @@ Inicia um novo download.
 
 **Nota:** o diretório de saída é fixo e usa o padrão configurado no backend (`DOWNLOADS_DIR`).
 
-**Response:**
+**Resposta:**
 
 ```json
 {
@@ -141,7 +141,7 @@ Inicia um novo download.
 
 Obtém status de um download.
 
-**Response:**
+**Resposta:**
 
 ```json
 {
@@ -163,7 +163,7 @@ Lista todos os downloads.
 
 Obtém informações sobre um vídeo sem baixar.
 
-**Request:**
+**Requisição:**
 
 ```json
 {
@@ -171,7 +171,7 @@ Obtém informações sobre um vídeo sem baixar.
 }
 ```
 
-**Response:**
+**Resposta:**
 
 ```json
 {
@@ -237,15 +237,15 @@ Obtém informações sobre um vídeo sem baixar.
 - Fetch server-side com cache nativo do Next:
   - `frontend/src/lib/server/api.ts`
   - tags em `frontend/src/lib/server/tags.ts`
-- Mutações passam por Route Handlers do Next (BFF) com invalidacao de tags:
+- Mutações passam por Route Handlers do Next (BFF) com invalidação de tags:
   - `frontend/src/app/api/*`
   - helper: `frontend/src/lib/server/route-utils.ts`
 
 ### Client API Unificado
 
-- Operacoes de mutacao no client usam um wrapper unico:
+- Operações de mutação no client usam um wrapper único:
   - `frontend/src/lib/client/api.ts`
-- Evita repeticao de fetch e padroniza erros.
+- Evita repetição de fetch e padroniza erros.
 
 ### Estrutura de Componentes
 
@@ -368,7 +368,7 @@ services:
 
 ---
 
-## 🔧 Troubleshooting
+## 🔧 Solução de Problemas
 
 ### Backend não inicia
 
@@ -435,7 +435,7 @@ Interface interativa para testar todos os endpoints.
 2. Crie uma branch (`git checkout -b feature/NovaFuncionalidade`)
 3. Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
 4. Push para a branch (`git push origin feature/NovaFuncionalidade`)
-5. Abra um Pull Request
+5. Abra um Pedido de Pull
 
 ---
 
