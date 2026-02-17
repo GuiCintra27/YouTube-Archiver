@@ -1,4 +1,6 @@
 # YT-Archiver - Relatório de Bugs
+
+[**PT-BR**](./BUGS.md) | [EN](./en/BUGS.md)
 **Data**: 2025-11-29 (atualizado)
 **Testado em**: localhost:3000
 **Backend**: FastAPI rodando em http://0.0.0.0:8000

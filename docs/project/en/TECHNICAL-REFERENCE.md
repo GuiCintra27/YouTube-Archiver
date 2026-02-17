@@ -1,16 +1,16 @@
-# Referência Técnica Rápida - YT-Archiver
+# Quick Technical Reference - YT-Archiver
 
-[**PT-BR**](./TECHNICAL-REFERENCE.md) | [EN](./en/TECHNICAL-REFERENCE.md)
+[PT-BR](../TECHNICAL-REFERENCE.md) | **EN**
 
-Guia de consulta rápida para desenvolvimento e troubleshooting.
+Quick reference guide for development and troubleshooting.
 
-**Índice:** **[INDEX.md](./INDEX.md)**
+**Index:** **[INDEX.md](./INDEX.md)**
 
-**Última atualização:** 2026-01-09
+**Last updated:** 2026-01-09
 
 ---
 
-## 🏗️ Arquitetura em Uma Olhada
+## 🏗️ Architecture at a Glance
 
 ```
 ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
@@ -29,94 +29,94 @@ Guia de consulta rápida para desenvolvimento e troubleshooting.
 
 ---
 
-## 🔧 Stack Técnico Completo
+## 🔧 Complete Technical Stack
 
 ### Backend
-| Componente | Tecnologia | Versão | Uso |
+| Component | Technology | Version | Usage |
 |------------|-----------|---------|-----|
 | Framework | FastAPI | 0.115+ | REST API |
 | Server | Uvicorn | 0.32+ | ASGI server |
-| Validação | Pydantic | 2.9+ | Request/response models |
+| Validation | Pydantic | 2.9+ | Request/response models |
 | Download | yt-dlp | 2024.07+ | Video downloader |
-| OAuth | google-auth-oauthlib | 1.2+ | Google Drive auth |
-| Drive API | google-api-python-client | 2.137+ | Drive operations |
-| Cache SQLite | aiosqlite | 0.19+ | Drive cache access |
-| Observabilidade | prometheus-client | 0.20+ | Metrics endpoint |
-| Jobs store (opcional) | redis | 5.0+ | Backend compartilhado de jobs |
-| Catalog DB | SQLite | Built-in | Catálogo persistente (local + drive) |
+| OAuth | google-auth-oauthlib | 1.2+ | Google Drive authentication |
+| Drive API | google-api-python-client | 2,137+ | Drive operations |
+| SQLite Cache | aiosqlite | 0.19+ | Drive cache access |
+| Observability | prometheus-client | 0.20+ | Endpoint Metrics |
+| Jobs store (optional) | redis | 5.0+ | Shared job backend |
+| Catalog DB | SQLite | Built-in | Persistent catalog (local + drive) |
 | Runtime | Python | 3.12+ | Backend runtime |
 
 ### Frontend
-| Componente | Tecnologia | Versão | Uso |
+| Component | Technology | Version | Usage |
 |------------|-----------|---------|-----|
 | Framework | Next.js | 15.0.5 | React framework |
 | UI Library | shadcn/ui | Latest | Component library |
 | CSS | Tailwind CSS | 3.4.17 | Styling |
-| Video Player | Vidstack | 1.12.13 | HTML5 player |
+| Video Player | Vidstack | 1.12.13 | HTML5player |
 | Icons | Lucide React | 0.468+ | Icon system |
 | Linter | ESLint | 9.39.1 | Flat config |
 | Runtime | Node.js | 18+ | Frontend runtime |
 
 ---
 
-## 📁 Mapa de Arquivos Críticos
+## 📁 Critical Files Map
 
-### Backend (Python) - Arquitetura Modular
+### Backend (Python) - Modular Architecture
 
 ```
 backend/app/
 ├── main.py                         # ⭐ Entry point FastAPI + routers + /metrics
 ├── config.py                       # Configurações globais (Settings)
 │
-├── core/                           # Módulo central compartilhado
+├── core/                           # Shared core module
 │   ├── logging.py                  # ⭐ Logger estruturado + request_id
 │   ├── metrics.py                  # ⭐ Prometheus metrics
 │   ├── middleware/                 # Middleware HTTP (metrics/context)
-│   ├── blocking.py                 # ⭐ Offload de IO bloqueante (to_thread)
-│   ├── validators.py               # ⭐ Validação de URLs, paths, filenames
+│   ├── blocking.py                 # ⭐ Blocking I/O offload (to_thread)
+│   ├── validators.py               # ⭐ URL, path and filename validation
 │   ├── paths.py                    # Helpers de paths
 │   ├── request_context.py          # Request ID/context
-│   └── rate_limit.py               # Rate limiting com slowapi
+│   └── rate_limit.py               # Rate limiting with slowapi
 │
-├── catalog/                        # Catálogo persistente (SQLite)
+├── catalog/                        # Persistent catalog (SQLite)
 │   ├── router.py                   # Endpoints /api/catalog/*
-│   ├── service.py                  # Regras de catálogo
-│   ├── repository.py               # Acesso ao SQLite
-│   ├── database.py                 # Schema e conexões
+│   ├── service.py                  # Catalog rules
+│   ├── repository.py               # SQLite access
+│   ├── database.py                 # Schema and connections
 │   ├── drive_snapshot.py           # Snapshot drive (catalog-drive.json.gz)
-│   └── identity.py                 # Identidade e hashing do catálogo
+│   └── identity.py                 # Catalog identity and hashing
 │
-├── downloads/                      # Módulo de downloads
+├── downloads/                      # Downloads module
 │   ├── router.py                   # Endpoints /api/download, /api/video-info
-│   ├── service.py                  # Lógica de negócio
+│   ├── service.py                  # Business logic
 │   ├── schemas.py                  # ⭐ DownloadRequest (Pydantic)
 │   └── downloader.py               # ⭐ Engine yt-dlp wrapper
-│       ├── Settings (dataclass):   Configurações de download
-│       ├── Downloader.download():  Método principal
-│       └── _base_opts():           Opções do yt-dlp
+│       ├── Settings (dataclass):   Download settings
+│       ├── Downloader.download():  Main method
+│       └── _base_opts():           yt-dlp options
 │
-├── jobs/                           # Módulo de jobs assíncronos
+├── jobs/                           # Async jobs module
 │   ├── router.py                   # Endpoints /api/jobs/*
-│   ├── service.py                  # Gerenciamento de jobs
-│   ├── schemas.py                  # Modelos de jobs
+│   ├── service.py                  # Jobs management
+│   ├── schemas.py                  # Job models
 │   ├── store.py                    # Storage (memory/redis)
-│   └── cleanup.py                  # ⭐ Limpeza automática de jobs antigos
+│   └── cleanup.py                  # ⭐ Automatic cleanup of old jobs
 │
-├── library/                        # Módulo de biblioteca local
+├── library/                        # Local library module
 │   ├── router.py                   # ⭐ Endpoints /api/videos/* (streaming)
-│   ├── service.py                  # Scan de diretórios
-│   ├── schemas.py                  # Modelos de vídeos
-│   └── cache.py                    # ⭐ Cache de scan de diretórios (TTL 30s)
+│   ├── service.py                  # Directory scan
+│   ├── schemas.py                  # Video models
+│   └── cache.py                    # ⭐ Directory scan cache (TTL 30s)
 │
-├── recordings/                     # Módulo de gravações
+├── recordings/                     # Recordings module
 │   ├── router.py                   # Endpoint /api/recordings/upload
-│   ├── service.py                  # Salvamento de gravações
-│   └── schemas.py                  # Modelos de gravações
+│   ├── service.py                  # Recording persistence
+│   └── schemas.py                  # Recording models
 │
-└── drive/                          # Módulo Google Drive
+└── drive/                          # Google Drive module
     ├── router.py                   # Endpoints /api/drive/*
-    ├── service.py                  # Lógica de negócio
-    ├── schemas.py                  # Modelos do Drive
+    ├── service.py                  # Business logic
+    ├── schemas.py                  # Drive models
     ├── manager.py                  # ⭐ DriveManager
     └── cache/                      # Cache SQLite (opcional)
         ├── database.py             # Schema e conexão
@@ -145,21 +145,21 @@ backend/
 frontend/
 ├── src/
 │   ├── app/
-│   │   ├── page.tsx                    # ⭐ Página principal (downloads)
-│   │   ├── drive/page.tsx              # ⭐ Página Google Drive
-│   │   ├── library/page.tsx            # Biblioteca de vídeos
-│   │   ├── record/page.tsx             # Gravação de tela
+│   │   ├── page.tsx                    # ⭐ Main page (downloads)
+│   │   ├── drive/page.tsx              # ⭐ Google Drive page
+│   │   ├── library/page.tsx            # Video library
+│   │   ├── record/page.tsx             # Screen recording
 │   │   ├── layout.tsx                  # ⭐ Layout global
-│   │   └── globals.css                 # Estilos Tailwind
+│   │   └── globals.css                 # Tailwind styles
 │   │
 │   ├── components/
-│   │   ├── common/                     # Componentes compartilhados
-│   │   │   ├── error-boundary.tsx      # ⭐ Error Boundary com retry
-│   │   │   ├── navigation.tsx          # Menu de navegação
+│   │   ├── common/                     # Shared components
+│   │   │   ├── error-boundary.tsx      # ⭐ Error Boundary with retry
+│   │   │   ├── navigation.tsx          # Navigation menu
 │   │   │   ├── providers.tsx           # Providers (tema/estado)
 │   │   │   ├── theme-provider.tsx      # Tema dark/light
-│   │   │   ├── theme-toggle.tsx        # Toggle de tema
-│   │   │   ├── pagination/             # Controles de paginação
+│   │   │   ├── theme-toggle.tsx        # Theme toggle
+│   │   │   ├── pagination/             # Pagination controls
 │   │   │   │   ├── index.ts
 │   │   │   │   └── pagination-controls.tsx
 │   │   │   └── videos/                 # VideoCard, VideoPlayer, RecentVideos
@@ -178,7 +178,7 @@ frontend/
 │   │   │   ├── library-grid-section.tsx
 │   │   │   ├── library-grid-skeleton.tsx
 │   │   │   └── paginated-video-grid.tsx
-│   │   ├── record/                     # Gravação de tela
+│   │   ├── record/                     # Screen recording
 │   │   │   ├── record-page-client.tsx
 │   │   │   ├── screen-recorder.tsx
 │   │   │   └── screen-recorder-loading.tsx
@@ -213,7 +213,7 @@ frontend/
 
 ## 🔑 Endpoints HTTP Cheat Sheet
 
-### Saúde e Informações
+### Health and Information
 ```bash
 GET  /                              # Health check
 GET  /api/health                    # Health check detalhado
@@ -224,64 +224,64 @@ GET  /docs                          # API docs (Swagger)
 ### Downloads
 ```bash
 POST /api/download                  # Inicia download
-POST /api/video-info                # Info sem baixar
+POST /api/video-info                # Info without download
 ```
 
 ### Jobs
 ```bash
-GET  /api/jobs                      # Lista jobs
-GET  /api/jobs/{id}                 # Status do job
-GET  /api/jobs/{id}/stream          # Stream de progresso (SSE)
-POST /api/jobs/{id}/cancel          # Cancela job
+GET  /api/jobs                      # List jobs
+GET  /api/jobs/{id}                 # Job status
+GET  /api/jobs/{id}/stream          # Progress stream (SSE)
+POST /api/jobs/{id}/cancel          # Cancel job
 DELETE /api/jobs/{id}               # Remove job
 ```
 
-### Biblioteca Local
+### Local Library
 ```bash
-GET  /api/videos                    # Lista vídeos
+GET  /api/videos                    # List videos
 GET  /api/videos/stream/{path}      # Stream (206)
 GET  /api/videos/thumbnail/{path}   # Thumbnail
-PATCH /api/videos/rename/{path}     # Renomear vídeo
+PATCH /api/videos/rename/{path}     # Rename video
 POST /api/videos/update-thumbnail/{path} # Atualizar thumbnail
-POST /api/videos/delete-batch       # Delete em lote
-DELETE /api/videos/{path}           # Exclui vídeo
+POST /api/videos/delete-batch       # Batch delete
+DELETE /api/videos/{path}           # Delete video
 ```
 
-### Gravações
+### Recordings
 ```bash
-POST /api/recordings/upload         # Upload de gravação
+POST /api/recordings/upload         # Recording upload
 ```
 
-### Catálogo (SQLite)
+### Catalog (SQLite)
 ```bash
-GET  /api/catalog/status            # Status do catálogo
-POST /api/catalog/bootstrap-local   # Indexa vídeos locais
-POST /api/catalog/drive/import      # Importa snapshot do Drive
-POST /api/catalog/drive/publish     # Publica snapshot no Drive
-POST /api/catalog/drive/rebuild     # Reconstrói catálogo lendo o Drive
+GET  /api/catalog/status            # Catalog status
+POST /api/catalog/bootstrap-local   # Index local videos
+POST /api/catalog/drive/import      # Import Drive snapshot
+POST /api/catalog/drive/publish     # Publish snapshot to Drive
+POST /api/catalog/drive/rebuild     # Rebuild catalog by reading Drive
 ```
 
 ### Google Drive
 ```bash
-GET  /api/drive/auth-status         # Verifica auth
+GET  /api/drive/auth-status         # Check auth
 GET  /api/drive/auth-url            # URL OAuth
 GET  /api/drive/oauth2callback      # Callback OAuth
-GET  /api/drive/videos              # Lista vídeos
+GET  /api/drive/videos              # List videos
 POST /api/drive/upload/{path}       # Upload individual
 POST /api/drive/upload-external     # Upload externo
 POST /api/drive/sync-all            # Upload em lote
 GET  /api/drive/sync-status         # Status sync
 GET  /api/drive/sync-items          # Itens paginados (diff)
-PATCH /api/drive/videos/{id}/rename # Renomear vídeo
+PATCH /api/drive/videos/{id}/rename # Rename video
 POST /api/drive/videos/{id}/thumbnail # Atualizar thumbnail
 GET  /api/drive/stream/{id}         # Stream (206)
 GET  /api/drive/thumbnail/{id}      # Thumbnail
 GET  /api/drive/custom-thumbnail/{id} # Thumbnail custom
-DELETE /api/drive/videos/{id}       # Remove vídeo + relacionados (retorna cleanup_job_id)
-POST /api/drive/videos/delete-batch # Delete em lote
-GET  /api/drive/videos/{id}/share   # Status do share
-POST /api/drive/videos/{id}/share   # Ativa share
-DELETE /api/drive/videos/{id}/share # Desativa share
+DELETE /api/drive/videos/{id}       # Remove video + related files (returns cleanup_job_id)
+POST /api/drive/videos/delete-batch # Batch delete
+GET  /api/drive/videos/{id}/share   # Share status
+POST /api/drive/videos/{id}/share   # Enable share
+DELETE /api/drive/videos/{id}/share # Disable share
 POST /api/drive/download            # Download (Drive -> local)
 POST /api/drive/download-all        # Download em lote (Drive -> local)
 POST /api/drive/cache/sync          # Sincroniza cache
@@ -292,11 +292,11 @@ DELETE /api/drive/cache             # Limpa cache
 
 ---
 
-## 🐛 Bugs Corrigidos (folha de referencia)
+## 🐛 Bugs Fixed (cheat sheet)
 
-### BUG #1: Local Video Streaming (CORRIGIDO ✅)
-**Erro:** `UnicodeEncodeError: 'latin-1' codec can't encode character '\u29f8'`
-**Arquivo:** `backend/app/library/router.py` (função `stream_video`)
+### BUG #1: Local Video Streaming (FIXED ✅)
+**Error:** `UnicodeEncodeError: 'latin-1' codec can't encode character '\u29f8'`
+**File:** `backend/app/library/router.py` (function `stream_video`)
 **Fix:**
 ```python
 from urllib.parse import quote
@@ -306,9 +306,9 @@ headers = {
 }
 ```
 
-### BUG #2: Drive Upload (CORRIGIDO ✅)
-**Erro:** Query malformada com aspas simples (ex: "60's")
-**Arquivo:** `backend/app/drive/manager.py` (métodos `upload_video`, `ensure_folder`)
+### BUG #2: Drive Upload (FIXED ✅)
+**Error:** Malformed query with single quotes (ex: "60's")
+**File:** `backend/app/drive/manager.py` (methods `upload_video`, `ensure_folder`)
 **Fix:**
 ```python
 escaped_name = name.replace("'", "\\'")
@@ -317,11 +317,11 @@ query = f"name='{escaped_name}' and '{parent_id}' in parents and trashed=false"
 
 ---
 
-## 💡 Padrões de Código
+## 💡 Code Patterns
 
-### Backend (Python) - Arquitetura Modular
+### Backend (Python) - Modular Architecture
 
-#### Padrão de Router (router.py)
+#### Router Pattern (router.py)
 ```python
 from fastapi import APIRouter, Request
 from .service import business_logic
@@ -349,7 +349,7 @@ async def endpoint_name(request: Request, body: RequestModel) -> ResponseModel:
         raise_error(500, ErrorCode.INTERNAL_ERROR, "Internal server error")
 ```
 
-#### Padrão de Service (service.py)
+#### Service Pattern (service.py)
 ```python
 from .schemas import RequestModel
 
@@ -378,7 +378,7 @@ return StreamingResponse(
 
 ### Frontend (TypeScript/React)
 
-#### Padrão de Componente (Client)
+#### Component Pattern (Client)
 ```typescript
 "use client";
 
@@ -409,7 +409,7 @@ export default function ComponentName() {
 }
 ```
 
-#### Padrão de Componente (Server)
+#### Component Pattern (Server)
 ```typescript
 import { fetchLocalVideosPage } from "@/lib/server/api";
 
@@ -419,14 +419,14 @@ export default async function LibraryPage() {
 }
 ```
 
-#### Padrão de chamada de API (client via Next BFF)
+#### API call pattern (client via Next BFF)
 ```typescript
 import { deleteLocalVideo } from "@/lib/client/api";
 
 await deleteLocalVideo("Channel/Video.mp4");
 ```
 
-#### Padrão de chamada de API (Route Handler + revalidação)
+#### API call pattern (Route Handler + revalidation)
 ```typescript
 import { proxyJsonWithRevalidate } from "@/lib/server/route-utils";
 import { CACHE_TAG_SETS } from "@/lib/server/tags";
@@ -442,28 +442,28 @@ export async function POST(request: Request) {
 
 ---
 
-## 🚨 Pontos de Atenção Críticos
+## 🚨 Critical Attention Points
 
 ### Python
-1. **SEMPRE escapar `'` em queries Drive:** `name.replace("'", "\\'")`
-2. **SEMPRE usar RFC 5987 em headers:** `filename*=UTF-8''{quote(name)}`
-3. **SEMPRE ativar venv:** Use `./run.sh`, não `python app/main.py`
-4. **IO bloqueante deve sair do event loop:** use `core/blocking.py` (to_thread)
-5. **Jobs são in-memory:** múltiplos workers exigem storage compartilhado (Redis/DB)
-6. **SEMPRE try/except com traceback em endpoints**
-7. **SEMPRE seguir o padrão modular:** router.py → service.py → schemas.py
+1. **ALWAYS escape `'` in Drive:** `name.replace("'", "\\'")` queries
+2. **ALWAYS use RFC 5987 in headers:** `filename*=UTF-8''{quote(name)}`
+3. **ALWAYS enable venv:** Use `./run.sh`, not `python app/main.py`
+4. **Blocking IO must exit the event loop:** use `core/blocking.py` (to_thread)
+5. **Jobs are in-memory:** multiple workers require shared storage (Redis/DB)
+6. **ALWAYS try/except with traceback on endpoints**
+7. **ALWAYS follow the modular pattern:** router.py → service.py → schemas.py
 
 ### TypeScript
-1. **SEMPRE usar `"use client"` em componentes interativos**
-2. **SEMPRE usar paths absolutos:** `/api/videos` não `api/videos`
-3. **SEMPRE importar CSS do Vidstack no layout:**
-   - `import "@vidstack/react/player/styles/default/theme.css";`
-   - `import "@vidstack/react/player/styles/default/layouts/video.css";`
-4. **SEMPRE tipar variáveis:** Evitar `any`
+1. **ALWAYS use `"use client"` in interactive components**
+2. **ALWAYS use absolute paths:** `/api/videos` not `api/videos`
+3. **ALWAYS import CSS from Vidstack into the layout:**
+- `import "@vidstack/react/player/styles/default/theme.css";`
+- `import "@vidstack/react/player/styles/default/layouts/video.css";`
+4. **ALWAYS type variables:** Avoid `any`
 
 ---
 
-## 🔐 Variáveis de Ambiente e Configuração
+## 🔐 Environment and Configuration Variables
 
 ### Backend (.env)
 ```bash
@@ -485,10 +485,10 @@ JOB_EXPIRY_HOURS=24               # Tempo para limpeza de jobs
 JOB_STORE_BACKEND=memory           # memory | redis
 REDIS_URL=redis://localhost:6379/0 # Usado quando JOB_STORE_BACKEND=redis
 CATALOG_ENABLED=false              # Catálogo SQLite (local + drive)
-CATALOG_DB_PATH=database.db        # Caminho do catálogo
+CATALOG_DB_PATH=database.db        # Catalog path
 CATALOG_DRIVE_AUTO_PUBLISH=true    # Publica snapshot após mutações do Drive
 CATALOG_DRIVE_REQUIRE_IMPORT_BEFORE_PUBLISH=true  # Proteção contra overwrite
-CATALOG_DRIVE_ALLOW_LEGACY_LISTING_FALLBACK=false # Fallback para listagem direta
+CATALOG_DRIVE_ALLOW_LEGACY_LISTING_FALLBACK=false # Fallback to direct listing
 BLOCKING_DRIVE_CONCURRENCY=3       # Limite de IO bloqueante (Drive)
 BLOCKING_FS_CONCURRENCY=2          # Limite de IO bloqueante (filesystem)
 BLOCKING_CATALOG_CONCURRENCY=4     # Limite de IO bloqueante (catalog)
@@ -498,9 +498,9 @@ DRIVE_CACHE_SYNC_INTERVAL=30       # Minutos entre syncs
 DRIVE_CACHE_FALLBACK_TO_API=true   # Fallback para API quando cache falhar
 DRIVE_UPLOAD_CHUNK_SIZE=8388608    # Chunk size para upload resumable
 
-# Para lista completa de variáveis, veja `backend/app/config.py`.
+# For the complete list of variables, see `backend/app/config.py`.
 
-# Arquivos de configuração:
+# Configuration files:
 backend/credentials.json    # OAuth Google (obter no Cloud Console)
 backend/token.json          # Gerado automaticamente após auth
 backend/archive.txt         # Gerado automaticamente
@@ -517,9 +517,9 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ---
 
-## 🛠️ Comandos de Desenvolvimento
+## 🛠️ Development Commands
 
-### Configuração Inicial
+### Initial Setup
 ```bash
 # Backend
 cd backend
@@ -532,7 +532,7 @@ cd frontend
 npm install
 ```
 
-### Desenvolvimento
+### Development
 ```bash
 # Backend (uvicorn com hot reload)
 cd backend && ./run.sh
@@ -550,13 +550,13 @@ cd frontend && npm run dev
 ./start-dev.sh
 ```
 
-### Testes
+### Tests
 ```bash
 # Backend - Testes automatizados (pytest) - 63 testes (sem drive_cache)
 cd backend && source .venv/bin/activate
 python -m pytest -q -k "not drive_cache"
 python -m pytest tests/ --cov=app --cov-report=html -k "not drive_cache"
-python -m pytest tests/test_validators.py -v  # Apenas um arquivo
+python -m pytest tests/test_validators.py -v  # Single file
 
 # Frontend - Lint e Build
 cd frontend
@@ -574,7 +574,7 @@ curl http://localhost:8000/api/drive/auth-status
 # Frontend: console do navegador (F12)
 ```
 
-### Depuração
+### Debugging
 ```bash
 # Matar processos travados
 lsof -ti:8000 | xargs kill -9  # Backend
@@ -589,7 +589,7 @@ cd frontend && npm run build && npm start
 
 ---
 
-## 📊 Modelo de Dados
+## 📊 Data Model
 
 ### DownloadRequest (API)
 ```python
@@ -612,10 +612,10 @@ cd frontend && npm run build && npm start
 }
 ```
 
-Notas (Download):
-- Diretório de saída é fixo (`DOWNLOADS_DIR`).
-- Naming: `Uploader/Playlist/Titulo.ext` (sem data/ID).
-- Se o arquivo já existir, o download falha e não sobrescreve.
+Notes (Download):
+- Output directory is fixed (`DOWNLOADS_DIR`).
+- Naming: `Uploader/Playlist/Titulo.ext` (without date/ID).
+- If the file already exists, the download fails and does not overwrite.
 
 ### Job (Response)
 ```python
@@ -655,30 +655,30 @@ Notas (Download):
 
 ---
 
-## 🎯 Matriz de Solução de Problemas
+## 🎯 Problem Solving Matrix
 
-| Sintoma | Causa Provável | Solução |
+| Symptom | Probable Cause | Solution |
 |---------|----------------|---------|
-| 500 ao fazer stream local | UnicodeEncodeError | ✅ Corrigido em `app/library/router.py` |
-| 500 ao fazer upload Drive | Aspas não escapadas | ✅ Corrigido em `app/drive/manager.py` |
-| ModuleNotFoundError | venv não ativado | Use `./run.sh` |
-| Import error no uvicorn | Estrutura de pasta errada | Verifique `backend/app/` existe |
-| Address in use (8000) | Backend travado | `lsof -ti:8000 \| xargs kill -9` |
-| Frontend não conecta | Backend não rodando | `cd backend && ./run.sh` |
-| No video formats found | DRM ou URL inválida | Verificar URL, tentar cookies |
-| Upload Drive falha | credentials.json faltando | Ver GOOGLE-DRIVE-SETUP.md |
-| Player não carrega | CSS do Vidstack ausente | Importar estilos no layout.tsx |
-| Vídeos não aparecem | Ainda baixando | Aguardar job completar |
+| 500 when streaming local | UnicodeEncodeError | ✅ Fixed in `app/library/router.py` |
+| 500 when uploading Drive | Unescaped quotation marks | ✅ Fixed in `app/drive/manager.py` |
+| ModuleNotFoundError | venv not activated | Use `./run.sh` |
+| Import error in uvicorn | Wrong folder structure | Check `backend/app/` exists |
+| Address in use (8000) | Backend crashed | `lsof -ti:8000 \| xargs kill -9` |
+| Frontend does not connect | Backend not running | `cd backend && ./run.sh` |
+| No video formats found | DRM or invalid URL | Check URL, try cookies |
+| Upload Drive fails | missing credentials.json | See GOOGLE-DRIVE-SETUP.md |
+| Player does not load | Vidstack CSS missing | Import styles in layout.tsx |
+| Videos do not appear | Still downloading | Wait for job to complete |
 
 ---
 
-## 📚 Links Úteis
+## 📚 Useful Links
 
-- **Documentação do Projeto:** `README.md`
-- **Guia para Claude:** `CLAUDE.md`
+- **Project Documentation:** `README.md`
+- **Guide for Claude:** `CLAUDE.md`
 - **Bug Tracking:** `BUGS.md`
 - **Setup Google Drive:** `GOOGLE-DRIVE-SETUP.md`
-- **API Interativa:** http://localhost:8000/docs
+- **Interactive API:** http://localhost:8000/docs
 - **yt-dlp Docs:** https://github.com/yt-dlp/yt-dlp
 - **FastAPI Docs:** https://fastapi.tiangolo.com/
 - **Next.js 15 Docs:** https://nextjs.org/docs
@@ -686,16 +686,16 @@ Notas (Download):
 
 ---
 
-**Este documento é uma referência rápida. Para detalhes completos, consulte os arquivos de documentação principais.**
+**This document is a quick reference. For full details, see the main documentation files.**
 
 
-## Observabilidade
+## Observability
 
-- /metrics (Prometheus) quando METRICS_ENABLED=true
-- /api/health para status detalhado
-- Stack local (Prometheus + Grafana): `docker compose -f docker-compose.observability.yml up -d`
-  - Prometheus: `http://localhost:9090`
-  - Grafana: `http://localhost:3001`
-  - Dashboards: `ops/observability/grafana/dashboards/`
-  - Alertas: `ops/observability/alerts.yml`
-  - Guia completo: `docs/project/OBSERVABILITY.md`
+- /metrics (Prometheus) when METRICS_ENABLED=true
+- /api/health for detailed status
+- Local stack (Prometheus + Grafana): `docker compose -f docker-compose.observability.yml up -d`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3001`
+- Dashboards: `ops/observability/grafana/dashboards/`
+- Alerts: `ops/observability/alerts.yml`
+- Complete guide: `docs/project/OBSERVABILITY.md`

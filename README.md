@@ -1,5 +1,7 @@
 # YT-Archiver
 
+[**PT-BR**](./README.md) | [EN](./README.en.md)
+
 <div align="center">
   <img src="./media/YT-ARCHIVER_BANNER_2.png" width="90%"/>
   <br/>
@@ -155,6 +157,7 @@ npm run dev
 ### Ponto de Entrada (oficial)
 
 - Índice geral: **[INDEX.md](./docs/project/INDEX.md)**
+- Índice em inglês: **[en/INDEX.md](./docs/project/en/INDEX.md)**
 
 ### Leitura Recomendada
 

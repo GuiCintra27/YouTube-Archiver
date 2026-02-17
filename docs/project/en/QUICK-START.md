@@ -1,10 +1,10 @@
-# 🚀 Início Rápido - Interface Web do YT-Archiver
+# 🚀 Quick Start - YT-Archiver Web Interface
 
-[**PT-BR**](./QUICK-START.md) | [EN](./en/QUICK-START.md)
+[PT-BR](../QUICK-START.md) | **EN**
 
-## Teste em 3 Passos
+## Test in 3 Steps
 
-### 1️⃣ Instalar Dependências
+### 1️⃣ Install Dependencies
 
 ```bash
 # Backend
@@ -20,9 +20,9 @@ npm install
 cd ..
 ```
 
-### 2️⃣ Iniciar Servidores
+### 2️⃣ Start Servers
 
-**Opção A - Script Automático (Recomendado)**
+**Option A - Automatic Script (Recommended)**
 
 ```bash
 # Linux/Mac
@@ -32,12 +32,12 @@ cd ..
 start-dev.bat
 ```
 
-O script:
-- instala dependências do backend
-- instala dependências do frontend (se `node_modules` não existir)
-- verifica `ffmpeg` no sistema (não instala automaticamente)
+The script:
+- install backend dependencies
+- install frontend dependencies (if `node_modules` does not exist)
+- checks for `ffmpeg` on the system (does not install automatically)
 
-**Opção B - Manual**
+**Option B - Manual**
 
 Terminal 1:
 ```bash
@@ -52,62 +52,62 @@ cd frontend
 npm run dev
 ```
 
-### 3️⃣ Testar
+### 3️⃣ Test
 
-1. Abra o navegador em: **http://localhost:3000**
-2. Cole uma URL de teste (exemplo abaixo)
-3. Clique em "Baixar"
-4. Veja o progresso em tempo real!
+1. Open the browser at: **http://localhost:3000**
+2. Paste a test URL (example below)
+3. Click "Download"
+4. See progress in real time!
 
-## 🎬 URLs de Teste
+## 🎬 Test URLs
 
-### YouTube (Vídeo Público)
+### YouTube (Public Video)
 
 ```
 https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ```
 
-### YouTube (Playlist Pública)
+### YouTube (Public Playlist)
 
 ```
 https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf
 ```
 
-### Testar com Opções Avançadas
+### Test with Advanced Options
 
-1. Clique em "Opções Avançadas"
+1. Click on "Advanced Options"
 2. Configure:
-   - **Resolução Máxima**: 720
-   - **Apenas Áudio**: ON
-   - **Nome do Arquivo**: "Teste Download"
-3. Baixe e veja o resultado!
+- **Maximum Resolution**: 720
+- **Audio Only**: ON
+- **File Name**: "Test Download"
+3. Download and see the result!
 
-## 📊 Verificar API
+## 📊 Check API
 
-Abra: **http://localhost:8000/docs**
+Open: **http://localhost:8000/docs**
 
-Interface Swagger interativa com todos os endpoints.
+Interactive Swagger interface with all endpoints.
 
-## 📦 Catálogo (primeira execução)
+## 📦 Catalog (first run)
 
-Se você pretende usar o Drive ou já tem vídeos locais:
+If you plan to use Drive or already have local videos:
 
-1. **Indexar vídeos locais**
-   - `POST /api/catalog/bootstrap-local`
-2. **Drive em máquina nova (snapshot já existe)**
-   - `POST /api/catalog/drive/import`
-3. **Drive já populado, sem snapshot**
-   - `POST /api/catalog/drive/rebuild`
+1. **Index local videos**
+- `POST /api/catalog/bootstrap-local`
+2. **Drive on new machine (snapshot already exists)**
+- `POST /api/catalog/drive/import`
+3. **Drive already populated, no snapshot**
+- `POST /api/catalog/drive/rebuild`
 
-## 🐛 Solução de Problemas Rápida
+## 🐛 Quick Troubleshooting
 
-### Backend não inicia
+### Backend does not start
 
 ```bash
-# Verificar ffmpeg
+# Check ffmpeg
 ffmpeg -version
 
-# Se não instalado:
+# If not installed:
 # Ubuntu/Debian
 sudo apt install ffmpeg
 
@@ -115,23 +115,23 @@ sudo apt install ffmpeg
 brew install ffmpeg
 
 # Windows
-# Baixar de: https://ffmpeg.org/download.html
+# Download from: https://ffmpeg.org/download.html
 ```
 
-### Frontend não conecta
+### Frontend does not connect
 
-Verificar se o backend está rodando:
+Check if the backend is running:
 ```bash
 curl http://localhost:8000/
 ```
 
-### Porta já em uso
+### Port already in use
 
 ```bash
-# Matar processo na porta
+# Kill process on port
 lsof -ti:8000 | xargs kill -9
 
-# Ou mudar porta do backend
+# Or change backend port
 cd backend
 source .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
@@ -143,14 +143,14 @@ source .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8001
 │  YT-Archiver                                            │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
-│  Baixe vídeos de forma simples                         │
-│  Suporte para YouTube, playlists e streams HLS         │
+│  Download videos in a simple way                         │
+│  Support for YouTube, playlists and HLS streams         │
 │                                                         │
 │  ┌───────────────────────────────────┐  ┌──────────┐  │
-│  │ https://youtube.com/watch?v=...   │  │  Baixar  │  │
+│  │ https://youtube.com/watch?v=...   │  │  Download  │  │
 │  └───────────────────────────────────┘  └──────────┘  │
 │                                                         │
-│  ▼ Opções Avançadas                                    │
+│  ▼ Advanced Options                                    │
 │                                                         │
 │  ╔═══════════════════════════════════════════════════╗ │
 │  ║ Baixando...                              45%      ║ │
@@ -165,21 +165,21 @@ source .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8001
 └─────────────────────────────────────────────────────────┘
 ```
 
-## 🎯 Próximos Passos
+## 🎯 Next Steps
 
-Após testar, explore:
+After testing, explore:
 
-1. **Opções Avançadas** - Headers customizados, cookies, etc
+1. **Advanced Options** - Custom headers, cookies, etc.
 2. **API Docs** - http://localhost:8000/docs
-3. **Histórico** - Ver downloads anteriores via API
-4. **CLI legado** - removido do monorepo atual (use tags antigas, se necessário)
+3. **History** - View previous downloads via API
+4. **legacy CLI** - removed from current monorepo (use old tags if necessary)
 
-## 📚 Documentação Completa
+## 📚 Complete Documentation
 
-- [README.md](../../README.md) - Documentação completa do projeto
-- [WEB-UI-README.md](../../frontend/docs/project/WEB-UI-README.md) - Detalhes da interface web
-- [CLAUDE.md](../../CLAUDE.md) - Instruções para desenvolvimento
+- [README.md](../../../README.en.md) - Complete project documentation
+- [WEB-UI-README.md](../../../frontend/docs/project/WEB-UI-README.md) - Web interface details
+- [CLAUDE.md](../../../CLAUDE.md) - Instructions for development
 
 ---
 
-**Divirta-se! 🎉**
+**Have fun! 🎉**

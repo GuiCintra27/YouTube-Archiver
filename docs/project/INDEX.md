@@ -1,5 +1,7 @@
 # Índice da Documentação
 
+[**PT-BR**](./INDEX.md) | [EN](./en/INDEX.md)
+
 Este índice agrupa a documentação principal do projeto para acesso rápido.
 
 ## Primeiros Passos
@@ -28,3 +30,7 @@ Este índice agrupa a documentação principal do projeto para acesso rápido.
 ## Arquivo
 
 - **Docs arquivadas:** [archive](./archive/README.md)
+
+## Versão em inglês
+
+- **Documentation Index (EN):** [en/INDEX.md](./en/INDEX.md)

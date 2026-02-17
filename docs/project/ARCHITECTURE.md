@@ -1,5 +1,7 @@
 # YT-Archiver - Visão Geral da Arquitetura
 
+[**PT-BR**](./ARCHITECTURE.md) | [EN](./en/ARCHITECTURE.md)
+
 ## Objetivo
 
 Documentar a arquitetura do YT-Archiver para facilitar entendimento técnico, onboarding e apresentação para recrutadores.

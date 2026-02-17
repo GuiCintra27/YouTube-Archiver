@@ -1,5 +1,7 @@
 # 🚀 Nova Funcionalidade: Integração com Google Drive
 
+[**PT-BR**](./GOOGLE-DRIVE-FEATURES.md) | [EN](./en/GOOGLE-DRIVE-FEATURES.md)
+
 ## ✨ O que foi implementado
 
 ### Backend (API)

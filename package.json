@@ -3,11 +3,15 @@
   "version": "2.0.0",
   "description": "Sistema completo de download e arquivamento de vídeos do YouTube com interface web e integração com Google Drive",
   "scripts": {
-    "commit": "cz"
+    "commit": "cz",
+    "docs:check-links": "node scripts/docs/check-links.mjs",
+    "docs:check-i18n": "node scripts/docs/validate-i18n.mjs",
+    "docs:check": "npm run docs:check-i18n && npm run docs:check-links"
   },
   "devDependencies": {
     "commitizen": "^4.3.1",
-    "cz-conventional-changelog": "^3.3.0"
+    "cz-conventional-changelog": "^3.3.0",
+    "markdown-link-check": "^3.12.2"
   },
   "config": {
     "commitizen": {

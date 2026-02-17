@@ -1,5 +1,7 @@
 # Global Player com Picture-in-Picture
 
+[**PT-BR**](./GLOBAL-PLAYER.md) | [EN](./en/GLOBAL-PLAYER.md)
+
 ## Visão Geral
 
 O Global Player é um player de vídeo persistente que permite reproduzir vídeos em background enquanto navega pelo site, com suporte a Picture-in-Picture (PiP) nativo do navegador.

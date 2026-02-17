@@ -1,5 +1,7 @@
 # Configuração do Google Drive
 
+[**PT-BR**](./GOOGLE-DRIVE-SETUP.md) | [EN](./en/GOOGLE-DRIVE-SETUP.md)
+
 Este guia explica como configurar a integração com Google Drive para sincronizar seus vídeos.
 
 ## 📋 Pré-requisitos

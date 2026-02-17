@@ -1,5 +1,7 @@
 # Observabilidade local (Prometheus + Grafana)
 
+[**PT-BR**](./OBSERVABILITY.md) | [EN](./en/OBSERVABILITY.md)
+
 Este setup adiciona um painel visual com Grafana e coleta de métricas via Prometheus.
 
 ## Pré-requisitos
